@@ -1,0 +1,82 @@
+/* AOC PageSpeed — generated from design/tokens.json (Design System mirror). Do not edit. */
+:root {
+  --surface-100: #f4f7fb;
+  --surface-200: #ffffff;
+  --surface-300: #e6edf8;
+  --border: #c9d5e6;
+  --border-strong: #6f86a8;
+  --ink: #0b1b33;
+  --ink-muted: #45587a;
+  --primary: #0a5cff;
+  --primary-hover: #0847c4;
+  --on-primary: #ffffff;
+  --primary-subtle: #dbe7ff;
+  --on-primary-subtle: #0a3a9e;
+  --link: #0847c4;
+  --brand-deep: #0b2a6e;
+  --danger: #b4283c;
+  --danger-subtle: #fbe8eb;
+  --on-danger-subtle: #8a1a2c;
+  --ok: #0a6f85;
+  --warning: #8a5200;
+  --focus-ring: var(--primary);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --font-sans: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-100: #070d1a;
+    --surface-200: #0d1830;
+    --surface-300: #14233f;
+    --border: #22365a;
+    --border-strong: #5f7aa8;
+    --ink: #e6eefc;
+    --ink-muted: #9db0d0;
+    --primary: #4d8dff;
+    --primary-hover: #7aa9ff;
+    --on-primary: #04122e;
+    --primary-subtle: #1a3570;
+    --on-primary-subtle: #cfe0ff;
+    --link: #8ab3ff;
+    --brand-deep: #1e44a0;
+    --danger: #ff7a8a;
+    --danger-subtle: #2e1219;
+    --on-danger-subtle: #ffb8c1;
+    --ok: #3cc7d9;
+    --warning: #f2b24a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --surface-100: #070d1a;
+  --surface-200: #0d1830;
+  --surface-300: #14233f;
+  --border: #22365a;
+  --border-strong: #5f7aa8;
+  --ink: #e6eefc;
+  --ink-muted: #9db0d0;
+  --primary: #4d8dff;
+  --primary-hover: #7aa9ff;
+  --on-primary: #04122e;
+  --primary-subtle: #1a3570;
+  --on-primary-subtle: #cfe0ff;
+  --link: #8ab3ff;
+  --brand-deep: #1e44a0;
+  --danger: #ff7a8a;
+  --danger-subtle: #2e1219;
+  --on-danger-subtle: #ffb8c1;
+  --ok: #3cc7d9;
+  --warning: #f2b24a;
+  color-scheme: dark;
+}
