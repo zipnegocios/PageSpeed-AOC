@@ -1,6 +1,8 @@
 // Punto de entrada que corre antes de levantar el web: `node migrate-cli.cjs && node server.js`.
 // Solo necesita DATABASE_URL; no valida el resto del entorno.
 import { Client } from "pg";
+import { seedAdminFromEnv } from "@/server/services/admin-auth";
+import { createDb } from "./client";
 import { runMigrations } from "./migrate";
 
 const ATTEMPTS = Number(process.env.MIGRATE_CONNECT_ATTEMPTS ?? 10);
@@ -47,6 +49,30 @@ async function main() {
   await waitForDb(url);
   await runMigrations(url, folder);
   console.log(`[migrate] migraciones al día en ${describeTarget(url)} (${Date.now() - started} ms)`);
+  await seedAdmin(url);
+}
+
+/** Crea el admin único la primera vez. Nunca detiene el arranque ni imprime la contraseña. */
+async function seedAdmin(url: string) {
+  const { db, pool } = createDb(url, 1);
+  try {
+    const result = await seedAdminFromEnv(
+      { ADMIN_EMAIL: process.env.ADMIN_EMAIL, ADMIN_PASSWORD: process.env.ADMIN_PASSWORD },
+      db,
+    );
+    const messages = {
+      created: "administrador creado",
+      exists: "ya existe un administrador",
+      "missing-env": "no hay administrador y faltan ADMIN_EMAIL / ADMIN_PASSWORD; no podrás iniciar sesión",
+      invalid: "ADMIN_EMAIL o ADMIN_PASSWORD no son válidos (la contraseña necesita al menos 12 caracteres)",
+    } as const;
+    const log = result === "created" || result === "exists" ? console.log : console.error;
+    log(`[seed] ${messages[result]}`);
+  } catch (err) {
+    console.error("[seed] no se pudo comprobar el administrador:", err instanceof Error ? err.message : err);
+  } finally {
+    await pool.end();
+  }
 }
 
 main().catch((err) => {
