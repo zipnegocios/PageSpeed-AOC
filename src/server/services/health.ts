@@ -114,6 +114,8 @@ export async function checkR2(cfg: {
     forcePathStyle: true,
     credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
     maxAttempts: 1,
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
   try {
     await client.send(new HeadBucketCommand({ Bucket: cfg.bucket }));

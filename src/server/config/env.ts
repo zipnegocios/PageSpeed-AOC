@@ -55,6 +55,35 @@ export function envIssues(source: Record<string, string | undefined>): string[] 
   return [...new Set(result.error.issues.map((i) => String(i.path[0] ?? "?")))];
 }
 
+// ------------------------------------------------------------ entorno del worker
+// El worker no necesita sesión, admin ni correo (el correo entra con las alertas).
+const workerSchema = schema.pick({
+  NODE_ENV: true,
+  LOG_LEVEL: true,
+  DATABASE_URL: true,
+  REDIS_URL: true,
+  R2_ENDPOINT: true,
+  R2_REGION: true,
+  R2_BUCKET: true,
+  R2_ACCESS_KEY_ID: true,
+  R2_SECRET_ACCESS_KEY: true,
+  CHROME_PATH: true,
+  AUDIT_COOLDOWN_MS: true,
+  AUDIT_TIMEOUT_MS: true,
+  AUDIT_ATTEMPTS: true,
+});
+
+export type WorkerEnv = z.infer<typeof workerSchema>;
+
+export function parseWorkerEnv(source: Record<string, string | undefined>): WorkerEnv {
+  const result = workerSchema.safeParse(source);
+  if (!result.success) {
+    const names = [...new Set(result.error.issues.map((i) => String(i.path[0] ?? "?")))];
+    throw new Error(`Variables de entorno del worker ausentes o inválidas: ${names.join(", ")}`);
+  }
+  return result.data;
+}
+
 let cached: Env | undefined;
 /** Validated process.env, parsed once. Never import this from client components. */
 export function env(): Env {
