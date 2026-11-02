@@ -9,7 +9,7 @@ RUN pnpm install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm build
+RUN pnpm build && pnpm migrate:build
 
 FROM node:22-slim AS run
 WORKDIR /app
@@ -17,5 +17,8 @@ ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+# Migraciones de Drizzle: se aplican antes de servir tráfico.
+COPY --from=build /app/dist/migrate-cli.cjs ./migrate-cli.cjs
+COPY --from=build /app/drizzle ./drizzle
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node migrate-cli.cjs && exec node server.js"]

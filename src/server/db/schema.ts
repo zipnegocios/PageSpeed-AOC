@@ -1,2 +1,325 @@
-// Esquema Drizzle completo en M1 (ver plan, sección 1).
-export {};
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  customType,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+/**
+ * Esquema de AOC PageSpeed. Postgres guarda solo el índice liviano de auditorías,
+ * metadatos y configuración; el JSON completo de cada auditoría vive en R2.
+ * Convenciones: PK uuid, timestamptz en UTC, soft-delete solo en clients y projects.
+ */
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+const timestamps = {
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+};
+
+// ---------------------------------------------------------------- enums
+export const clientStatus = pgEnum("client_status", ["active", "suspended"]);
+export const projectPhase = pgEnum("project_phase", ["development", "production"]);
+export const auditFrequency = pgEnum("audit_frequency", ["weekly", "daily"]);
+export const authStrategy = pgEnum("auth_strategy", ["none", "cookie", "script"]);
+export const routeSource = pgEnum("route_source", ["sitemap", "manual", "adhoc"]);
+export const alertMetric = pgEnum("alert_metric", [
+  "performance",
+  "seo",
+  "accessibility",
+  "best_practices",
+]);
+export const auditProfile = pgEnum("audit_profile", ["mobile", "desktop"]);
+export const auditTrigger = pgEnum("audit_trigger", ["scheduled", "manual", "mcp"]);
+export const auditStatus = pgEnum("audit_status", ["queued", "running", "succeeded", "failed"]);
+export const alertKind = pgEnum("alert_kind", ["threshold", "audit_failure"]);
+export const alertStateStatus = pgEnum("alert_state_status", ["open", "resolved", "suppressed"]);
+export const notificationType = pgEnum("notification_type", [
+  "initial",
+  "reminder",
+  "failure",
+  "report",
+]);
+export const notificationStatus = pgEnum("notification_status", ["sent", "failed"]);
+
+// -------------------------------------------------------------- clients
+export const clients = pgTable("clients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  // Inmutable: forma el prefijo de R2 (cliente/proyecto/año/mes/...).
+  slug: text("slug").notNull().unique(),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  // Para generar el link wa.me con el mensaje prellenado.
+  contactPhone: text("contact_phone"),
+  status: clientStatus("status").notNull().default("active"),
+  // Link mágico permanente: 32 bytes aleatorios en base64url. Rotable.
+  magicToken: text("magic_token").notNull().unique(),
+  magicTokenRotatedAt: timestamp("magic_token_rotated_at", { withTimezone: true }),
+  notes: text("notes"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  ...timestamps,
+});
+
+// ------------------------------------------------------------- projects
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    // Inmutable, único dentro del cliente.
+    slug: text("slug").notNull(),
+    baseUrl: text("base_url").notNull(),
+    // Lista de hosts permitidos (anti-SSRF). Por defecto, el host de base_url.
+    allowedHosts: text("allowed_hosts")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    phase: projectPhase("phase").notNull().default("development"),
+    phaseChangedAt: timestamp("phase_changed_at", { withTimezone: true }).notNull().defaultNow(),
+    // Relevante solo en producción; daily = tier prioritario.
+    auditFrequency: auditFrequency("audit_frequency").notNull().default("weekly"),
+    sitemapUrl: text("sitemap_url"),
+    lastSitemapScanAt: timestamp("last_sitemap_scan_at", { withTimezone: true }),
+    authStrategy: authStrategy("auth_strategy").notNull().default("none"),
+    // AES-256-GCM con AUTH_ENCRYPTION_KEY. Usuario de prueba dedicado, nunca el admin real.
+    authConfigEnc: bytea("auth_config_enc"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [unique("projects_client_slug_unique").on(t.clientId, t.slug)],
+);
+
+// --------------------------------------------------------------- routes
+export const routes = pgTable(
+  "routes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // Normalizado: empieza con "/", sin fragmento.
+    path: text("path").notNull(),
+    url: text("url").notNull(),
+    label: text("label"),
+    source: routeSource("source").notNull().default("manual"),
+    // true = entra a las auditorías programadas de producción.
+    // false = candidata del sitemap o página ad-hoc auditada bajo demanda.
+    monitored: boolean("monitored").notNull().default(false),
+    requiresAuth: boolean("requires_auth").notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [unique("routes_project_path_unique").on(t.projectId, t.path)],
+);
+
+// ----------------------------------------------------- alert_thresholds
+export const alertThresholds = pgTable(
+  "alert_thresholds",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    metric: alertMetric("metric").notNull(),
+    minScore: smallint("min_score").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    // Corridas consecutivas bajo el umbral antes de alertar (D2). MVP: 1.
+    confirmRuns: smallint("confirm_runs").notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.metric] }),
+    check("alert_thresholds_min_score_range", sql`${t.minScore} between 0 and 100`),
+    check("alert_thresholds_confirm_runs_min", sql`${t.confirmRuns} >= 1`),
+  ],
+);
+
+// ----------------------------------------------------------- audit_logs
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    // = jobId de BullMQ. Se crea al encolar.
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    routeId: uuid("route_id")
+      .notNull()
+      .references(() => routes.id, { onDelete: "cascade" }),
+    profile: auditProfile("profile").notNull(),
+    trigger: auditTrigger("trigger").notNull(),
+    requestedBy: text("requested_by"),
+    // Snapshot de la fase del proyecto al ejecutar.
+    phaseAtRun: projectPhase("phase_at_run").notNull(),
+    status: auditStatus("status").notNull().default("queued"),
+    attempts: smallint("attempts").notNull().default(0),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    scorePerformance: smallint("score_performance"),
+    scoreSeo: smallint("score_seo"),
+    scoreAccessibility: smallint("score_accessibility"),
+    scoreBestPractices: smallint("score_best_practices"),
+    lcpMs: integer("lcp_ms"),
+    cls: numeric("cls", { precision: 7, scale: 4 }),
+    tbtMs: integer("tbt_ms"),
+    fcpMs: integer("fcp_ms"),
+    ttfbMs: integer("ttfb_ms"),
+    // Lighthouse en modo navigation no mide INP; queda nullable (decisión D1).
+    inpMs: integer("inp_ms"),
+    lighthouseVersion: text("lighthouse_version"),
+    finalUrl: text("final_url"),
+    httpStatus: smallint("http_status"),
+    // Clave completa del JSON en R2; se persiste, no se reconstruye.
+    r2Key: text("r2_key"),
+    queuedAt: timestamp("queued_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+  },
+  (t) => [
+    index("audit_logs_route_profile_finished_idx").on(t.routeId, t.profile, t.finishedAt.desc()),
+    index("audit_logs_project_finished_idx").on(t.projectId, t.finishedAt.desc()),
+    index("audit_logs_status_queued_idx").on(t.status, t.queuedAt),
+    // Idempotencia: una sola auditoría pendiente por ruta + perfil.
+    uniqueIndex("audit_logs_pending_unique")
+      .on(t.routeId, t.profile)
+      .where(sql`${t.status} in ('queued', 'running')`),
+    check(
+      "audit_logs_scores_range",
+      sql`(${t.scorePerformance} is null or ${t.scorePerformance} between 0 and 100)
+        and (${t.scoreSeo} is null or ${t.scoreSeo} between 0 and 100)
+        and (${t.scoreAccessibility} is null or ${t.scoreAccessibility} between 0 and 100)
+        and (${t.scoreBestPractices} is null or ${t.scoreBestPractices} between 0 and 100)`,
+    ),
+  ],
+);
+
+// --------------------------------------------------------- alert_states
+export const alertStates = pgTable(
+  "alert_states",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    routeId: uuid("route_id")
+      .notNull()
+      .references(() => routes.id, { onDelete: "cascade" }),
+    profile: auditProfile("profile").notNull(),
+    kind: alertKind("kind").notNull(),
+    // null cuando kind = audit_failure.
+    metric: alertMetric("metric"),
+    status: alertStateStatus("status").notNull().default("open"),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+    openedByAuditId: uuid("opened_by_audit_id").references(() => auditLogs.id, {
+      onDelete: "set null",
+    }),
+    lastValue: smallint("last_value"),
+    thresholdAtOpen: smallint("threshold_at_open"),
+    lastNotifiedAt: timestamp("last_notified_at", { withTimezone: true }),
+    reminderCount: smallint("reminder_count").notNull().default(0),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedByAuditId: uuid("resolved_by_audit_id").references(() => auditLogs.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (t) => [
+    // Máximo un estado abierto por condición. Dos índices parciales (uno por tipo) porque
+    // metric es null en audit_failure y castear un enum a texto no es IMMUTABLE en Postgres.
+    uniqueIndex("alert_states_open_threshold_unique")
+      .on(t.routeId, t.profile, t.metric)
+      .where(sql`${t.status} = 'open' and ${t.kind} = 'threshold'`),
+    uniqueIndex("alert_states_open_failure_unique")
+      .on(t.routeId, t.profile)
+      .where(sql`${t.status} = 'open' and ${t.kind} = 'audit_failure'`),
+    index("alert_states_status_notified_idx").on(t.status, t.lastNotifiedAt),
+    check(
+      "alert_states_metric_matches_kind",
+      sql`(${t.kind} = 'threshold' and ${t.metric} is not null)
+        or (${t.kind} = 'audit_failure' and ${t.metric} is null)`,
+    ),
+  ],
+);
+
+// -------------------------------------------------------- notifications
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    type: notificationType("type").notNull(),
+    channel: text("channel").notNull().default("email"),
+    recipient: text("recipient").notNull(),
+    subject: text("subject").notNull(),
+    alertStateIds: uuid("alert_state_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
+    status: notificationStatus("status").notNull(),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("notifications_project_sent_idx").on(t.projectId, t.sentAt.desc())],
+);
+
+// -------------------------------------------------------- mcp_api_keys
+export const mcpApiKeys = pgTable("mcp_api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  // sha256 de la clave; la clave en claro se muestra una sola vez al crearla.
+  keyHash: text("key_hash").notNull().unique(),
+  // Allowlist de tools MCP que esta clave puede usar.
+  scopes: text("scopes")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// --------------------------------------------------------- admin_users
+// Admin único: la app crea la fila del primer arranque; no hay registro público.
+export const adminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  ...timestamps,
+});
+
+// ------------------------------------------------------------- settings
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
