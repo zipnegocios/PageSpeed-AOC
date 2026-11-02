@@ -155,6 +155,12 @@ describe.skipIf(!url)("servicios de dominio", () => {
         "INVALID",
         /no es un host válido/,
       );
+      // Los espacios no separan hosts: "host con espacios" no se acepta como tres hosts sueltos.
+      await rejectsWith(
+        projects.updateProject(p.id, { name: "Web", baseUrl: "https://acme.test", auditFrequency: "weekly", allowedHosts: "host con espacios" }, db),
+        "INVALID",
+        /no es un host válido/,
+      );
     });
 
     it("pasar a desarrollo silencia las alertas abiertas; pasar a producción no toca nada", async () => {

@@ -19,10 +19,15 @@ export function normalizeBaseUrl(input: string): string {
   return parseHttpUrl(input).origin;
 }
 
-/** Lista de hosts permitidos desde texto libre (uno por línea o separados por comas). */
+/**
+ * Lista de hosts permitidos desde texto libre. Se separa solo por líneas o comas (nunca por
+ * espacios): así un error como "host con espacios" se rechaza en lugar de aceptarse en silencio.
+ */
 export function parseAllowedHosts(text: string | undefined, baseUrl: string): string[] {
   const hosts = new Set<string>([normalizeHost(new URL(baseUrl).hostname)]);
-  for (const entry of (text ?? "").split(/[\s,]+/).filter(Boolean)) {
+  for (const raw of (text ?? "").split(/[\n,;]+/)) {
+    const entry = raw.trim();
+    if (!entry) continue;
     const host = normalizeHost(entry.replace(/^https?:\/\//i, "").split("/")[0]!.split(":")[0]!);
     if (!HOST_RE.test(host) || host.length > 253) {
       throw new DomainError("INVALID", `"${entry}" no es un host válido. Usa por ejemplo www.ejemplo.com o *.ejemplo.com.`);

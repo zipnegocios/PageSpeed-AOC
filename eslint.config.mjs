@@ -10,6 +10,13 @@ export default defineConfig([
   ...nextTs,
   globalIgnores([".next/**", "dist/**", "next-env.d.ts", "drizzle/**"]),
   {
+    // Los parámetros que empiezan con "_" son obligatorios por la firma (p. ej. el estado
+    // previo de las Server Actions) y pueden quedar sin usar.
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
+  },
+  {
     files: ["src/app/**/*.{ts,tsx}", "src/mcp/**/*.ts"],
     rules: {
       "no-restricted-imports": [
