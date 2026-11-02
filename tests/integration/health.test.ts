@@ -24,14 +24,42 @@ describe.skipIf(!dbUrl)("salud: Postgres", () => {
   });
 });
 
+// No depende del Redis del entorno: algunos (como el de la CI) no tienen contraseña.
+describe("salud: Redis con contraseña incorrecta (servidor simulado)", () => {
+  let fake: TcpServer;
+  let port: number;
+  beforeAll(async () => {
+    // ioredis envía varios comandos juntos (HELLO … AUTH y CLIENT SETINFO) y espera una respuesta
+    // por cada uno, como Redis: se rechaza el login y se exige autenticación al resto.
+    fake = createTcp((socket) => {
+      socket.on("data", (data) => {
+        for (const command of data.toString().split(/(?=\*\d+\r\n\$)/)) {
+          const name = /^\*\d+\r\n\$\d+\r\n(\w+)\r\n/.exec(command)?.[1]?.toLowerCase();
+          if (!name) continue;
+          socket.write(
+            name === "hello" || name === "auth"
+              ? "-WRONGPASS invalid username-password pair or user is disabled.\r\n"
+              : "-NOAUTH Authentication required.\r\n",
+          );
+        }
+      });
+    });
+    await new Promise<void>((r) => fake.listen(0, "127.0.0.1", r));
+    port = (fake.address() as AddressInfo).port;
+  });
+  afterAll(() => fake.close());
+
+  it("se informa como AUTH, sin filtrar la contraseña ni el mensaje del servidor", async () => {
+    const [r] = await runChecks({ redis: () => checkRedis(`redis://default:clave-secreta@127.0.0.1:${port}`) });
+    expect(r).toMatchObject({ name: "redis", ok: false, error: "AUTH" });
+    expect(JSON.stringify(r)).not.toContain("clave-secreta");
+    expect(JSON.stringify(r)).not.toContain("WRONGPASS");
+  });
+});
+
 describe.skipIf(!redisUrl)("salud: Redis", () => {
   it("acepta la contraseña correcta", async () => {
     await expect(checkRedis(redisUrl!)).resolves.toBeUndefined();
-  });
-  it("detecta una contraseña incorrecta como AUTH", async () => {
-    const bad = redisUrl!.replace(/:[^:@/]*@/, ":incorrecta@");
-    const [r] = await runChecks({ redis: () => checkRedis(bad) });
-    expect(r).toMatchObject({ ok: false, error: "AUTH" });
   });
   it("detecta un Redis inalcanzable", async () => {
     const [r] = await runChecks({ redis: () => checkRedis("redis://127.0.0.1:1") });
