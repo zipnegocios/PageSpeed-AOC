@@ -13,6 +13,14 @@ pnpm dev            # web en http://localhost:3000
 pnpm worker:dev     # worker (otro terminal)
 ```
 
+## Despliegue y CI
+
+- Cada push a `main` despliega el servicio **web** por el webhook de EasyPanel. El worker **no** tiene
+  webhook: se despliega con el botón Deploy cuando cambia algo que le afecta.
+- `.github/workflows/ci.yml` solo corre a demanda (Actions > CI > Run workflow); no hay ejecuciones
+  automáticas. Antes de cada push se corren en local `pnpm typecheck`, `pnpm lint`, `pnpm test`,
+  `pnpm build`, `pnpm migrate:build` y `pnpm worker:build`.
+
 ## Worker de auditorías
 
 El worker (BullMQ + Lighthouse + Chromium) es un proceso aparte: `docker/Dockerfile.worker`, una sola réplica.

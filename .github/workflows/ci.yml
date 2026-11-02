@@ -1,7 +1,9 @@
 name: CI
+# Solo manual: Actions > CI > Run workflow. El despliegue lo hace el webhook de EasyPanel en cada
+# push a main; este workflow no despliega ni bloquea nada. Las mismas comprobaciones se corren en
+# local antes de cada push (typecheck, lint, pruebas, builds).
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 jobs:
   check:
     runs-on: ubuntu-latest
