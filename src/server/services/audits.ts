@@ -1,14 +1,17 @@
+import { gunzipSync } from "node:zlib";
 import type { Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import { getDb, type Database } from "@/server/db/client";
 import { assertRouteAuditable, planProfiles, type AuditTrigger, type Profile } from "@/server/domain/audit-rules";
 import { DomainError } from "@/server/domain/errors";
 import { readHeartbeat } from "@/server/queue/heartbeat";
+import { topOpportunities, type LhrLike, type Opportunity } from "@/server/domain/score-extraction";
 import { getRedis } from "@/server/queue/connection";
 import { auditJobOptions, lighthouseQueue, PRIORITY, type AuditJobData } from "@/server/queue/queues";
 import * as repo from "@/server/repositories/audits";
 import { findProject } from "@/server/repositories/projects";
 import { findRoute } from "@/server/repositories/routes";
+import { getR2, type R2Store } from "@/server/storage/r2";
 import { assertUuid, isUniqueViolation } from "./shared";
 
 export type { AuditDetail, AuditLog, AuditWithRoute } from "@/server/repositories/audits";
@@ -120,4 +123,37 @@ export async function getAudit(id: string, db: Database = getDb()) {
   const audit = await repo.findAuditDetail(db, id);
   if (!audit) throw new DomainError("NOT_FOUND", "Auditoría no encontrada.");
   return audit;
+}
+
+/** Mejoras principales leídas del JSON completo en R2. null si no hay JSON o R2 no responde. */
+export async function getAuditOpportunities(
+  audit: Pick<repo.AuditDetail, "status" | "r2Key">,
+  r2: Pick<R2Store, "getAuditJson"> = getR2(),
+): Promise<Opportunity[] | null> {
+  if (audit.status !== "succeeded" || !audit.r2Key) return null;
+  try {
+    return topOpportunities(await r2.getAuditJson<LhrLike>(audit.r2Key));
+  } catch {
+    return null;
+  }
+}
+
+/** JSON completo de la auditoría (descomprimido) para descargarlo. */
+export async function getAuditReportFile(
+  id: string,
+  db: Database = getDb(),
+  r2: Pick<R2Store, "getAuditGzip"> = getR2(),
+): Promise<{ filename: string; json: Buffer }> {
+  const audit = await getAudit(id, db);
+  if (audit.status !== "succeeded" || !audit.r2Key) {
+    throw new DomainError("NOT_FOUND", "Esta auditoría no tiene un informe guardado.");
+  }
+  let gz: Buffer;
+  try {
+    gz = await r2.getAuditGzip(audit.r2Key);
+  } catch {
+    throw new DomainError("UPSTREAM", "No se pudo leer el informe en el almacenamiento.");
+  }
+  const base = audit.r2Key.split("/").pop() ?? `${audit.id}.json.gz`;
+  return { filename: base.replace(/\.gz$/, ""), json: gunzipSync(gz) };
 }

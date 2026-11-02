@@ -5,16 +5,23 @@ import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { CheckboxField, Field, SelectField } from "@/lib/ui/components/field";
+import { listAudits } from "@/server/services/audits";
 import { getProject } from "@/server/services/projects";
 import { listRoutes } from "@/server/services/routes";
 import { getThresholds } from "@/server/services/thresholds";
+import { formatDate, formatDuration, formatSeconds, isPending, PROFILE_LABEL } from "@/lib/audit-format";
+import { Score } from "@/lib/ui/components/score";
+import Link from "next/link";
 import { AdminShell } from "../../_components/admin-shell";
+import { AutoRefresh } from "../../_components/auto-refresh";
+import { AuditStatusBadge } from "../../_components/audit-badge";
 import {
   addRouteAction,
   archiveProjectAction,
   discoverRoutesAction,
   importRoutesAction,
   removeRouteAction,
+  requestAuditAction,
   setPhaseAction,
   setThresholdsAction,
   toggleRouteAction,
@@ -37,7 +44,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const session = await verifySession();
   const { id } = await params;
   const project = await orNotFound(getProject(id));
-  const [routes, thresholds] = await Promise.all([listRoutes(id), getThresholds(id)]);
+  const [routes, thresholds, audits] = await Promise.all([listRoutes(id), getThresholds(id), listAudits(id, 20)]);
   const production = project.phase === "production";
 
   return (
@@ -84,6 +91,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2">
+                  <ActionForm action={requestAuditAction.bind(null, id, r.id)} submitLabel={production ? "Auditar (móvil y escritorio)" : "Auditar"} variant="secondary" pendingLabel="Encolando…" className="flex-row flex-wrap items-center gap-2">
+                    {production ? null : (
+                      <select name="profile" aria-label="Perfil a auditar" defaultValue="mobile" className="min-h-11 rounded-sm border border-border-strong bg-surface-100 px-2 text-[17px] text-ink">
+                        <option value="mobile">Móvil</option>
+                        <option value="desktop">Escritorio</option>
+                      </select>
+                    )}
+                  </ActionForm>
                   <Badge tone={r.monitored ? "ok" : "neutral"}>{r.monitored ? "Monitoreada" : "Inactiva"}</Badge>
                   <ActionForm action={toggleRouteAction.bind(null, id, r.id, !r.monitored)} submitLabel={r.monitored ? "Desactivar" : "Activar"} variant="ghost" pendingLabel="…" />
                   <ActionForm action={removeRouteAction.bind(null, id, r.id)} submitLabel="Borrar" variant="ghost" pendingLabel="…" />
@@ -112,6 +127,55 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <SitemapImporter discover={discoverRoutesAction.bind(null, id)} importRoutes={importRoutesAction.bind(null, id)} />
           </div>
         </details>
+      </Card>
+
+      <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. La lista se actualiza sola mientras haya auditorías pendientes.">
+        <AutoRefresh active={audits.some((a) => isPending(a.status))} />
+        {audits.length === 0 ? (
+          <p className="text-ink-muted">Todavía no hay auditorías. Usa el botón Auditar en una ruta.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-sm border border-border">
+            <table className="w-full min-w-[44rem] border-collapse text-left text-[15px]">
+              <thead className="bg-surface-300 text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
+                <tr>
+                  <th className="px-3 py-2">Ruta</th>
+                  <th className="px-3 py-2">Estado</th>
+                  <th className="px-3 py-2 text-right" title="Rendimiento">Rend.</th>
+                  <th className="px-3 py-2 text-right">SEO</th>
+                  <th className="px-3 py-2 text-right" title="Accesibilidad">Acces.</th>
+                  <th className="px-3 py-2 text-right" title="Buenas prácticas">B. prác.</th>
+                  <th className="px-3 py-2 text-right">LCP</th>
+                  <th className="px-3 py-2">Cuándo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {audits.map((a) => (
+                  <tr key={a.id} className="align-top">
+                    <td className="px-3 py-2">
+                      <Link href={`/admin/auditorias/${a.id}`} className="font-mono break-all text-link hover:underline">
+                        {a.routePath}
+                      </Link>
+                      <div className="text-[14px] text-ink-muted">{PROFILE_LABEL[a.profile]}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <AuditStatusBadge audit={a} />
+                      {a.attempts > 1 ? <div className="text-[14px] text-ink-muted">Intento {a.attempts}</div> : null}
+                    </td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scorePerformance} /></td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scoreSeo} /></td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scoreAccessibility} /></td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scoreBestPractices} /></td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatSeconds(a.lcpMs)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {formatDate(a.finishedAt ?? a.queuedAt)}
+                      <div className="text-[14px] text-ink-muted">{formatDuration(a.durationMs)}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <Card title="Umbrales de alerta" description="Puntuación mínima aceptable, por métrica. Si baja de aquí, se abre una alerta (solo en producción).">

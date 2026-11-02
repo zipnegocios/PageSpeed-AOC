@@ -5,7 +5,7 @@ import { Alert } from "@/lib/ui/components/alert";
 import { Button } from "@/lib/ui/components/button";
 import { cx } from "@/lib/ui/cx";
 
-type Check = { name: "postgres" | "redis" | "r2" | "smtp"; ok: boolean; ms: number; error?: string };
+type Check = { name: "postgres" | "redis" | "r2" | "smtp" | "worker"; ok: boolean; ms: number; error?: string };
 type Report = { status: "ok" | "degraded"; checkedAt: string; checks: Check[]; invalidEnv?: string[] };
 
 const LABELS: Record<Check["name"], string> = {
@@ -13,6 +13,7 @@ const LABELS: Record<Check["name"], string> = {
   redis: "Cola (Redis)",
   r2: "Almacenamiento (Cloudflare R2)",
   smtp: "Correo (SMTP)",
+  worker: "Worker de auditorías",
 };
 
 export function HealthPanel() {

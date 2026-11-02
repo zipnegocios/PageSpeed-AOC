@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
+import { requestAudit } from "@/server/services/audits";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 import { discoverRoutes, importRoutes } from "@/server/services/sitemap-discovery";
@@ -130,5 +131,30 @@ export async function archiveProjectAction(id: string, clientId: string, _prev: 
     await projects.archiveProject(id);
     revalidatePath(`/admin/clientes/${clientId}`);
     redirect(`/admin/clientes/${clientId}`);
+  });
+}
+
+/**
+ * Solicita auditar una ruta. En desarrollo el formulario trae el perfil elegido; en producción
+ * no trae ninguno y se auditan ambos (móvil y escritorio).
+ */
+export async function requestAuditAction(
+  projectId: string,
+  routeId: string,
+  _prev: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const session = await verifySession();
+  return guarded(async () => {
+    const profile = field(fd, "profile");
+    const result = await requestAudit({
+      routeId,
+      profiles: profile === "mobile" || profile === "desktop" ? [profile] : undefined,
+      trigger: "manual",
+      requestedBy: session.email,
+    });
+    refresh(projectId);
+    if (result.created === 0) return { ok: "Ya había una auditoría pendiente para esta ruta." };
+    return { ok: result.created === 1 ? "Auditoría en cola." : `${result.created} auditorías en cola (móvil y escritorio).` };
   });
 }

@@ -103,6 +103,19 @@ describe("salud: SMTP (servidor simulado)", () => {
   });
 });
 
+describe.skipIf(!dbUrl || !redisUrl)("checkDependencies con entorno parcial", () => {
+  it("comprueba lo que puede y nombra las variables que faltan", async () => {
+    process.env.DATABASE_URL = dbUrl;
+    const report = await checkDependencies({ DATABASE_URL: dbUrl, REDIS_URL: redisUrl });
+    expect(report.status).toBe("degraded");
+    expect(report.checks.map((c) => c.name).sort()).toEqual(["postgres", "redis", "worker"]);
+    expect(report.checks.find((c) => c.name === "postgres")?.ok).toBe(true);
+    expect(report.checks.find((c) => c.name === "redis")?.ok).toBe(true);
+    expect(report.invalidEnv).toEqual(expect.arrayContaining(["R2_BUCKET", "SMTP_HOST", "SESSION_SECRET"]));
+    expect(JSON.stringify(report)).not.toContain(redisUrl!);
+  });
+});
+
 describe("checkDependencies", () => {
   it("con entorno incompleto informa qué variables faltan, solo por nombre", async () => {
     const report = await checkDependencies({ DATABASE_URL: "", SESSION_SECRET: "x" });

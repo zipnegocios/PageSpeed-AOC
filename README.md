@@ -13,6 +13,19 @@ pnpm dev            # web en http://localhost:3000
 pnpm worker:dev     # worker (otro terminal)
 ```
 
+## Worker de auditorías
+
+El worker (BullMQ + Lighthouse + Chromium) es un proceso aparte: `docker/Dockerfile.worker`, una sola réplica.
+Necesita `DATABASE_URL`, `REDIS_URL`, `R2_*` y, opcionalmente, `CHROME_PATH` y `AUDIT_*`
+(ver `.env.example`; no usa SESSION_SECRET, ADMIN_* ni SMTP).
+
+- Si no hay worker en línea, el botón **Auditar** se niega con un aviso (no deja filas bloqueadas).
+- En local, para auditar sitios en `localhost` (el worker de producción los rechaza a propósito):
+  `pnpm exec tsx scripts/dev-worker.ts`. Ese script no se incluye en la imagen.
+- Prueba con Chromium y Lighthouse reales (opcional):
+  `TEST_CHROME_PATH=/ruta/a/chrome pnpm exec vitest run --dangerouslyIgnoreUnhandledErrors tests/integration/lighthouse-real.test.ts`
+- `pnpm worker:build` compila el worker y genera su `package.json` mínimo (`scripts/worker-manifest.mjs`).
+
 ## Design System
 
 La fuente de verdad del diseño es el Design System "AOC PageSpeed" (Rajdhani, azules tecnológicos, rojos sutiles).

@@ -3,9 +3,11 @@ import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { Redis } from "ioredis";
 import { createTransport } from "nodemailer";
 import { getDb } from "@/server/db/client";
-import { envIssues, parseEnv } from "@/server/config/env";
+import { getRedis } from "@/server/queue/connection";
+import { readHeartbeat } from "@/server/queue/heartbeat";
+import { envIssues } from "@/server/config/env";
 
-export type CheckName = "postgres" | "redis" | "r2" | "smtp";
+export type CheckName = "postgres" | "redis" | "r2" | "smtp" | "worker";
 export type CheckResult = { name: CheckName; ok: boolean; ms: number; error?: string };
 export type HealthReport = {
   status: "ok" | "degraded";
@@ -146,6 +148,13 @@ export async function checkSmtp(cfg: {
   }
 }
 
+/** El worker de auditorías publica un latido cada 10 s; si falta, no está en línea. */
+export async function checkWorker(): Promise<void> {
+  const beat = await readHeartbeat(getRedis());
+  if (!beat) throw Object.assign(new Error("sin latido"), { code: "OFFLINE" });
+  if (!beat.chrome) throw Object.assign(new Error("sin chromium"), { code: "NO_CHROMIUM" });
+}
+
 // ---------------------------------------------------------------- informes
 
 /** Comprobación liviana para el balanceador/EasyPanel: ¿el proceso está vivo y ve la base? */
@@ -154,34 +163,56 @@ export async function isLive(): Promise<boolean> {
   return result?.ok === true;
 }
 
-/** Comprobación completa de Postgres, Redis, R2 y SMTP. Requiere el entorno completo. */
+// Variables que necesita cada comprobación: si faltan, esa se omite y las demás siguen.
+const REQUIRED_ENV: Record<CheckName, string[]> = {
+  postgres: ["DATABASE_URL"],
+  redis: ["REDIS_URL"],
+  worker: ["REDIS_URL"],
+  r2: ["R2_ENDPOINT", "R2_BUCKET", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"],
+  smtp: ["SMTP_HOST", "EMAIL_FROM"],
+};
+
+/**
+ * Comprobación completa de Postgres, Redis, R2, SMTP y el worker. Si faltan variables de
+ * entorno, informa cuáles (solo por nombre) y comprueba igualmente lo que sí puede.
+ */
 export async function checkDependencies(
   source: Record<string, string | undefined> = process.env,
 ): Promise<HealthReport> {
   const checkedAt = new Date().toISOString();
   const invalid = envIssues(source);
-  if (invalid.length > 0) {
-    // Con el entorno incompleto, solo se puede comprobar Postgres (si su variable es válida).
-    const checks = invalid.includes("DATABASE_URL") ? [] : await runChecks({ postgres: checkPostgres });
-    return { status: "degraded", checkedAt, checks, invalidEnv: invalid };
-  }
-  const env = parseEnv(source);
-  const checks = await runChecks({
+  const bad = new Set(invalid);
+  const ready = (name: CheckName) => REQUIRED_ENV[name].every((v) => !bad.has(v) && Boolean(source[v]));
+
+  const port = Number(source.SMTP_PORT);
+  const runnable: Record<CheckName, () => Promise<void>> = {
     postgres: checkPostgres,
-    redis: () => checkRedis(env.REDIS_URL),
+    redis: () => checkRedis(source.REDIS_URL!),
+    worker: checkWorker,
     r2: () =>
       checkR2({
-        endpoint: env.R2_ENDPOINT,
-        region: env.R2_REGION,
-        bucket: env.R2_BUCKET,
-        accessKeyId: env.R2_ACCESS_KEY_ID,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+        endpoint: source.R2_ENDPOINT!,
+        region: source.R2_REGION || "auto",
+        bucket: source.R2_BUCKET!,
+        accessKeyId: source.R2_ACCESS_KEY_ID!,
+        secretAccessKey: source.R2_SECRET_ACCESS_KEY!,
       }),
-    smtp: () => checkSmtp({ host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS }),
-  });
+    smtp: () =>
+      checkSmtp({
+        host: source.SMTP_HOST!,
+        port: Number.isInteger(port) && port > 0 ? port : 587,
+        user: source.SMTP_USER || undefined,
+        pass: source.SMTP_PASS || undefined,
+      }),
+  };
+  const selected = (Object.keys(runnable) as CheckName[]).filter(ready);
+  const checks = await runChecks(Object.fromEntries(selected.map((n) => [n, runnable[n]])));
+  const omitted = selected.length < Object.keys(runnable).length;
+
   return {
-    status: checks.every((c) => c.ok) ? "ok" : "degraded",
+    status: checks.every((c) => c.ok) && invalid.length === 0 && !omitted ? "ok" : "degraded",
     checkedAt,
     checks,
+    ...(invalid.length > 0 ? { invalidEnv: invalid } : {}),
   };
 }
