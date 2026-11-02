@@ -4,8 +4,13 @@ const int = (def: number) => z.coerce.number().int().positive().default(def);
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  // URL pública del web; se usa para armar los links mágicos y los enlaces de los emails.
   APP_URL: z.url().default("http://localhost:3000"),
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   SESSION_SECRET: z.string().min(32),
+  // Admin único: se crea en el primer arranque si no existe; después estas variables se ignoran.
+  ADMIN_EMAIL: z.email().optional(),
+  ADMIN_PASSWORD: z.string().min(12).optional(),
   AUTH_ENCRYPTION_KEY: z
     .string()
     .optional()

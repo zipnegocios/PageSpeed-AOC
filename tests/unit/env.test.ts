@@ -21,6 +21,20 @@ describe("parseEnv", () => {
     expect(env.SMTP_PORT).toBe(587);
   });
 
+  it("accepts the Cloudflare R2 S3 endpoint and the reportes bucket", () => {
+    const env = parseEnv({
+      ...base,
+      R2_ENDPOINT: "https://0123456789abcdef.r2.cloudflarestorage.com",
+      R2_BUCKET: "reportes",
+    });
+    expect(env.R2_BUCKET).toBe("reportes");
+    expect(env.LOG_LEVEL).toBe("info");
+  });
+
+  it("rejects an admin password shorter than 12 characters", () => {
+    expect(() => parseEnv({ ...base, ADMIN_PASSWORD: "corta" })).toThrow(/ADMIN_PASSWORD/);
+  });
+
   it("rejects a short session secret", () => {
     expect(() => parseEnv({ ...base, SESSION_SECRET: "short" })).toThrow(/SESSION_SECRET/);
   });
