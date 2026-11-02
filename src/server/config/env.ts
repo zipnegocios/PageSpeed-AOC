@@ -48,6 +48,13 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   return result.data;
 }
 
+/** Nombres de las variables inválidas o ausentes. Nunca incluye valores. */
+export function envIssues(source: Record<string, string | undefined>): string[] {
+  const result = schema.safeParse(source);
+  if (result.success) return [];
+  return [...new Set(result.error.issues.map((i) => String(i.path[0] ?? "?")))];
+}
+
 let cached: Env | undefined;
 /** Validated process.env, parsed once. Never import this from client components. */
 export function env(): Env {

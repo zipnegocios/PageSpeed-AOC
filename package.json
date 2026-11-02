@@ -22,10 +22,13 @@
     "migrate:build": "tsup --config tsup.migrate.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
     "bullmq": "^6.5.3",
     "drizzle-orm": "^0.45.4",
+    "ioredis": "^6.0.0",
     "jose": "^6.2.15",
     "next": "16.4.4",
+    "nodemailer": "^10.3.1",
     "pg": "^8.13.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -35,6 +38,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.11.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",

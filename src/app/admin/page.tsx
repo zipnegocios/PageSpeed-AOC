@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { verifySession } from "@/lib/auth/session";
 import { Button } from "@/lib/ui/components/button";
 import { logoutAction } from "./actions";
+import { HealthPanel } from "./health-panel";
 
 export const metadata: Metadata = {
   title: "Panel · AOC PageSpeed",
@@ -25,11 +26,7 @@ export default async function AdminHome() {
         </form>
       </header>
       <section className="rounded-md border border-border bg-surface-200 p-4 md:p-6">
-        <h2 className="text-[24px] leading-7 font-semibold text-ink">Sesión iniciada</h2>
-        <p className="mt-2 text-ink-muted">
-          El acceso de administrador funciona. Aquí irán los clientes, proyectos y umbrales en las
-          próximas entregas.
-        </p>
+        <HealthPanel />
       </section>
     </main>
   );
