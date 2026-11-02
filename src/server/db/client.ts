@@ -21,3 +21,5 @@ export function getDb(): Database {
   }
   return globalForDb.__aocDb.db;
 }
+
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
