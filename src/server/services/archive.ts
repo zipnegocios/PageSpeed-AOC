@@ -25,13 +25,17 @@ function assertConfirmed(typed: string | undefined, name: string, what: string):
   }
 }
 
-/** Borra del almacenamiento todo lo que cuelga de un prefijo. Si falla, no se toca la base de datos. */
-async function purgePrefix(prefix: string, r2: Deps["r2"]): Promise<number> {
+/**
+ * Borra del almacenamiento los informes indicados y todo lo que cuelga de los prefijos. Si falla, no se toca la base de
+ * datos. Las claves exactas (guardadas en cada auditoría) cubren las carpetas de identificadores anteriores.
+ */
+async function purge(prefixes: string[], keys: string[], r2: Deps["r2"]): Promise<number> {
   try {
     const store = r2 ?? getR2();
-    const objects = await store.listObjects(prefix);
-    if (objects.length > 0) await store.deleteObjects(objects.map((o) => o.key));
-    return objects.length;
+    const all = new Set(keys);
+    for (const prefix of prefixes) for (const o of await store.listObjects(prefix)) all.add(o.key);
+    if (all.size > 0) await store.deleteObjects([...all]);
+    return all.size;
   } catch {
     throw new DomainError("UPSTREAM", "No se pudieron borrar los informes guardados. No se eliminó nada; revisa el almacenamiento (R2) e inténtalo de nuevo.");
   }
@@ -60,7 +64,11 @@ export async function deleteProject(id: string, confirmName: string | undefined,
   const found = await repo.findArchivedProject(db, id);
   if (!found) throw new DomainError("NOT_FOUND", "Proyecto archivado no encontrado. Solo se pueden eliminar proyectos archivados.");
   assertConfirmed(confirmName, found.project.name, "el proyecto");
-  const files = await purgePrefix(`${found.clientSlug}/${found.project.slug}/`, deps.r2);
+  // Carpeta actual y las de identificadores anteriores (del proyecto y del cliente: quedan reservados, no se reutilizan).
+  const clientSlugs = [found.clientSlug, ...found.clientSlugAliases];
+  const projectSlugs = [found.project.slug, ...found.project.slugAliases];
+  const prefixes = clientSlugs.flatMap((c) => projectSlugs.map((p) => `${c}/${p}/`));
+  const files = await purge(prefixes, await repo.listProjectR2Keys(db, id), deps.r2);
   await repo.deleteProjectRow(db, id);
   return { files };
 }
@@ -70,7 +78,8 @@ export async function deleteClient(id: string, confirmName: string | undefined, 
   const client = await repo.findArchivedClient(db, id);
   if (!client) throw new DomainError("NOT_FOUND", "Cliente archivado no encontrado. Solo se pueden eliminar clientes archivados.");
   assertConfirmed(confirmName, client.name, "el cliente");
-  const files = await purgePrefix(`${client.slug}/`, deps.r2);
+  const prefixes = [client.slug, ...client.slugAliases].map((c) => `${c}/`);
+  const files = await purge(prefixes, await repo.listClientR2Keys(db, id), deps.r2);
   await repo.deleteClientRow(db, id);
   return { files };
 }

@@ -94,6 +94,26 @@ export async function getProject(id: string, db: Database = getDb()) {
   return project;
 }
 
+/** Cambia el identificador del proyecto; el anterior sigue resolviendo y queda reservado dentro del cliente. */
+export async function renameProjectSlug(id: string, rawSlug: string, db: Database = getDb()) {
+  assertUuid(id, "Proyecto");
+  const slug = requireSlug((rawSlug ?? "").trim());
+  const current = await repo.findProject(db, id);
+  if (!current) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+  if (slug === current.slug) return current;
+  if (!current.slugAliases.includes(slug) && (await repo.projectSlugTaken(db, current.clientId, slug))) {
+    throw new DomainError("CONFLICT", `Este cliente ya tiene un proyecto con el identificador "${slug}" (o lo tuvo).`);
+  }
+  try {
+    const updated = await repo.setProjectSlug(db, id, slug, current.slug);
+    if (!updated) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+    return updated;
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new DomainError("CONFLICT", `Este cliente ya tiene un proyecto con el identificador "${slug}".`);
+    throw err;
+  }
+}
+
 /** Proyecto por (cliente, proyecto) en slug o, para enlaces antiguos, en UUID. El proyecto debe ser de ese cliente. */
 export async function getProjectByRef(clientRef: string, projectRef: string, db: Database = getDb()) {
   const client = isUuid(clientRef) ? await findClient(db, clientRef) : await findClientBySlug(db, clientRef);

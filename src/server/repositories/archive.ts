@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
-import { clients, projects } from "@/server/db/schema";
+import { auditLogs, clients, projects } from "@/server/db/schema";
 
 export type ArchivedClient = {
   id: string;
@@ -60,7 +60,7 @@ export async function findArchivedClient(db: Database, id: string) {
 
 export async function findArchivedProject(db: Database, id: string) {
   const [row] = await db
-    .select({ project: projects, clientSlug: clients.slug, clientDeletedAt: clients.deletedAt })
+    .select({ project: projects, clientSlug: clients.slug, clientSlugAliases: clients.slugAliases, clientDeletedAt: clients.deletedAt })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))
     .where(and(eq(projects.id, id), isNotNull(projects.deletedAt)))
@@ -76,6 +76,22 @@ export async function restoreClientRow(db: Database, id: string) {
 export async function restoreProjectRow(db: Database, id: string) {
   const [row] = await db.update(projects).set({ deletedAt: null }).where(and(eq(projects.id, id), isNotNull(projects.deletedAt))).returning();
   return row;
+}
+
+/** Claves de R2 que guardan las auditorías de un proyecto (aunque estén en una carpeta con un identificador anterior). */
+export async function listProjectR2Keys(db: Database, projectId: string): Promise<string[]> {
+  const rows = await db.selectDistinct({ key: auditLogs.r2Key }).from(auditLogs).where(and(eq(auditLogs.projectId, projectId), isNotNull(auditLogs.r2Key)));
+  return rows.flatMap((r) => (r.key ? [r.key] : []));
+}
+
+/** Idem para todos los proyectos de un cliente. */
+export async function listClientR2Keys(db: Database, clientId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ key: auditLogs.r2Key })
+    .from(auditLogs)
+    .innerJoin(projects, eq(projects.id, auditLogs.projectId))
+    .where(and(eq(projects.clientId, clientId), isNotNull(auditLogs.r2Key)));
+  return rows.flatMap((r) => (r.key ? [r.key] : []));
 }
 
 /** Borra el proyecto; sus rutas, auditorías, alertas, avisos y datos reales caen en cascada. */

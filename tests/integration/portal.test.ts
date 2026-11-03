@@ -60,6 +60,25 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
   }
 
   describe("resolvePortal", () => {
+    it("el link fijo (identificador del cliente) da acceso igual que el token, y un identificador anterior también", async () => {
+      const { client } = await setup();
+      expect(await portal.resolvePortal(client.slug, db)).toEqual({ state: "ok", client: { id: client.id, name: "Acme" } });
+      await clients.renameClientSlug(client.id, "acme-corp", db);
+      expect(await portal.resolvePortal("acme-corp", db)).toMatchObject({ state: "ok" });
+      expect(await portal.resolvePortal(client.slug, db)).toMatchObject({ state: "ok" }); // el anterior sigue valiendo
+      expect(await portal.resolvePortal("no-existe", db)).toEqual({ state: "invalid" });
+      expect(await portal.resolvePortal("ACME", db)).toEqual({ state: "invalid" });
+    });
+
+    it("suspendido, el link fijo muestra el aviso y archivado deja de existir", async () => {
+      const { client } = await setup();
+      await clients.setClientStatus(client.id, "suspended", db);
+      expect(await portal.resolvePortal(client.slug, db)).toEqual({ state: "suspended", clientName: "Acme" });
+      await clients.setClientStatus(client.id, "active", db);
+      await clients.archiveClient(client.id, db);
+      expect(await portal.resolvePortal(client.slug, db)).toEqual({ state: "invalid" });
+    });
+
     it("un token vigente da acceso; uno mal formado o desconocido, no", async () => {
       const { client } = await setup();
       const c = await clients.getClient(client.id, db);

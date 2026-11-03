@@ -74,6 +74,30 @@ export async function setClientStatus(id: string, status: "active" | "suspended"
   return updated;
 }
 
+/**
+ * Cambia el identificador (slug). El anterior sigue funcionando en los enlaces viejos y queda reservado. Los informes ya
+ * guardados no se mueven: cada auditoría guarda la clave completa de su archivo en R2.
+ */
+export async function renameClientSlug(id: string, rawSlug: string, db: Database = getDb()) {
+  assertUuid(id, "Cliente");
+  const slug = requireSlug((rawSlug ?? "").trim());
+  const current = await repo.findClient(db, id);
+  if (!current) throw new DomainError("NOT_FOUND", "Cliente no encontrado.");
+  if (slug === current.slug) return current;
+  // Volver a un identificador anterior del mismo cliente está permitido.
+  if (!current.slugAliases.includes(slug) && (await repo.slugTaken(db, slug))) {
+    throw new DomainError("CONFLICT", `El identificador "${slug}" ya está en uso (o fue de otro cliente).`);
+  }
+  try {
+    const updated = await repo.setClientSlug(db, id, slug, current.slug);
+    if (!updated) throw new DomainError("NOT_FOUND", "Cliente no encontrado.");
+    return updated;
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new DomainError("CONFLICT", `El identificador "${slug}" ya está en uso.`);
+    throw err;
+  }
+}
+
 /** Invalida el link anterior y genera uno nuevo. */
 export async function rotateMagicToken(id: string, db: Database = getDb()) {
   assertUuid(id, "Cliente");

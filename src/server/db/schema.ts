@@ -65,8 +65,14 @@ export const notificationStatus = pgEnum("notification_status", ["sent", "failed
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  // Inmutable: forma el prefijo de R2 (cliente/proyecto/año/mes/...).
+  // Se puede cambiar (el anterior pasa a `slugAliases`). Los informes ya guardados conservan su carpeta de R2
+  // porque cada auditoría guarda su clave completa.
   slug: text("slug").notNull().unique(),
+  // Identificadores anteriores: siguen resolviendo al cliente (enlaces viejos) y quedan reservados.
+  slugAliases: text("slug_aliases")
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   // Para generar el link wa.me con el mensaje prellenado.
@@ -89,8 +95,12 @@ export const projects = pgTable(
       .notNull()
       .references(() => clients.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
-    // Inmutable, único dentro del cliente.
+    // Único dentro del cliente. Se puede cambiar (el anterior pasa a `slugAliases`).
     slug: text("slug").notNull(),
+    slugAliases: text("slug_aliases")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     baseUrl: text("base_url").notNull(),
     // Lista de hosts permitidos (anti-SSRF). Por defecto, el host de base_url.
     allowedHosts: text("allowed_hosts")

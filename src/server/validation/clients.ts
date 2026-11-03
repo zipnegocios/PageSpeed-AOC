@@ -3,7 +3,7 @@ import { optionalEmail, optionalPhone, optionalText, requiredText } from "./comm
 
 export const clientInput = z.object({
   name: requiredText("El nombre", 2, 120),
-  /** Opcional al crear; es inmutable después (forma el prefijo de R2). */
+  /** Opcional al crear; se cambia después con `renameClientSlug`. */
   slug: optionalText(40),
   contactName: optionalText(120),
   contactEmail: optionalEmail,

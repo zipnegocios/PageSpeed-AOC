@@ -1,4 +1,4 @@
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNull, or, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { clients, projects } from "@/server/db/schema";
 
@@ -28,19 +28,34 @@ export async function findClient(db: Database, id: string): Promise<Client | und
   return row;
 }
 
+/** Por identificador actual o por uno anterior (enlaces viejos). Solo clientes vigentes. */
 export async function findClientBySlug(db: Database, slug: string): Promise<Client | undefined> {
   const [row] = await db
     .select()
     .from(clients)
-    .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
+    .where(and(or(eq(clients.slug, slug), sql`${slug} = any(${clients.slugAliases})`), isNull(clients.deletedAt)))
     .limit(1);
   return row;
 }
 
-/** Incluye clientes archivados: el slug sigue ocupado porque forma el prefijo de R2. */
+/** Incluye clientes archivados e identificadores anteriores: siguen reservados (enlaces viejos y carpetas de R2). */
 export async function slugTaken(db: Database, slug: string): Promise<boolean> {
-  const [row] = await db.select({ id: clients.id }).from(clients).where(eq(clients.slug, slug)).limit(1);
+  const [row] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .where(or(eq(clients.slug, slug), sql`${slug} = any(${clients.slugAliases})`))
+    .limit(1);
   return Boolean(row);
+}
+
+/** Cambia el identificador y guarda el anterior como alias. Si se vuelve a uno anterior propio, deja de ser alias. */
+export async function setClientSlug(db: Database, id: string, slug: string, previous: string): Promise<Client | undefined> {
+  const [row] = await db
+    .update(clients)
+    .set({ slug, slugAliases: sql`array_append(array_remove(${clients.slugAliases}, ${slug}), ${previous})` })
+    .where(and(eq(clients.id, id), isNull(clients.deletedAt)))
+    .returning();
+  return row;
 }
 
 export async function insertClient(db: Database, values: typeof clients.$inferInsert): Promise<Client> {

@@ -50,7 +50,7 @@ export async function sendProjectReport(
     contactName: client.contactName,
     projectName: project.name,
     days,
-    portalUrl: `${base}${portalProjectPath(client.magicToken, project.slug)}`,
+    portalUrl: `${base}${portalProjectPath(client.slug, project.slug)}`,
   });
   const record = { projectId, clientId: client.id, type: "report" as const, recipient: to, subject: mail.subject, sentAt: now };
   try {

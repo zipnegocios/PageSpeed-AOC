@@ -1,4 +1,4 @@
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNull, or, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { alertStates, alertThresholds, auditLogs, clients, projects, routes } from "@/server/db/schema";
 
@@ -33,7 +33,7 @@ export async function findProjectBySlug(db: Database, clientId: string, slug: st
     .select({ project: projects, clientName: clients.name, clientSlug: clients.slug })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))
-    .where(and(eq(projects.clientId, clientId), eq(projects.slug, slug), live(), isNull(clients.deletedAt)))
+    .where(and(eq(projects.clientId, clientId), or(eq(projects.slug, slug), sql`${slug} = any(${projects.slugAliases})`), live(), isNull(clients.deletedAt)))
     .limit(1);
   return row ? { ...row.project, clientName: row.clientName, clientSlug: row.clientSlug } : undefined;
 }
@@ -42,9 +42,19 @@ export async function projectSlugTaken(db: Database, clientId: string, slug: str
   const [row] = await db
     .select({ id: projects.id })
     .from(projects)
-    .where(and(eq(projects.clientId, clientId), eq(projects.slug, slug)))
+    .where(and(eq(projects.clientId, clientId), or(eq(projects.slug, slug), sql`${slug} = any(${projects.slugAliases})`)))
     .limit(1);
   return Boolean(row);
+}
+
+/** Cambia el identificador y guarda el anterior como alias. Si se vuelve a uno anterior propio, deja de ser alias. */
+export async function setProjectSlug(db: Database, id: string, slug: string, previous: string): Promise<Project | undefined> {
+  const [row] = await db
+    .update(projects)
+    .set({ slug, slugAliases: sql`array_append(array_remove(${projects.slugAliases}, ${slug}), ${previous})` })
+    .where(and(eq(projects.id, id), live()))
+    .returning();
+  return row;
 }
 
 export async function updateProject(

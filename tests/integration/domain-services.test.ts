@@ -72,6 +72,25 @@ describe.skipIf(!url)("servicios de dominio", () => {
       expect(rotated.magicTokenRotatedAt).toBeInstanceOf(Date);
     });
 
+    it("renombrar el identificador deja el anterior como alias reservado y vuelve a funcionar al regresar a él", async () => {
+      const a = await newClient("Acme");
+      const b = await newClient("Beta");
+      const renamed = await clients.renameClientSlug(a.id, " acme-corp ", db);
+      expect(renamed).toMatchObject({ slug: "acme-corp", slugAliases: ["acme"] });
+      expect((await clients.getClientByRef("acme", db)).id).toBe(a.id); // enlace viejo
+      expect((await clients.getClientByRef("acme-corp", db)).id).toBe(a.id);
+      // el anterior queda reservado: nadie más (ni al crear ni al renombrar) puede tomarlo
+      await rejectsWith(clients.renameClientSlug(b.id, "acme", db), "CONFLICT");
+      await rejectsWith(clients.createClient({ name: "Otro", slug: "acme" }, db), "CONFLICT");
+      expect((await newClient("Acme")).slug).toBe("acme-2");
+      await rejectsWith(clients.renameClientSlug(b.id, "acme-corp", db), "CONFLICT");
+      await rejectsWith(clients.renameClientSlug(b.id, "Mal Slug", db), "INVALID");
+      await rejectsWith(clients.renameClientSlug(b.id, "a", db), "INVALID");
+      // igual al actual no hace nada; volver a uno anterior propio lo saca de los alias
+      expect((await clients.renameClientSlug(a.id, "acme-corp", db)).slugAliases).toEqual(["acme"]);
+      expect(await clients.renameClientSlug(a.id, "acme", db)).toMatchObject({ slug: "acme", slugAliases: ["acme-corp"] });
+    });
+
     it("un cliente se encuentra por su slug o, en enlaces antiguos, por su UUID; los archivados no", async () => {
       const c = await newClient("Acme");
       expect((await clients.getClientByRef("acme", db)).id).toBe(c.id);
@@ -104,6 +123,24 @@ describe.skipIf(!url)("servicios de dominio", () => {
   });
 
   describe("proyectos", () => {
+    it("renombrar un proyecto: el anterior sigue resolviendo, queda reservado dentro del cliente y es libre en otros", async () => {
+      const acme = await newClient("Acme");
+      const otro = await newClient("Otro");
+      const p = await projects.createProject(acme.id, { name: "Sitio web", baseUrl: "https://acme.test" }, db);
+      const q = await projects.createProject(acme.id, { name: "Blog", baseUrl: "https://blog.acme.test" }, db);
+      const renamed = await projects.renameProjectSlug(p.id, "web", db);
+      expect(renamed).toMatchObject({ slug: "web", slugAliases: ["sitio-web"] });
+      expect((await projects.getProjectByRef("acme", "sitio-web", db)).id).toBe(p.id);
+      expect((await projects.getProjectByRef("acme", "web", db)).slug).toBe("web");
+      await rejectsWith(projects.renameProjectSlug(q.id, "sitio-web", db), "CONFLICT");
+      await rejectsWith(projects.renameProjectSlug(q.id, "web", db), "CONFLICT");
+      await rejectsWith(projects.renameProjectSlug(q.id, "NO", db), "INVALID");
+      // en otro cliente el nombre sí está libre
+      const ajeno = await projects.createProject(otro.id, { name: "Sitio web", baseUrl: "https://otro.test" }, db);
+      expect(ajeno.slug).toBe("sitio-web");
+      expect(await projects.renameProjectSlug(p.id, "sitio-web", db)).toMatchObject({ slug: "sitio-web", slugAliases: ["web"] });
+    });
+
     it("un proyecto se encuentra por (cliente, proyecto) en slug o UUID, y solo dentro de su cliente", async () => {
       const acme = await newClient("Acme");
       const otro = await newClient("Otro");

@@ -1,7 +1,8 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
-import { findClientByToken } from "@/server/repositories/clients";
+import { isValidSlug } from "@/server/domain/slug";
+import { findClientBySlug, findClientByToken } from "@/server/repositories/clients";
 import { listOpenAlerts, type AlertView } from "./alerts";
 import { averageScores, getLatestScores, type LatestScores } from "./history";
 import { assertUuid } from "./shared";
@@ -19,10 +20,13 @@ export type PortalAccess =
   | { state: "suspended"; clientName: string }
   | { state: "ok"; client: PortalClient };
 
-/** Resuelve el link mágico. Invalida al instante cuando se rota el token o se suspende al cliente. */
-export async function resolvePortal(token: string, db: Database = getDb()): Promise<PortalAccess> {
-  if (!isPlausibleToken(token)) return { state: "invalid" };
-  const client = await findClientByToken(db, token);
+/**
+ * Resuelve el enlace del portal. Hay dos formas: el link privado (token de 43 caracteres, rotable) y el link fijo con el
+ * identificador del cliente (hasta 40 caracteres, así que no se confunden). Un identificador anterior también vale.
+ * Se comprueba en cada petición: rotar el token o suspender al cliente surte efecto al instante.
+ */
+export async function resolvePortal(ref: string, db: Database = getDb()): Promise<PortalAccess> {
+  const client = isPlausibleToken(ref) ? await findClientByToken(db, ref) : isValidSlug(ref) ? await findClientBySlug(db, ref) : undefined;
   if (!client) return { state: "invalid" };
   if (client.status === "suspended") return { state: "suspended", clientName: client.name };
   return { state: "ok", client: { id: client.id, name: client.name } };
@@ -41,7 +45,7 @@ export type PortalProjectSummary = {
 /** Solo proyectos en producción y no archivados: lo que se monitorea de verdad. */
 async function productionProjects(db: Database, clientId: string) {
   return db
-    .select({ id: projects.id, slug: projects.slug, name: projects.name, baseUrl: projects.baseUrl })
+    .select({ id: projects.id, slug: projects.slug, slugAliases: projects.slugAliases, name: projects.name, baseUrl: projects.baseUrl })
     .from(projects)
     .where(and(eq(projects.clientId, clientId), eq(projects.phase, "production"), isNull(projects.deletedAt)))
     .orderBy(asc(projects.name));
@@ -79,7 +83,8 @@ export type PortalProject = {
  */
 export async function getPortalProject(clientId: string, ref: string, db: Database = getDb()): Promise<PortalProject | null> {
   assertUuid(clientId, "Cliente");
-  const project = (await productionProjects(db, clientId)).find((p) => p.slug === ref || p.id === ref);
+  const found = (await productionProjects(db, clientId)).find((p) => p.slug === ref || p.slugAliases.includes(ref) || p.id === ref);
+  const project = found ? { id: found.id, slug: found.slug, name: found.name, baseUrl: found.baseUrl } : undefined;
   if (!project) return null;
   const [latest, alerts] = await Promise.all([getLatestScores(project.id, db), listOpenAlerts(project.id, db)]);
   return {

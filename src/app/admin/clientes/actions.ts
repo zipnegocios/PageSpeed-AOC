@@ -50,6 +50,16 @@ export async function setClientStatusAction(
   });
 }
 
+export async function renameClientSlugAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const client = await clients.renameClientSlug(id, field(fd, "slug"));
+    revalidateAdmin();
+    // La dirección actual cambió: se abre la nueva.
+    redirect(clientPath(client.slug));
+  });
+}
+
 export async function rotateMagicTokenAction(id: string, _prev: ActionState): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {

@@ -121,6 +121,32 @@ describe.skipIf(!dbUrl)("archivar, restaurar y eliminar", () => {
     });
   });
 
+  describe("tras renombrar identificadores", () => {
+    it("eliminar un proyecto renombrado borra también la carpeta antigua de sus informes", async () => {
+      const { tienda, client } = await setup();
+      await projects.renameProjectSlug(tienda.id, "tienda-nueva", db);
+      await clients.renameClientSlug(client.id, "acme-sa", db);
+      // un informe nuevo bajo las carpetas nuevas, y el viejo (ya guardado) bajo las antiguas
+      stored.push("acme-sa/tienda-nueva/2026/12/n.json.gz");
+      const [route] = await db.select().from(s.routes);
+      await db.insert(s.auditLogs).values({ projectId: tienda.id, routeId: route!.id, profile: "desktop", trigger: "manual", phaseAtRun: "development", status: "succeeded", r2Key: "acme-sa/tienda-nueva/2026/12/n.json.gz" });
+      await projects.archiveProject(tienda.id, db, noQueues);
+      const out = await archive.deleteProject(tienda.id, "Tienda", db, { r2 });
+      expect(out.files).toBe(3); // a, b (carpeta antigua) y n (carpeta nueva)
+      expect(stored.sort()).toEqual(["acme-2/x/e.json.gz", "acme/blog/2026/11/c.json.gz", "otro/tienda/2026/11/d.json.gz"].sort());
+    });
+
+    it("eliminar un cliente renombrado borra su carpeta actual y las anteriores", async () => {
+      const { client } = await setup();
+      await clients.renameClientSlug(client.id, "acme-sa", db);
+      stored.push("acme-sa/tienda/2026/12/n.json.gz");
+      await clients.archiveClient(client.id, db);
+      const out = await archive.deleteClient(client.id, "Acme", db, { r2 });
+      expect(out.files).toBe(4);
+      expect(stored.sort()).toEqual(["acme-2/x/e.json.gz", "otro/tienda/2026/11/d.json.gz"].sort());
+    });
+  });
+
   describe("eliminación definitiva de un cliente", () => {
     it("solo se puede eliminar un cliente archivado y con su nombre exacto", async () => {
       const { client } = await setup();

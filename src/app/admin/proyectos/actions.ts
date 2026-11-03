@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
-import { clientPath } from "@/lib/urls";
+import { clientPath, projectPath } from "@/lib/urls";
 import { parsePeriod } from "@/server/domain/history";
 import { requestAudit } from "@/server/services/audits";
 import { sendProjectReport } from "@/server/services/report-email";
@@ -129,6 +129,15 @@ export async function importRoutesAction(id: string, _prev: ActionState, fd: For
     );
     refresh(id);
     return { ok: `${result.added} rutas activadas para monitoreo${result.skipped ? ` (${result.skipped} ya existían)` : ""}.` };
+  });
+}
+
+export async function renameProjectSlugAction(id: string, clientSlug: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const project = await projects.renameProjectSlug(id, field(fd, "slug"));
+    refresh();
+    redirect(projectPath(clientSlug, project.slug));
   });
 }
 

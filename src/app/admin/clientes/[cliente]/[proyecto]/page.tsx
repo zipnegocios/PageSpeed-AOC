@@ -30,6 +30,7 @@ import {
   discoverRoutesAction,
   importRoutesAction,
   removeRouteAction,
+  renameProjectSlugAction,
   requestAuditAction,
   sendReportAction,
   clearAuthAction,
@@ -42,6 +43,7 @@ import {
   toggleRouteAction,
   updateProjectAction,
 } from "@/app/admin/proyectos/actions";
+import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { SitemapImporter } from "./sitemap-importer";
 
 export const metadata: Metadata = { title: "Proyecto · AOC PageSpeed", robots: { index: false, follow: false } };
@@ -397,6 +399,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             </p>
           </div>
         </ActionForm>
+      </Card>
+
+      <Card title="Identificador" description="Es el nombre que aparece en las direcciones del panel y del portal.">
+        <RenameSlugForm action={renameProjectSlugAction.bind(null, id, project.clientSlug)} current={project.slug} what="proyecto" aliases={project.slugAliases} />
       </Card>
 
       <Card title="Archivar proyecto" description="Lo oculta del panel y detiene sus auditorías. No borra nada: lo encuentras en Archivados, donde puedes restaurarlo o eliminarlo para siempre.">

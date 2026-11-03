@@ -11,10 +11,12 @@ import { CopyButton } from "@/lib/ui/components/copy-button";
 import { Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
+import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
 import {
   archiveClientAction,
   createProjectAction,
+  renameClientSlugAction,
   rotateMagicTokenAction,
   setClientStatusAction,
   updateClientAction,
@@ -31,6 +33,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   const id = client.id;
   const projects = await listProjects(id);
   const portalUrl = `${appUrl()}/c/${client.magicToken}`;
+  const fixedUrl = `${appUrl()}/c/${client.slug}`;
   const active = client.status === "active";
 
   return (
@@ -86,8 +89,25 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
 
       <Card title="Acceso del cliente" description="El cliente ve sus resultados con un link permanente, sin usuario ni contraseña.">
         <div className="flex flex-col gap-3">
+          <label htmlFor="portal-link-fixed" className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+            Link fijo
+          </label>
+          <input
+            id="portal-link-fixed"
+            readOnly
+            value={fixedUrl}
+            className="min-h-11 w-full rounded-sm border border-border-strong bg-surface-100 px-3 font-mono text-[14px] text-ink"
+          />
+          <div>
+            <CopyButton value={fixedUrl} label="Copiar link fijo" />
+          </div>
+          <p className="text-[15px] leading-5 text-ink-muted">
+            Es el que conviene darle al cliente: lleva su identificador y no cambia mientras no lo cambies. Cualquier persona que lo conozca puede abrir el portal.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 border-t border-border pt-4">
           <label htmlFor="portal-link" className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-            Link del portal
+            Link privado
           </label>
           <input
             id="portal-link"
@@ -96,11 +116,11 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             className="min-h-11 w-full rounded-sm border border-border-strong bg-surface-100 px-3 font-mono text-[14px] text-ink"
           />
           <div className="flex flex-wrap items-center gap-3">
-            <CopyButton value={portalUrl} label="Copiar link" />
+            <CopyButton value={portalUrl} label="Copiar link privado" />
             <ActionForm action={rotateMagicTokenAction.bind(null, id)} submitLabel="Generar link nuevo" variant="ghost" pendingLabel="Generando…" />
           </div>
           <p className="text-[15px] leading-5 text-ink-muted">
-            El cliente ve sus proyectos en producción, su evolución y puede descargar el informe en PDF o instalar el portal como app. Si generas un link nuevo, el anterior deja de funcionar al instante.
+            Lleva una clave imposible de adivinar. Si generas un link nuevo, el privado anterior deja de funcionar al instante; el fijo no cambia. Ambos muestran lo mismo: proyectos en producción, su evolución, el informe en PDF y el portal instalable como app.
           </p>
         </div>
         <div className="flex flex-col gap-2 border-t border-border pt-4">
@@ -130,9 +150,10 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
           </div>
           <TextareaField label="Notas internas" id="notes" maxLength={2000} defaultValue={client.notes ?? ""} />
           <p className="text-[15px] leading-5 text-ink-muted">
-            El identificador <span className="font-mono">{client.slug}</span> no se puede cambiar: nombra la carpeta de este cliente en el almacenamiento.
+            Para cambiar el identificador <span className="font-mono">{client.slug}</span> usa el bloque de abajo.
           </p>
         </ActionForm>
+        <RenameSlugForm action={renameClientSlugAction.bind(null, id)} current={client.slug} what="cliente" aliases={client.slugAliases} />
       </Card>
 
       <Card title="Archivar cliente" description="Lo oculta del panel, detiene sus auditorías y desactiva su link del portal. No borra nada: lo encuentras en Archivados, donde puedes restaurarlo o eliminarlo para siempre.">

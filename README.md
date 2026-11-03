@@ -41,9 +41,17 @@ evalúa las alertas y lo avisa en los logs.
   igual y la reconciliación lo corrige.
 - **Direcciones legibles:** el panel usa el identificador (slug) del cliente y del proyecto, no UUID:
   `/admin/clientes/acme` y `/admin/clientes/acme/tienda` (el slug del proyecto solo es único dentro de su
-  cliente, por eso va anidado). En el portal, `/c/<token>/tienda`. Los enlaces antiguos con UUID
-  (`/admin/proyectos/<uuid>`, `/c/<token>/<uuid>`) siguen funcionando y redirigen a la dirección legible.
-  El slug se fija al crear (forma la carpeta de R2) y no cambia al renombrar el cliente o el proyecto.
+  cliente, por eso va anidado). Los enlaces antiguos con UUID siguen funcionando y redirigen.
+- **Portal del cliente:** dos enlaces equivalentes. El **link fijo** `/c/<identificador-del-cliente>` (el que se
+  le da al cliente; no cambia mientras no cambies el identificador) y el **link privado** `/c/<token>` con una
+  clave imposible de adivinar (rotable). Ojo: quien conozca el identificador del cliente puede abrir el portal
+  fijo; si un cliente necesita más reserva, dale solo el privado y cambia su identificador a algo no obvio.
+  Suspender al cliente cubre ambos: muestra el aviso con el contacto (`src/lib/contact.ts`) y un botón de
+  WhatsApp con el mensaje ya escrito. El informe por correo usa el link fijo.
+- **Renombrar identificadores:** en la ficha del cliente o del proyecto. El anterior pasa a la lista de alias
+  (`slug_aliases`): sigue funcionando en los enlaces viejos y queda reservado, así nadie más puede tomarlo. Los
+  informes ya guardados en R2 no se mueven (cada auditoría guarda su clave completa) y los nuevos van a la
+  carpeta nueva; al eliminar, se borran todas las carpetas.
 - **Archivar, restaurar y eliminar:** archivar un cliente o un proyecto es reversible: sale del panel, deja de
   auditarse y (en un cliente) su link del portal deja de funcionar. Lo archivado se ve en `/admin/archivados`,
   donde se puede **Restaurar** o **Eliminar definitivamente**. Eliminar solo se ofrece sobre lo ya archivado,
