@@ -6,7 +6,17 @@ import { createDb } from "@/server/db/client";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { clearHeartbeat, writeHeartbeat } from "@/server/queue/heartbeat";
 import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
-import { PLAN_JOB, RECONCILE_EVERY_MS, RECONCILE_JOB, RECONCILE_SCHEDULER_ID } from "@/server/queue/schedulers";
+import {
+  NOTIFY_EVERY_MS,
+  NOTIFY_JOB,
+  NOTIFY_SCHEDULER_ID,
+  PLAN_JOB,
+  RECONCILE_EVERY_MS,
+  RECONCILE_JOB,
+  RECONCILE_SCHEDULER_ID,
+} from "@/server/queue/schedulers";
+import { createMailer, type Mailer } from "@/server/notify/mailer";
+import { resolveAlertRecipient, sweepNotifications } from "@/server/services/alerts";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
 import { createAuditProcessor } from "./processors/audit.processor";
@@ -23,6 +33,8 @@ export type StartWorkerOptions = {
   /** Solo pruebas y script de desarrollo: permite auditar direcciones privadas. */
   allowPrivate?: boolean;
   heartbeatIntervalMs?: number;
+  /** Solo pruebas: sustituye al envío SMTP. */
+  mailer?: Mailer | null;
 };
 
 export type RunningWorker = { close(): Promise<void> };
@@ -107,6 +119,26 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
   lighthouse.on("error", (err) => log.error({ err: err.message }, "error de la cola lighthouse"));
   maintenance.on("error", (err) => log.error({ err: err.message }, "error de la cola maintenance"));
 
+  const mailer =
+    options.mailer !== undefined
+      ? options.mailer
+      : env.SMTP_HOST && env.EMAIL_FROM
+        ? createMailer({ host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER || undefined, pass: env.SMTP_PASS || undefined, from: env.EMAIL_FROM })
+        : null;
+  if (!mailer) log.warn("SMTP_HOST o EMAIL_FROM sin definir: las alertas se evalúan pero no se envían por correo");
+  if (mailer && env.NODE_ENV === "production" && /localhost|127\.0\.0\.1/.test(env.APP_URL)) {
+    log.warn({ appUrl: env.APP_URL }, "APP_URL apunta a localhost: los enlaces de los correos no servirán; defínela en el worker");
+  }
+  const runNotify = async () => {
+    const recipient = await resolveAlertRecipient(env.ALERT_EMAIL, db);
+    if (!recipient) {
+      log.warn("sin destinatario de alertas: define ALERT_EMAIL o crea el administrador");
+      return;
+    }
+    const r = await sweepNotifications({ db, mailer, recipient, appUrl: env.APP_URL, log });
+    if (r.sent || r.failed) log.info(r, "barrido de alertas");
+  };
+
   const planProject = createPlanProjectProcessor({ db, redis, lighthouse, maintenance, log });
   const runReconcile = () => reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
   const maintenanceWorker = new Worker(
@@ -117,6 +149,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
         await runReconcile();
         return;
       }
+      if (job.name === NOTIFY_JOB) return runNotify();
       log.warn({ name: job.name }, "trabajo de mantenimiento desconocido");
     },
     { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1 },
@@ -142,6 +175,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la reconciliación periódica")),
     30_000,
     "registro de la reconciliación periódica",
+    log,
+  );
+
+  await withDeadline(
+    maintenance
+      .upsertJobScheduler(NOTIFY_SCHEDULER_ID, { every: NOTIFY_EVERY_MS, startDate: new Date(Date.now() + 30_000) }, { name: NOTIFY_JOB, data: {} })
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar el barrido de alertas")),
+    30_000,
+    "registro del barrido de alertas",
     log,
   );
 

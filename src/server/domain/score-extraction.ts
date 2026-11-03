@@ -4,12 +4,19 @@ export type LhrLike = {
   finalDisplayedUrl?: string;
   finalUrl?: string;
   runtimeError?: { code?: string; message?: string };
-  categories?: Record<string, { score?: number | null } | undefined>;
+  categories?: Record<
+    string,
+    | { title?: string; score?: number | null; auditRefs?: Array<{ id: string; weight?: number; group?: string }> }
+    | undefined
+  >;
   audits?: Record<
     string,
     | {
         numericValue?: number;
         title?: string;
+        description?: string;
+        displayValue?: string;
+        scoreDisplayMode?: string;
         score?: number | null;
         details?: { type?: string; overallSavingsMs?: number; items?: Array<Record<string, unknown>> };
       }

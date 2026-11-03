@@ -25,7 +25,9 @@ pnpm worker:dev     # worker (otro terminal)
 
 El worker (BullMQ + Lighthouse + Chromium) es un proceso aparte: `docker/Dockerfile.worker`, una sola réplica.
 Necesita `DATABASE_URL`, `REDIS_URL`, `R2_*` y, opcionalmente, `CHROME_PATH` y `AUDIT_*`
-(ver `.env.example`; no usa SESSION_SECRET, ADMIN_* ni SMTP).
+(ver `.env.example`; no usa SESSION_SECRET ni ADMIN_*). Para enviar las alertas por correo también
+necesita `SMTP_*`, `EMAIL_FROM` y `APP_URL` (y opcionalmente `ALERT_EMAIL`); sin SMTP el worker arranca igual,
+evalúa las alertas y lo avisa en los logs.
 
 - Si no hay worker en línea, el botón **Auditar** se niega con un aviso (no deja filas bloqueadas).
 - En local, para auditar sitios en `localhost` (el worker de producción los rechaza a propósito):
@@ -40,6 +42,23 @@ Necesita `DATABASE_URL`, `REDIS_URL`, `R2_*` y, opcionalmente, `CHROME_PATH` y `
 - **Reconciliación:** al arrancar y cada 15 minutos, el worker corrige desfases entre Postgres y Redis
   (auditorías huérfanas, trabajos perdidos, agendadores que faltan o sobran). `/admin/cola` muestra el estado.
 - **Despliegue:** un cambio que toca `src/worker`, `src/server` o las dependencias exige redesplegar **web y worker**.
+
+## Alertas y correos
+
+Solo en proyectos en **producción**. Tras cada auditoría el worker compara las puntuaciones con los umbrales
+del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con pruebas de tabla):
+
+- Una alerta es una condición (ruta + perfil + métrica, o "la auditoría falla"). Se **abre una vez**, no se
+  repite mientras siga igual y se **cierra sola** al recuperarse; una nueva caída es una alerta nueva.
+- Un fallo definitivo (reintentos agotados) abre una alerta de fallo de auditoría; un éxito posterior la cierra.
+- Cada 5 minutos el worker barre las alertas pendientes y envía **un correo por proyecto** (agrupado). Espera
+  a que terminen las auditorías pendientes del proyecto para no mandar varios correos de una misma corrida.
+  Mientras una alerta siga abierta, recuerda cada **7 días**. No se envía correo de recuperación.
+- Un envío fallido queda en la bitácora (`notifications`) y se reintenta pasada una hora.
+- Destinatario: `ALERT_EMAIL` si está definido; si no, el correo del administrador.
+- Pasar a desarrollo silencia las alertas abiertas. `/admin/alertas` y la ficha del proyecto muestran las
+  alertas, el registro de correos y un botón de **WhatsApp** (enlace `wa.me` con el mensaje prellenado,
+  usando el teléfono del cliente) para avisarle.
 
 ## Design System
 

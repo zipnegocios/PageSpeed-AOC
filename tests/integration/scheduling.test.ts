@@ -11,7 +11,7 @@ import * as s from "@/server/db/schema";
 import { projectCron, schedulerId } from "@/server/domain/schedule";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
-import { PLAN_JOB, RECONCILE_SCHEDULER_ID, getProjectNextRun, listProjectSchedules, upsertProjectScheduler, type PlanJobData } from "@/server/queue/schedulers";
+import { NOTIFY_SCHEDULER_ID, PLAN_JOB, RECONCILE_SCHEDULER_ID, getProjectNextRun, listProjectSchedules, upsertProjectScheduler, type PlanJobData } from "@/server/queue/schedulers";
 import { cancelScheduledAudits } from "@/server/services/audits";
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
@@ -323,6 +323,7 @@ describe.skipIf(!ready)("agendado, plan-project-audit y reconciliación", () => 
       NODE_ENV: "test", LOG_LEVEL: "error", DATABASE_URL: dbUrl!, REDIS_URL: redisUrl!, R2_ENDPOINT: s3.url, R2_REGION: "auto",
       R2_BUCKET: "reportes", R2_ACCESS_KEY_ID: "ak", R2_SECRET_ACCESS_KEY: "sk", CHROME_PATH: undefined,
       AUDIT_COOLDOWN_MS: 30, AUDIT_TIMEOUT_MS: 5000, AUDIT_ATTEMPTS: 3,
+      APP_URL: "http://localhost:3000", SMTP_PORT: 587,
     });
     const okRunner: LighthouseRunner = async () => ({ lhr: structuredClone(fixture) as never });
 
@@ -332,6 +333,7 @@ describe.skipIf(!ready)("agendado, plan-project-audit y reconciliación", () => 
       worker = await startWorker({ env: env(), runner: okRunner, allowPrivate: true, logger: log });
       expect(await maintenance.getJobScheduler(schedulerId(project.id))).toBeDefined();
       expect(await maintenance.getJobScheduler(RECONCILE_SCHEDULER_ID)).toMatchObject({ every: 15 * 60_000 });
+      expect(await maintenance.getJobScheduler(NOTIFY_SCHEDULER_ID)).toMatchObject({ every: 5 * 60_000, name: "notify" });
     });
 
     it("cuando el agendador se dispara, el worker encola y ejecuta las auditorías de punta a punta", async () => {

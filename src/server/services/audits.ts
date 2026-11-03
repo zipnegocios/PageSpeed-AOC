@@ -5,6 +5,7 @@ import { getDb, type Database } from "@/server/db/client";
 import { assertRouteAuditable, planProfiles, type AuditTrigger, type Profile } from "@/server/domain/audit-rules";
 import { DomainError } from "@/server/domain/errors";
 import { readHeartbeat } from "@/server/queue/heartbeat";
+import { failedChecks, type CategoryChecks } from "@/server/domain/failed-checks";
 import { topOpportunities, type LhrLike, type Opportunity } from "@/server/domain/score-extraction";
 import { getRedis } from "@/server/queue/connection";
 import { auditJobOptions, lighthouseQueue, PRIORITY, type AuditJobData } from "@/server/queue/queues";
@@ -125,14 +126,20 @@ export async function getAudit(id: string, db: Database = getDb()) {
   return audit;
 }
 
-/** Mejoras principales leídas del JSON completo en R2. null si no hay JSON o R2 no responde. */
-export async function getAuditOpportunities(
+export type AuditInsights = { opportunities: Opportunity[]; failed: CategoryChecks[] };
+
+/**
+ * Mejoras principales y comprobaciones fallidas, leídas del JSON completo en R2 (una sola lectura).
+ * null si no hay JSON o R2 no responde.
+ */
+export async function getAuditInsights(
   audit: Pick<repo.AuditDetail, "status" | "r2Key">,
   r2: Pick<R2Store, "getAuditJson"> = getR2(),
-): Promise<Opportunity[] | null> {
+): Promise<AuditInsights | null> {
   if (audit.status !== "succeeded" || !audit.r2Key) return null;
   try {
-    return topOpportunities(await r2.getAuditJson<LhrLike>(audit.r2Key));
+    const lhr = await r2.getAuditJson<LhrLike>(audit.r2Key);
+    return { opportunities: topOpportunities(lhr), failed: failedChecks(lhr) };
   } catch {
     return null;
   }

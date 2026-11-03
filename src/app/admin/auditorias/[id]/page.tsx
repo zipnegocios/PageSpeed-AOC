@@ -5,12 +5,64 @@ import { orNotFound } from "@/lib/not-found";
 import { Alert } from "@/lib/ui/components/alert";
 import { Card } from "@/lib/ui/components/card";
 import { Score } from "@/lib/ui/components/score";
-import { getAudit, getAuditOpportunities } from "@/server/services/audits";
+import type { CategoryChecks } from "@/server/domain/failed-checks";
+import { getAudit, getAuditInsights } from "@/server/services/audits";
 import { AdminShell } from "../../_components/admin-shell";
 import { AuditStatusBadge } from "../../_components/audit-badge";
 import { AutoRefresh } from "../../_components/auto-refresh";
 
 export const metadata: Metadata = { title: "Auditoría · AOC PageSpeed", robots: { index: false, follow: false } };
+
+function FailedChecksCard({ categories }: { categories: CategoryChecks[] | null }) {
+  const total = categories?.reduce((n, c) => n + c.failedCount, 0) ?? 0;
+  return (
+    <Card
+      title="Comprobaciones que fallan"
+      description="Lo que resta puntos en cada categoría, de mayor a menor peso. Corregirlas sube la puntuación."
+    >
+      {categories === null ? (
+        <p className="text-ink-muted">No se pudo leer el informe completo en el almacenamiento.</p>
+      ) : total === 0 ? (
+        <p className="text-ink-muted">Todas las comprobaciones con peso en la puntuación se cumplen.</p>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {categories
+            .filter((c) => c.failedCount > 0)
+            .map((c) => (
+              <section key={c.category} className="flex flex-col gap-2">
+                <h3 className="flex items-baseline gap-2 text-[19px] font-semibold text-ink">
+                  {c.label}
+                  {c.score !== null ? <span className="text-[15px] text-ink-muted tabular-nums">{c.score}/100</span> : null}
+                  <span className="text-[15px] font-normal text-ink-muted">
+                    · {c.failedCount} {c.failedCount === 1 ? "comprobación" : "comprobaciones"}
+                  </span>
+                </h3>
+                <ul className="divide-y divide-border rounded-sm border border-border">
+                  {c.checks.map((k) => (
+                    <li key={k.id} className="flex flex-col gap-1 px-3 py-3">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-semibold text-ink">{k.title}</span>
+                        {k.displayValue ? <span className="text-[15px] whitespace-nowrap text-ink-muted tabular-nums">{k.displayValue}</span> : null}
+                      </div>
+                      {k.description ? <p className="text-[15px] leading-5 text-ink-muted">{k.description}</p> : null}
+                      {k.learnMoreUrl ? (
+                        <a href={k.learnMoreUrl} target="_blank" rel="noopener noreferrer" className="text-[15px] font-semibold text-link hover:underline">
+                          Más información
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                {c.failedCount > c.checks.length ? (
+                  <p className="text-[15px] text-ink-muted">Se muestran las {c.checks.length} de mayor peso; el resto está en el informe completo.</p>
+                ) : null}
+              </section>
+            ))}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 const TRIGGER_LABEL = { manual: "Manual", scheduled: "Programada", mcp: "Agente (MCP)" } as const;
 
@@ -18,7 +70,8 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
   const session = await verifySession();
   const { id } = await params;
   const audit = await orNotFound(getAudit(id));
-  const opportunities = await getAuditOpportunities(audit);
+  const insights = await getAuditInsights(audit);
+  const opportunities = insights?.opportunities ?? null;
   const done = audit.status === "succeeded";
 
   const scores = [
@@ -89,6 +142,8 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
               INP no se mide en el laboratorio de Lighthouse; el TBT es el indicador de interactividad equivalente.
             </p>
           </Card>
+
+          <FailedChecksCard categories={insights?.failed ?? null} />
 
           <Card title="Mejoras principales" description="Ahorro estimado de tiempo de carga que propone Lighthouse.">
             {opportunities === null ? (

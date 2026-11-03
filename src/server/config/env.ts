@@ -30,6 +30,8 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().min(1),
+  // A quién se avisan las alertas. Vacío o ausente: el correo del administrador.
+  ALERT_EMAIL: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.email().optional()),
 
   CHROME_PATH: z.string().optional(),
   AUDIT_COOLDOWN_MS: int(12_000),
@@ -56,22 +58,33 @@ export function envIssues(source: Record<string, string | undefined>): string[] 
 }
 
 // ------------------------------------------------------------ entorno del worker
-// El worker no necesita sesión, admin ni correo (el correo entra con las alertas).
-const workerSchema = schema.pick({
-  NODE_ENV: true,
-  LOG_LEVEL: true,
-  DATABASE_URL: true,
-  REDIS_URL: true,
-  R2_ENDPOINT: true,
-  R2_REGION: true,
-  R2_BUCKET: true,
-  R2_ACCESS_KEY_ID: true,
-  R2_SECRET_ACCESS_KEY: true,
-  CHROME_PATH: true,
-  AUDIT_COOLDOWN_MS: true,
-  AUDIT_TIMEOUT_MS: true,
-  AUDIT_ATTEMPTS: true,
-});
+// El worker no necesita sesión ni admin. El correo (alertas) es opcional: sin SMTP evalúa las
+// alertas pero no las envía, y lo avisa en los logs.
+const workerSchema = schema
+  .pick({
+    NODE_ENV: true,
+    LOG_LEVEL: true,
+    DATABASE_URL: true,
+    REDIS_URL: true,
+    R2_ENDPOINT: true,
+    R2_REGION: true,
+    R2_BUCKET: true,
+    R2_ACCESS_KEY_ID: true,
+    R2_SECRET_ACCESS_KEY: true,
+    CHROME_PATH: true,
+    AUDIT_COOLDOWN_MS: true,
+    AUDIT_TIMEOUT_MS: true,
+    AUDIT_ATTEMPTS: true,
+    APP_URL: true,
+    SMTP_PORT: true,
+    SMTP_USER: true,
+    SMTP_PASS: true,
+    ALERT_EMAIL: true,
+  })
+  .extend({
+    SMTP_HOST: z.string().optional(),
+    EMAIL_FROM: z.string().optional(),
+  });
 
 export type WorkerEnv = z.infer<typeof workerSchema>;
 

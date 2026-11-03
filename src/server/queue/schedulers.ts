@@ -10,6 +10,11 @@ export const RECONCILE_JOB = "reconcile";
 export const RECONCILE_SCHEDULER_ID = "reconcile";
 export const RECONCILE_EVERY_MS = 15 * 60 * 1000;
 
+/** Barrido que envía los correos de alertas pendientes. */
+export const NOTIFY_JOB = "notify";
+export const NOTIFY_SCHEDULER_ID = "notify";
+export const NOTIFY_EVERY_MS = 5 * 60 * 1000;
+
 export type ProjectSchedule = { projectId: string; pattern: string | null; next: Date | null };
 
 /**

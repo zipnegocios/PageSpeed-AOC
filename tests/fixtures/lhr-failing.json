@@ -1,0 +1,440 @@
+{
+ "lighthouseVersion": "13.6.0",
+ "finalDisplayedUrl": "http://127.0.0.1:18123/",
+ "categories": {
+  "performance": {
+   "id": "performance",
+   "title": "Performance",
+   "score": 0.62,
+   "auditRefs": [
+    {
+     "id": "first-contentful-paint",
+     "weight": 10,
+     "group": "metrics"
+    },
+    {
+     "id": "largest-contentful-paint",
+     "weight": 25,
+     "group": "metrics"
+    },
+    {
+     "id": "total-blocking-time",
+     "weight": 30,
+     "group": "metrics"
+    },
+    {
+     "id": "cumulative-layout-shift",
+     "weight": 25,
+     "group": "metrics"
+    },
+    {
+     "id": "speed-index",
+     "weight": 10,
+     "group": "metrics"
+    }
+   ]
+  },
+  "accessibility": {
+   "id": "accessibility",
+   "title": "Accessibility",
+   "score": 0.95,
+   "auditRefs": [
+    {
+     "id": "aria-hidden-body",
+     "weight": 10,
+     "group": "a11y-aria"
+    },
+    {
+     "id": "color-contrast",
+     "weight": 7,
+     "group": "a11y-color-contrast"
+    },
+    {
+     "id": "document-title",
+     "weight": 7,
+     "group": "a11y-names-labels"
+    },
+    {
+     "id": "heading-order",
+     "weight": 3,
+     "group": "a11y-navigation"
+    },
+    {
+     "id": "html-has-lang",
+     "weight": 7,
+     "group": "a11y-language"
+    },
+    {
+     "id": "html-lang-valid",
+     "weight": 7,
+     "group": "a11y-language"
+    },
+    {
+     "id": "image-alt",
+     "weight": 10,
+     "group": "a11y-names-labels"
+    },
+    {
+     "id": "meta-viewport",
+     "weight": 10,
+     "group": "a11y-best-practices"
+    },
+    {
+     "id": "landmark-one-main",
+     "weight": 3,
+     "group": "a11y-best-practices"
+    }
+   ]
+  },
+  "best-practices": {
+   "id": "best-practices",
+   "title": "Best Practices",
+   "score": 0.96,
+   "auditRefs": [
+    {
+     "id": "is-on-https",
+     "weight": 5,
+     "group": "best-practices-trust-safety"
+    },
+    {
+     "id": "geolocation-on-start",
+     "weight": 1,
+     "group": "best-practices-trust-safety"
+    },
+    {
+     "id": "notification-on-start",
+     "weight": 1,
+     "group": "best-practices-trust-safety"
+    },
+    {
+     "id": "paste-preventing-inputs",
+     "weight": 3,
+     "group": "best-practices-ux"
+    },
+    {
+     "id": "image-aspect-ratio",
+     "weight": 1,
+     "group": "best-practices-ux"
+    },
+    {
+     "id": "image-size-responsive",
+     "weight": 1,
+     "group": "best-practices-ux"
+    },
+    {
+     "id": "doctype",
+     "weight": 1,
+     "group": "best-practices-browser-compat"
+    },
+    {
+     "id": "charset",
+     "weight": 1,
+     "group": "best-practices-browser-compat"
+    },
+    {
+     "id": "deprecations",
+     "weight": 5,
+     "group": "best-practices-general"
+    },
+    {
+     "id": "third-party-cookies",
+     "weight": 5,
+     "group": "best-practices-general"
+    },
+    {
+     "id": "errors-in-console",
+     "weight": 1,
+     "group": "best-practices-general"
+    },
+    {
+     "id": "inspector-issues",
+     "weight": 1,
+     "group": "best-practices-general"
+    }
+   ]
+  },
+  "seo": {
+   "id": "seo",
+   "title": "SEO",
+   "score": 0.69,
+   "auditRefs": [
+    {
+     "id": "is-crawlable",
+     "weight": 4.043478260869565,
+     "group": "seo-crawl"
+    },
+    {
+     "id": "document-title",
+     "weight": 1,
+     "group": "seo-content"
+    },
+    {
+     "id": "meta-description",
+     "weight": 1,
+     "group": "seo-content"
+    },
+    {
+     "id": "http-status-code",
+     "weight": 1,
+     "group": "seo-crawl"
+    },
+    {
+     "id": "link-text",
+     "weight": 1,
+     "group": "seo-content"
+    },
+    {
+     "id": "crawlable-anchors",
+     "weight": 1,
+     "group": "seo-crawl"
+    },
+    {
+     "id": "image-alt",
+     "weight": 1,
+     "group": "seo-content"
+    },
+    {
+     "id": "hreflang",
+     "weight": 1,
+     "group": "seo-content"
+    }
+   ]
+  }
+ },
+ "audits": {
+  "first-contentful-paint": {
+   "id": "first-contentful-paint",
+   "title": "First Contentful Paint",
+   "description": "First Contentful Paint marks the time at which the first text or image is painted. [Learn more about the First Contentful Paint metric](https://developer.chrome.com/docs/lighthouse/performance/first-contentful-paint/).",
+   "score": null,
+   "scoreDisplayMode": "numeric",
+   "displayValue": "0.6 s",
+   "numericValue": 641.15545
+  },
+  "largest-contentful-paint": {
+   "id": "largest-contentful-paint",
+   "title": "Largest Contentful Paint",
+   "description": "Largest Contentful Paint marks the time at which the largest text or image is painted. [Learn more about the Largest Contentful Paint metric](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-largest-contentful-paint/)",
+   "score": 0.42,
+   "scoreDisplayMode": "numeric",
+   "displayValue": "4.1 s",
+   "numericValue": 641.15545
+  },
+  "total-blocking-time": {
+   "id": "total-blocking-time",
+   "title": "Total Blocking Time",
+   "description": "Sum of all time periods between FCP and Time to Interactive, when task length exceeded 50ms, expressed in milliseconds. [Learn more about the Total Blocking Time metric](https://developer.chrome.com/docs/lighthouse/performance/lighthouse-total-blocking-time/).",
+   "score": 0.9,
+   "scoreDisplayMode": "numeric",
+   "displayValue": "0 ms",
+   "numericValue": 0
+  },
+  "cumulative-layout-shift": {
+   "id": "cumulative-layout-shift",
+   "title": "Cumulative Layout Shift",
+   "description": "Cumulative Layout Shift measures the movement of visible elements within the viewport. [Learn more about the Cumulative Layout Shift metric](https://web.dev/articles/cls).",
+   "score": 0.89,
+   "scoreDisplayMode": "numeric",
+   "displayValue": "0.12",
+   "numericValue": 0
+  },
+  "speed-index": {
+   "id": "speed-index",
+   "title": "Speed Index",
+   "description": "Speed Index shows how quickly the contents of a page are visibly populated. [Learn more about the Speed Index metric](https://developer.chrome.com/docs/lighthouse/performance/speed-index/).",
+   "score": 1,
+   "scoreDisplayMode": "numeric",
+   "displayValue": "0.6 s",
+   "numericValue": 641.15545
+  },
+  "aria-hidden-body": {
+   "id": "aria-hidden-body",
+   "title": "`[aria-hidden=\"true\"]` is not present on the document `<body>`",
+   "description": "Assistive technologies, like screen readers, work inconsistently when `aria-hidden=\"true\"` is set on the document `<body>`. [Learn how `aria-hidden` affects the document body](https://dequeuniversity.com/rules/axe/4.14/aria-hidden-body).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "color-contrast": {
+   "id": "color-contrast",
+   "title": "Background and foreground colors have a sufficient contrast ratio",
+   "description": "Low-contrast text is difficult or impossible for many users to read. [Learn how to provide sufficient color contrast](https://dequeuniversity.com/rules/axe/4.14/color-contrast).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "document-title": {
+   "id": "document-title",
+   "title": "Document has a `<title>` element",
+   "description": "The title gives screen reader users an overview of the page, and search engine users rely on it heavily to determine if a page is relevant to their search. [Learn more about document titles](https://dequeuniversity.com/rules/axe/4.14/document-title).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "heading-order": {
+   "id": "heading-order",
+   "title": "Heading elements appear in a sequentially-descending order",
+   "description": "Properly ordered headings that do not skip levels convey the semantic structure of the page, making it easier to navigate and understand when using assistive technologies. [Learn more about heading order](https://dequeuniversity.com/rules/axe/4.14/heading-order).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "html-has-lang": {
+   "id": "html-has-lang",
+   "title": "`<html>` element has a `[lang]` attribute",
+   "description": "If a page doesn't specify a `lang` attribute, a screen reader assumes that the page is in the default language that the user chose when setting up the screen reader. If the page isn't actually in the default language, then the screen reader might not announce the page's text correctly. [Learn more about the `lang` attribute](https://dequeuniversity.com/rules/axe/4.14/html-has-lang).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "html-lang-valid": {
+   "id": "html-lang-valid",
+   "title": "`<html>` element has a valid value for its `[lang]` attribute",
+   "description": "Specifying a valid [BCP 47 language](https://www.w3.org/International/questions/qa-choosing-language-tags#question) helps screen readers announce text properly. [Learn how to use the `lang` attribute](https://dequeuniversity.com/rules/axe/4.14/html-lang-valid).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "image-alt": {
+   "id": "image-alt",
+   "title": "Image elements have `[alt]` attributes",
+   "description": "Informative elements should aim for short, descriptive alternate text. Decorative elements can be ignored with an empty alt attribute. [Learn more about the `alt` attribute](https://dequeuniversity.com/rules/axe/4.14/image-alt).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "meta-viewport": {
+   "id": "meta-viewport",
+   "title": "`[user-scalable=\"no\"]` is not used in the `<meta name=\"viewport\">` element and the `[maximum-scale]` attribute is not less than 5.",
+   "description": "Disabling zooming is problematic for users with low vision who rely on screen magnification to properly see the contents of a web page. [Learn more about the viewport meta tag](https://dequeuniversity.com/rules/axe/4.14/meta-viewport).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "landmark-one-main": {
+   "id": "landmark-one-main",
+   "title": "Document does not have a main landmark.",
+   "description": "One main landmark helps screen reader users navigate a web page. [Learn more about landmarks](https://dequeuniversity.com/rules/axe/4.14/landmark-one-main).",
+   "score": 0,
+   "scoreDisplayMode": "binary"
+  },
+  "is-on-https": {
+   "id": "is-on-https",
+   "title": "Uses HTTPS",
+   "description": "All sites should be protected with HTTPS, even ones that don't handle sensitive data. This includes avoiding [mixed content](https://developers.google.com/web/fundamentals/security/prevent-mixed-content/what-is-mixed-content), where some resources are loaded over HTTP despite the initial request being served over HTTPS. HTTPS prevents intruders from tampering with or passively listening in on the communications between your app and your users, and is a prerequisite for HTTP/2 and many new web platform APIs. [Learn more about HTTPS](https://developer.chrome.com/docs/lighthouse/pwa/is-on-https/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "geolocation-on-start": {
+   "id": "geolocation-on-start",
+   "title": "Avoids requesting the geolocation permission on page load",
+   "description": "Users are mistrustful of or confused by sites that request their location without context. Consider tying the request to a user action instead. [Learn more about the geolocation permission](https://developer.chrome.com/docs/lighthouse/best-practices/geolocation-on-start/). Also consider using the [`<geolocation>` element](https://developer.chrome.com/blog/geolocation-html-element).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "notification-on-start": {
+   "id": "notification-on-start",
+   "title": "Avoids requesting the notification permission on page load",
+   "description": "Users are mistrustful of or confused by sites that request to send notifications without context. Consider tying the request to user gestures instead. [Learn more about responsibly getting permission for notifications](https://developer.chrome.com/docs/lighthouse/best-practices/notification-on-start/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "paste-preventing-inputs": {
+   "id": "paste-preventing-inputs",
+   "title": "Allows users to paste into input fields",
+   "description": "Preventing input pasting is a bad practice for the UX, and weakens security by blocking password managers.[Learn more about user-friendly input fields](https://developer.chrome.com/docs/lighthouse/best-practices/paste-preventing-inputs/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "image-aspect-ratio": {
+   "id": "image-aspect-ratio",
+   "title": "Displays images with correct aspect ratio",
+   "description": "Image display dimensions should match natural aspect ratio. [Learn more about image aspect ratio](https://developer.chrome.com/docs/lighthouse/best-practices/image-aspect-ratio/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "image-size-responsive": {
+   "id": "image-size-responsive",
+   "title": "Serves images with appropriate resolution",
+   "description": "Image natural dimensions should be proportional to the display size and the pixel ratio to maximize image clarity. [Learn how to provide responsive images](https://web.dev/articles/serve-responsive-images).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "doctype": {
+   "id": "doctype",
+   "title": "Page has the HTML doctype",
+   "description": "Specifying a doctype prevents the browser from switching to quirks-mode. [Learn more about the doctype declaration](https://developer.chrome.com/docs/lighthouse/best-practices/doctype/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "charset": {
+   "id": "charset",
+   "title": "Properly defines charset",
+   "description": "A character encoding declaration is required. It can be done with a `<meta>` tag in the first 1024 bytes of the HTML or in the Content-Type HTTP response header. [Learn more about declaring the character encoding](https://developer.chrome.com/docs/lighthouse/best-practices/charset/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "deprecations": {
+   "id": "deprecations",
+   "title": "Avoids deprecated APIs",
+   "description": "Deprecated APIs will eventually be removed from the browser. [Learn more about deprecated APIs](https://developer.chrome.com/docs/lighthouse/best-practices/deprecations/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "third-party-cookies": {
+   "id": "third-party-cookies",
+   "title": "Avoids third-party cookies",
+   "description": "Third-party cookies may be blocked in some contexts. [Learn more about preparing for third-party cookie restrictions](https://privacysandbox.google.com/cookies/prepare/overview).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "errors-in-console": {
+   "id": "errors-in-console",
+   "title": "Browser errors were logged to the console",
+   "description": "Errors logged to the console indicate unresolved problems. They can come from network request failures and other browser concerns. [Learn more about this errors in console diagnostic audit](https://developer.chrome.com/docs/lighthouse/best-practices/errors-in-console/)",
+   "score": 0,
+   "scoreDisplayMode": "binary"
+  },
+  "inspector-issues": {
+   "id": "inspector-issues",
+   "title": "No issues in the `Issues` panel in Chrome Devtools",
+   "description": "Issues logged to the `Issues` panel in Chrome Devtools indicate unresolved problems. They can come from network request failures, insufficient security controls, and other browser concerns. Open up the Issues panel in Chrome DevTools for more details on each issue.",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "is-crawlable": {
+   "id": "is-crawlable",
+   "title": "Page isn’t blocked from indexing",
+   "description": "Search engines are unable to include your pages in search results if they don't have permission to crawl them. [Learn more about crawler directives](https://developer.chrome.com/docs/lighthouse/seo/is-crawlable/).",
+   "score": 0,
+   "scoreDisplayMode": "binary"
+  },
+  "meta-description": {
+   "id": "meta-description",
+   "title": "Document has a meta description",
+   "description": "Meta descriptions may be included in search results to concisely summarize page content. [Learn more about the meta description](https://developer.chrome.com/docs/lighthouse/seo/meta-description/).",
+   "score": 0,
+   "scoreDisplayMode": "binary"
+  },
+  "http-status-code": {
+   "id": "http-status-code",
+   "title": "Page has successful HTTP status code",
+   "description": "Pages with unsuccessful HTTP status codes may not be indexed properly. [Learn more about HTTP status codes](https://developer.chrome.com/docs/lighthouse/seo/http-status-code/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "link-text": {
+   "id": "link-text",
+   "title": "Links have descriptive text",
+   "description": "Descriptive link text helps search engines understand your content. [Learn how to make links more accessible](https://developer.chrome.com/docs/lighthouse/seo/link-text/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "crawlable-anchors": {
+   "id": "crawlable-anchors",
+   "title": "Links are crawlable",
+   "description": "Search engines may use `href` attributes on links to crawl websites. Ensure that the `href` attribute of anchor elements links to an appropriate destination, so more pages of the site can be discovered. [Learn how to make links crawlable](https://support.google.com/webmasters/answer/9112205)",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  },
+  "hreflang": {
+   "id": "hreflang",
+   "title": "Document has a valid `hreflang`",
+   "description": "hreflang links tell search engines what version of a page they should list in search results for a given language or region. [Learn more about `hreflang`](https://developer.chrome.com/docs/lighthouse/seo/hreflang/).",
+   "score": 1,
+   "scoreDisplayMode": "binary"
+  }
+ }
+}

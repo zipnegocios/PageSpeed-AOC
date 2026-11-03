@@ -57,6 +57,8 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
     AUDIT_COOLDOWN_MS: COOLDOWN,
     AUDIT_TIMEOUT_MS: 5000,
     AUDIT_ATTEMPTS: 3,
+    APP_URL: "http://localhost:3000",
+    SMTP_PORT: 587,
   });
 
   const okRunner: LighthouseRunner = async () => ({ lhr: structuredClone(fixture) as never });

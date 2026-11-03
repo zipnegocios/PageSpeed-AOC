@@ -8,6 +8,7 @@ import { buildAuditKey } from "@/server/domain/r2-key";
 import { extractResults } from "@/server/domain/score-extraction";
 import type { AuditJobData } from "@/server/queue/queues";
 import * as repo from "@/server/repositories/audits";
+import { evaluateAudit, evaluateFailure } from "@/server/services/alerts";
 import type { R2Store } from "@/server/storage/r2";
 import { resolvePinnedHost, type HostResolver } from "../host-pin";
 import type { LighthouseRunner } from "../lighthouse/runner";
@@ -25,6 +26,8 @@ export type AuditProcessorDeps = {
   resolver?: HostResolver;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
+  /** Evaluación de alertas; se puede sustituir en pruebas. */
+  alerts?: { evaluateAudit: typeof evaluateAudit; evaluateFailure: typeof evaluateFailure };
 };
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -37,6 +40,18 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 export function createAuditProcessor(deps: AuditProcessorDeps) {
   const sleep = deps.sleep ?? defaultSleep;
   const now = deps.now ?? (() => new Date());
+  const alerts = deps.alerts ?? { evaluateAudit, evaluateFailure };
+
+  /** Las alertas son de mejor esfuerzo: un fallo aquí jamás cambia el resultado de la auditoría. */
+  async function evaluate(kind: "success" | "failure", auditId: string, log: Logger): Promise<void> {
+    try {
+      const run = kind === "success" ? alerts.evaluateAudit : alerts.evaluateFailure;
+      const r = await run(auditId, { db: deps.db, now });
+      if (r.opened || r.resolved) log.info(r, "alertas actualizadas");
+    } catch (err) {
+      log.error({ err: err instanceof Error ? err.message : String(err) }, "no se pudieron evaluar las alertas");
+    }
+  }
 
   return async function processAudit(job: Job<AuditJobData>): Promise<void> {
     const { auditId } = job.data;
@@ -92,12 +107,14 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
         { key, bytes, performance: extracted.metrics.scorePerformance, seo: extracted.metrics.scoreSeo },
         "auditoría correcta",
       );
+      await evaluate("success", auditId, log);
     } catch (err) {
       const failure = classifyError(err);
       const isLast = !failure.retryable || attempt >= maxAttempts;
       if (isLast) {
         await repo.markFailed(deps.db, auditId, failure);
         log.warn({ code: failure.code, attempt }, `auditoría fallida: ${failure.message}`);
+        await evaluate("failure", auditId, log);
       } else {
         await repo.markRetry(deps.db, auditId, failure);
         log.warn({ code: failure.code, attempt, maxAttempts }, `intento fallido, se reintentará: ${failure.message}`);

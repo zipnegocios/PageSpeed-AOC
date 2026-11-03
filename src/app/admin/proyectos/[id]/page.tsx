@@ -5,6 +5,7 @@ import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { CheckboxField, Field, SelectField } from "@/lib/ui/components/field";
+import { getWhatsappLinkForProject, listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
 import { listAudits } from "@/server/services/audits";
 import { getNextScheduledRun, getProject } from "@/server/services/projects";
 import { listRoutes } from "@/server/services/routes";
@@ -14,6 +15,7 @@ import { Score } from "@/lib/ui/components/score";
 import Link from "next/link";
 import { AdminShell } from "../../_components/admin-shell";
 import { AutoRefresh } from "../../_components/auto-refresh";
+import { AlertList, NotificationList } from "../../_components/alert-list";
 import { AuditStatusBadge } from "../../_components/audit-badge";
 import {
   addRouteAction,
@@ -44,7 +46,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const session = await verifySession();
   const { id } = await params;
   const project = await orNotFound(getProject(id));
-  const [routes, thresholds, audits] = await Promise.all([listRoutes(id), getThresholds(id), listAudits(id, 20)]);
+  const [routes, thresholds, audits, alerts, notifications, whatsappLink] = await Promise.all([
+    listRoutes(id),
+    getThresholds(id),
+    listAudits(id, 20),
+    listOpenAlerts(id),
+    listRecentNotifications(5, id),
+    getWhatsappLinkForProject(id),
+  ]);
   const production = project.phase === "production";
   const nextRun = production ? await getNextScheduledRun(id) : null;
 
@@ -128,6 +137,43 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             <SitemapImporter discover={discoverRoutesAction.bind(null, id)} importRoutes={importRoutesAction.bind(null, id)} />
           </div>
         </details>
+      </Card>
+
+      <Card
+        title={`Alertas (${alerts.length})`}
+        description={
+          production
+            ? "Se avisa por correo al abrirse y se recuerda cada 7 días mientras sigan abiertas. Al recuperarse se cierran solas."
+            : "En desarrollo no se generan ni se envían alertas."
+        }
+      >
+        {alerts.length === 0 ? (
+          <p className="text-ink-muted">{production ? "No hay alertas abiertas en este proyecto." : "Sin alertas."}</p>
+        ) : (
+          <>
+            <AlertList alerts={alerts} />
+            <div>
+              {whatsappLink ? (
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
+                >
+                  Avisar al cliente por WhatsApp
+                </a>
+              ) : (
+                <p className="text-[15px] text-ink-muted">Agrega un teléfono de contacto al cliente para avisarle por WhatsApp.</p>
+              )}
+            </div>
+          </>
+        )}
+        {notifications.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">Últimos correos</h3>
+            <NotificationList items={notifications} />
+          </div>
+        ) : null}
       </Card>
 
       <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. La lista se actualiza sola mientras haya auditorías pendientes.">
