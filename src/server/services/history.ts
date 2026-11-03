@@ -97,3 +97,33 @@ export function listMonitoredRoutes(projectId: string, opts: { all?: boolean } =
   assertUuid(projectId, "Proyecto");
   return repo.listMonitoredRoutes(db, projectId, !opts.all);
 }
+
+export type RouteHistoryRow = {
+  auditId: string;
+  at: Date;
+  scores: Record<(typeof METRIC_KEYS)[number], number | null>;
+  lcpMs: number | null;
+  tbtMs: number | null;
+  cls: number | null;
+};
+
+/** Auditorías correctas de una ruta en el periodo, de la más reciente a la más antigua. */
+export async function getRouteHistory(
+  input: { routeId: string; profile: Profile; days: number; limit?: number },
+  db: Database = getDb(),
+  now: Date = new Date(),
+): Promise<RouteHistoryRow[]> {
+  assertUuid(input.routeId, "Ruta");
+  const rows = await repo.listSeries(db, input.routeId, input.profile, periodStart(now, input.days));
+  return rows
+    .slice(-Math.min(Math.max(input.limit ?? 50, 1), 200))
+    .reverse()
+    .map((r) => ({
+      auditId: r.id,
+      at: r.finishedAt,
+      scores: Object.fromEntries(METRIC_KEYS.map((m) => [m, metricValue(r, m)])) as RouteHistoryRow["scores"],
+      lcpMs: r.lcpMs,
+      tbtMs: r.tbtMs,
+      cls: metricValue(r, "cls"),
+    }));
+}

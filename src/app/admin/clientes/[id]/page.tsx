@@ -95,7 +95,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             <ActionForm action={rotateMagicTokenAction.bind(null, id)} submitLabel="Generar link nuevo" variant="ghost" pendingLabel="Generando…" />
           </div>
           <p className="text-[15px] leading-5 text-ink-muted">
-            El portal del cliente se activa en un próximo milestone: el link ya queda generado. Si generas uno nuevo, el anterior deja de funcionar.
+            El cliente ve sus proyectos en producción, su evolución y puede descargar el informe en PDF o instalar el portal como app. Si generas un link nuevo, el anterior deja de funcionar al instante.
           </p>
         </div>
         <div className="flex flex-col gap-2 border-t border-border pt-4">

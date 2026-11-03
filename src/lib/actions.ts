@@ -7,6 +7,8 @@ export type SitemapCandidate = { path: string; url: string };
 export type ActionState = {
   error?: string;
   ok?: string;
+  /** Credencial que se muestra una sola vez (clave de agente recién creada). Nunca se guarda ni se registra. */
+  secret?: string;
   /** Rutas halladas en el sitemap, pendientes de elegir. */
   candidates?: SitemapCandidate[];
 };

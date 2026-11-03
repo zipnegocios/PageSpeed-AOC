@@ -93,3 +93,31 @@ export async function listProductionProjectsInfo(db: Database): Promise<Producti
     .where(and(eq(projects.phase, "production"), live(), isNull(clients.deletedAt)))
     .orderBy(asc(clients.name), asc(projects.name));
 }
+
+export type ProjectListing = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  phase: "development" | "production";
+  auditFrequency: "weekly" | "daily";
+  clientId: string;
+  clientName: string;
+};
+
+/** Todos los proyectos vigentes con su cliente, para listados. */
+export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
+  return db
+    .select({
+      id: projects.id,
+      name: projects.name,
+      baseUrl: projects.baseUrl,
+      phase: projects.phase,
+      auditFrequency: projects.auditFrequency,
+      clientId: clients.id,
+      clientName: clients.name,
+    })
+    .from(projects)
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .where(and(isNull(projects.deletedAt), isNull(clients.deletedAt)))
+    .orderBy(asc(sql`lower(${clients.name})`), asc(sql`lower(${projects.name})`));
+}

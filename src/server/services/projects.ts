@@ -78,6 +78,10 @@ export function parseAllowedHosts(text: string | undefined, baseUrl: string): st
   return [...hosts];
 }
 
+export function listAllProjects(db: Database = getDb()) {
+  return repo.listAllProjects(db);
+}
+
 export function listProjects(clientId: string, db: Database = getDb()) {
   assertUuid(clientId, "Cliente");
   return repo.listProjectsForClient(db, clientId);

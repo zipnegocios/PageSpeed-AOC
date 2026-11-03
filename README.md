@@ -88,6 +88,22 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   nombre del cliente. Iconos en `public/pwa` (origen: `design/icons/app-icon.svg`). No hay service worker: sin
   conexión el navegador lo dice, nunca se muestran puntuaciones viejas.
 
+## Agentes (MCP)
+
+- Servidor MCP en `POST /api/mcp` (Streamable HTTP, **sin sesión**: cada petición crea su servidor y lo libera).
+  Autenticación con `Authorization: Bearer aoc_...`; las claves se crean y revocan en **Panel → Agentes**, se
+  muestran una sola vez y en la base solo queda su sha256. Un `Origin` ajeno se rechaza (anti DNS-rebinding).
+- Tres niveles de permisos (presets): solo lectura, + auditorías, + configuración. La clave guarda los nombres
+  de las herramientas permitidas; las demás ni aparecen en `tools/list`. Ninguna herramienta borra, cambia la
+  fase, rota links ni suspende clientes.
+- Límites en memoria: 60 llamadas por minuto por clave y 20 claves inválidas cada 10 minutos por IP.
+- `run_audit` reutiliza `requestAudit` (idempotente, exige worker en línea, respeta la fase) con `trigger = mcp` y
+  `requested_by = mcp:<nombre de la clave>`. Con una URL crea una ruta puntual (`source = adhoc`, sin monitoreo),
+  limitada a los hosts permitidos del proyecto y a 50 por proyecto.
+- La capa `src/mcp` solo llama a servicios (la misma lógica que el panel). Guía para agentes: `docs/mcp-skill.md`.
+- Probar con el inspector oficial: `npx @modelcontextprotocol/inspector` (transporte HTTP, cabecera Authorization);
+  las pruebas de integración usan el cliente MCP real del SDK.
+
 ## Design System
 
 La fuente de verdad del diseño es el Design System "AOC PageSpeed" (Rajdhani, azules tecnológicos, rojos sutiles).

@@ -10,6 +10,13 @@ import { assertUuid, isUniqueViolation, parseInput } from "./shared";
 
 export type { Route } from "@/server/repositories/routes";
 
+export async function getRoute(routeId: string, db: Database = getDb()) {
+  assertUuid(routeId, "Ruta");
+  const route = await repo.findRoute(db, routeId);
+  if (!route) throw new DomainError("NOT_FOUND", "Ruta no encontrada.");
+  return route;
+}
+
 export function listRoutes(projectId: string, db: Database = getDb()) {
   assertUuid(projectId, "Proyecto");
   return repo.listRoutes(db, projectId);
@@ -48,6 +55,35 @@ export async function addRoute(projectId: string, raw: unknown, db: Database = g
   } catch (err) {
     if (isUniqueViolation(err)) throw new DomainError("CONFLICT", `La ruta ${path} ya existe en este proyecto.`);
     throw err;
+  }
+}
+
+/** Tope de rutas puntuales por proyecto: un agente no puede llenar la lista a base de URLs sueltas. */
+export const MAX_ADHOC_ROUTES = 50;
+
+/**
+ * Ruta para auditar "esta URL ahora": la que ya exista con ese camino o una nueva marcada como
+ * puntual y sin monitoreo, de modo que no entra a las auditorías programadas. El host debe estar permitido.
+ */
+export async function findOrCreateAdhocRoute(projectId: string, urlOrPath: string, db: Database = getDb()) {
+  const project = await requireProject(projectId, db);
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(urlOrPath)) assertHostAllowed(parseHttpUrl(urlOrPath), project.allowedHosts);
+  const path = normalizePath(urlOrPath);
+  const existing = await repo.findRouteByPath(db, projectId, path);
+  if (existing) return existing;
+  const adhoc = (await repo.listRoutes(db, projectId)).filter((r) => r.source === "adhoc").length;
+  if (adhoc >= MAX_ADHOC_ROUTES) {
+    throw new DomainError("CONFLICT", `Este proyecto ya tiene ${MAX_ADHOC_ROUTES} rutas puntuales. Agrega la ruta de forma permanente o reutiliza una existente.`);
+  }
+  try {
+    const [row] = await db
+      .insert(routes)
+      .values({ projectId, path, url: routeUrl(project.baseUrl, path), source: "adhoc", monitored: false, requiresAuth: false })
+      .returning();
+    return row!;
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    return (await repo.findRouteByPath(db, projectId, path))!;
   }
 }
 

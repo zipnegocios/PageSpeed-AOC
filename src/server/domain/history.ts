@@ -107,7 +107,7 @@ export function computeChange(metric: HistoryMetric, current: number | null, pre
 }
 
 /** Cuántos días mira atrás cada periodo, para pedir los datos. */
-export const periodStart = (now: Date, days: Period): Date => new Date(now.getTime() - days * 86_400_000);
+export const periodStart = (now: Date, days: number): Date => new Date(now.getTime() - days * 86_400_000);
 
 /** Promedio entero de los valores presentes; null si no hay ninguno. */
 export function average(values: Array<number | null>): number | null {

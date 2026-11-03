@@ -34,6 +34,9 @@ export function AdminShell({
           <Link href="/admin/alertas" className="text-[17px] font-semibold text-link hover:underline">
             Alertas
           </Link>
+          <Link href="/admin/agentes" className="text-[17px] font-semibold text-link hover:underline">
+            Agentes
+          </Link>
           <Link href="/admin/cola" className="text-[17px] font-semibold text-link hover:underline">
             Cola
           </Link>

@@ -18,6 +18,8 @@ type Props = {
   /** Vacía los campos cuando la acción termina bien (p. ej. "agregar ruta"). */
   resetOnSuccess?: boolean;
   className?: string;
+  /** Contenido extra bajo los mensajes, según el resultado (solo desde componentes de cliente). */
+  renderResult?: (state: ActionState) => ReactNode;
   children?: ReactNode;
 };
 
@@ -32,6 +34,7 @@ export function ActionForm({
   variant = "primary",
   resetOnSuccess = false,
   className,
+  renderResult,
   children,
 }: Props) {
   const [state, dispatch, pending] = useActionState<ActionState, FormData>(action, NO_STATE);
@@ -52,6 +55,7 @@ export function ActionForm({
       {children}
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
       {state.ok ? <Alert tone="info">{state.ok}</Alert> : null}
+      {renderResult ? renderResult(state) : null}
       {submitLabel ? (
         <div>
           <Button type="submit" variant={variant} disabled={pending}>
