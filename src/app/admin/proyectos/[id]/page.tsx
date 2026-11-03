@@ -3,10 +3,12 @@ import { orNotFound } from "@/lib/not-found";
 import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
+import { Alert } from "@/lib/ui/components/alert";
 import { Card } from "@/lib/ui/components/card";
-import { CheckboxField, Field, SelectField } from "@/lib/ui/components/field";
+import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getWhatsappLinkForProject, listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
 import { listAudits } from "@/server/services/audits";
+import { authKeyStatus, getProjectAuthSummary } from "@/server/services/project-auth";
 import { getNextScheduledRun, getProject } from "@/server/services/projects";
 import { getClient } from "@/server/services/clients";
 import { listRoutes } from "@/server/services/routes";
@@ -27,6 +29,10 @@ import {
   removeRouteAction,
   requestAuditAction,
   sendReportAction,
+  clearAuthAction,
+  saveCookieAuthAction,
+  saveFormAuthAction,
+  toggleRouteAuthAction,
   setPhaseAction,
   setThresholdsAction,
   toggleRouteAction,
@@ -50,14 +56,16 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const { id } = await params;
   const search = await searchParams;
   const project = await orNotFound(getProject(id));
-  const [routes, thresholds, audits, alerts, notifications, whatsappLink] = await Promise.all([
+  const [routes, thresholds, audits, alerts, notifications, whatsappLink, authSummary] = await Promise.all([
     listRoutes(id),
     getThresholds(id),
     listAudits(id, 20),
     listOpenAlerts(id),
     listRecentNotifications(5, id),
     getWhatsappLinkForProject(id),
+    getProjectAuthSummary(id),
   ]);
+  const authKey = authKeyStatus();
   const client = await getClient(project.clientId);
   const production = project.phase === "production";
   const nextRun = production ? await getNextScheduledRun(id) : null;
@@ -102,7 +110,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <span className="flex flex-wrap gap-2 text-[14px] text-ink-muted">
                     {r.label ? <span>{r.label}</span> : null}
                     <span>{r.source === "sitemap" ? "Desde sitemap" : "Manual"}</span>
-                    {r.requiresAuth ? <span>Requiere login</span> : null}
+                    {r.requiresAuth ? <Badge>Requiere sesión</Badge> : null}
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2">
@@ -115,6 +123,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     )}
                   </ActionForm>
                   <Badge tone={r.monitored ? "ok" : "neutral"}>{r.monitored ? "Monitoreada" : "Inactiva"}</Badge>
+                  <ActionForm action={toggleRouteAuthAction.bind(null, id, r.id, !r.requiresAuth)} submitLabel={r.requiresAuth ? "Sin sesión" : "Pedir sesión"} variant="ghost" pendingLabel="…" />
                   <ActionForm action={toggleRouteAction.bind(null, id, r.id, !r.monitored)} submitLabel={r.monitored ? "Desactivar" : "Activar"} variant="ghost" pendingLabel="…" />
                   <ActionForm action={removeRouteAction.bind(null, id, r.id)} submitLabel="Borrar" variant="ghost" pendingLabel="…" />
                 </span>
@@ -128,7 +137,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <ActionForm action={addRouteAction.bind(null, id)} submitLabel="Agregar ruta" pendingLabel="Agregando…" resetOnSuccess className="mt-4">
             <Field label="Ruta o URL" id="path" required placeholder="/contacto" autoComplete="off" hint="Puedes pegar la URL completa; se guarda solo la ruta." />
             <Field label="Etiqueta (opcional)" id="label" maxLength={120} autoComplete="off" />
-            <CheckboxField label="Requiere iniciar sesión" id="requiresAuth" hint="Para páginas privadas; el login de prueba se configura en un milestone posterior." />
+            <CheckboxField label="Requiere iniciar sesión" id="requiresAuth" hint="Para páginas privadas. El usuario de prueba se configura en «Acceso a páginas privadas», más abajo." />
           </ActionForm>
         </details>
 
@@ -142,6 +151,69 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <SitemapImporter discover={discoverRoutesAction.bind(null, id)} importRoutes={importRoutesAction.bind(null, id)} />
           </div>
         </details>
+      </Card>
+
+      <Card
+        title="Acceso a páginas privadas"
+        description="Para auditar páginas que exigen iniciar sesión. Crea un usuario de prueba solo para esto; nunca uses una cuenta real de administración."
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge tone={authSummary.configured ? "ok" : "neutral"}>{authSummary.configured ? "Configurado" : "Sin configurar"}</Badge>
+          {authSummary.configured && authSummary.unreadable ? (
+            <span className="text-[15px] text-ink-muted">Hay un acceso guardado, pero no se puede leer con la clave actual.</span>
+          ) : authSummary.configured && authSummary.strategy === "form" ? (
+            <span className="text-[15px] break-all text-ink-muted">
+              Formulario en <span className="font-mono">{authSummary.loginUrl}</span> con el usuario <strong className="text-ink">{authSummary.username}</strong>
+            </span>
+          ) : authSummary.configured && authSummary.strategy === "cookie" ? (
+            <span className="text-[15px] text-ink-muted">
+              Cookies: <span className="font-mono">{authSummary.cookieNames.join(", ")}</span>
+            </span>
+          ) : null}
+        </div>
+        {authKey !== "ok" ? (
+          <Alert tone="danger">
+            {authKey === "missing"
+              ? "Falta AUTH_ENCRYPTION_KEY en el servicio web. Créala con «openssl rand -base64 32» y cárgala igual en el web y en el worker antes de guardar credenciales."
+              : "AUTH_ENCRYPTION_KEY no es válida: debe ser de 32 bytes en base64 («openssl rand -base64 32»)."}
+          </Alert>
+        ) : (
+          <>
+            <details className="rounded-sm border border-border p-4">
+              <summary className="cursor-pointer text-[19px] font-semibold text-ink">Formulario de inicio de sesión</summary>
+              <ActionForm action={saveFormAuthAction.bind(null, id)} submitLabel="Guardar acceso" pendingLabel="Guardando…" resetOnSuccess className="mt-4 max-w-xl">
+                <Field label="Página de inicio de sesión" id="loginUrl" required placeholder="/login" autoComplete="off" hint="Una ruta o una URL de un host permitido de este proyecto." />
+                <Field label="Usuario de prueba" id="username" required autoComplete="off" />
+                <Field label="Contraseña" id="password" type="password" required autoComplete="new-password" hint="Se guarda cifrada y no se vuelve a mostrar." />
+                <details className="rounded-sm border border-border p-3">
+                  <summary className="cursor-pointer text-[17px] font-semibold text-ink">Selectores (solo si el formulario es poco común)</summary>
+                  <div className="mt-3 flex flex-col gap-3">
+                    <Field label="Campo de usuario" id="usernameSelector" autoComplete="off" placeholder='input[name="email"]' />
+                    <Field label="Campo de contraseña" id="passwordSelector" autoComplete="off" placeholder='input[type="password"]' />
+                    <Field label="Botón de enviar" id="submitSelector" autoComplete="off" placeholder='button[type="submit"]' />
+                    <Field label="Elemento que confirma la sesión" id="successSelector" autoComplete="off" hint="Si lo indicas, el acceso se da por bueno cuando aparece. Si no, cuando desaparece el campo de contraseña." />
+                  </div>
+                </details>
+              </ActionForm>
+            </details>
+            <details className="rounded-sm border border-border p-4">
+              <summary className="cursor-pointer text-[19px] font-semibold text-ink">Cookies de sesión</summary>
+              <ActionForm action={saveCookieAuthAction.bind(null, id)} submitLabel="Guardar cookies" pendingLabel="Guardando…" resetOnSuccess className="mt-4 max-w-xl">
+                <TextareaField
+                  label="Cookies (una por línea: nombre=valor)"
+                  id="cookies"
+                  required
+                  rows={4}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="font-mono [-webkit-text-security:disc]"
+                  hint="Se guardan cifradas y no se vuelven a mostrar. Si caducan, las auditorías fallarán con AUTH_FAILED hasta que pegues unas nuevas."
+                />
+              </ActionForm>
+            </details>
+            {authSummary.configured ? <ActionForm action={clearAuthAction.bind(null, id)} submitLabel="Quitar acceso" pendingLabel="Quitando…" variant="ghost" /> : null}
+          </>
+        )}
       </Card>
 
       <Card

@@ -23,6 +23,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | ✔ | ✔ | El web envía el informe; el worker, alertas y avisos de respaldo |
 | `APP_URL` | ✔ | ✔ | Dirección pública con `https://`. Sin ella los enlaces de los correos apuntan a localhost |
 | `ALERT_EMAIL` | opc. | opc. | Destinatario de alertas. Vacío: el correo del administrador |
+| `AUTH_ENCRYPTION_KEY` | ✔ | ✔ | `openssl rand -base64 32`. **Idéntica en ambos.** Cifra las credenciales de páginas privadas. Guárdala fuera del sistema (gestor de contraseñas) |
 | `SESSION_SECRET` | ✔ | — | ≥ 32 caracteres. Cambiarla cierra todas las sesiones |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | ✔ | — | Solo se leen si no existe ningún administrador |
 | `AUDIT_COOLDOWN_MS`, `AUDIT_TIMEOUT_MS`, `AUDIT_ATTEMPTS` | — | opc. | 12000 / 90000 / 3 por defecto |
@@ -59,6 +60,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 ### Qué hay
 - Cada día a las 03:17 UTC el worker sube a R2 un archivo `_backups/postgres/AAAA/MM/aoc-<fecha>.ndjson.gz` con **todas** las tablas. Se conservan 30 días y siempre los 5 más recientes. Si falla, el panel lo muestra (Cola → Respaldos) y llega un correo.
 - *Respaldar ahora*: botón en Cola → Respaldos (lo ejecuta el worker; hay que tenerlo en línea).
+- Las credenciales de páginas privadas van en el respaldo **cifradas**; la clave (`AUTH_ENCRYPTION_KEY`) no. Al restaurar en otro servidor, usa la misma clave o tendrás que volver a introducir los accesos.
 - Los JSON de las auditorías ya viven en R2 y no forman parte del respaldo: allí están a salvo. **Recomendado**: activar el versionado de objetos del bucket en Cloudflare.
 - El respaldo contiene hashes de contraseña, links mágicos y huellas de claves. Quien lea el bucket los ve: mantén el token de R2 acotado a ese bucket y no lo compartas.
 
@@ -86,6 +88,7 @@ Lo que se pierde: cambios hechos entre el último respaldo y la caída (hasta 24
 | `SESSION_SECRET` | Cambiar la variable y reiniciar el web | Cierra todas las sesiones |
 | Link de un cliente filtrado | Ficha del cliente → *Generar link nuevo* | El anterior deja de funcionar al instante. También sirve *Suspender* |
 | Clave de agente (MCP) filtrada | Panel → Agentes → *Revocar* | Deja de funcionar al instante |
+| `AUTH_ENCRYPTION_KEY` | No se puede rotar sin más: las credenciales guardadas quedan ilegibles. Cambia la clave en web **y** worker, redespliega ambos y vuelve a introducir el acceso de cada proyecto (tarjeta *Acceso a páginas privadas*) | Mientras tanto esas rutas fallan con `AUTH_CONFIG` |
 | Token de R2 / SMTP | Rotar en el proveedor y actualizar la variable en **web y worker**; redesplegar ambos | — |
 
 ## 7. Incidentes
@@ -95,6 +98,9 @@ Mira los logs de `page_speed_worker`. Causas habituales: servicio detenido, `RED
 
 **Auditorías atascadas "En cola" o "En curso"**
 El worker las reconcilia cada 15 minutos (las huérfanas vuelven a la cola o fallan). Si hace falta ya: redespliega el worker.
+
+**Una ruta privada falla con `AUTH_FAILED`, `AUTH_NOT_CONFIGURED` o `AUTH_CONFIG`**
+`AUTH_FAILED`: la contraseña de prueba cambió, las cookies caducaron o el formulario es poco común (revisa los selectores). Entra a mano con ese usuario para comprobarlo y vuelve a guardar el acceso. `AUTH_NOT_CONFIGURED`: la ruta pide sesión pero el proyecto no tiene acceso. `AUTH_CONFIG`: `AUTH_ENCRYPTION_KEY` del worker no coincide con la del web (o falta). No se reintentan; la alerta de fallo queda abierta hasta que se corrija.
 
 **Muchas auditorías fallan con el mismo código**
 `TIMEOUT`/`PAGE_HUNG`: el sitio es lento o pesado; sube `AUDIT_TIMEOUT_MS` con cuidado. `SITE_DOWN`/`HTTP_5XX`: el sitio del cliente está caído (avísale). `FORBIDDEN_HOST`: el host salió de *Hosts permitidos* del proyecto. `CHROME_CRASH`: poca memoria en el worker.

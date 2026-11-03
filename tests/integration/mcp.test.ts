@@ -191,7 +191,7 @@ describe.skipIf(!ready)("servidor MCP", () => {
       expect(detail.thresholds).toHaveLength(4);
       expect(detail.open_alerts.map((a: { summary: string }) => a.summary).sort()).toEqual(["Rendimiento 70 (mínimo 80)", "SEO 69 (mínimo 90)"]);
       expect(detail.latest_scores[0]).toMatchObject({ path: "/", profile: "mobile", scores: { performance: 70, seo: 69 }, change_vs_previous: { performance: "+10", seo: "-11" } });
-      expect(JSON.stringify(detail)).not.toMatch(/magic|password|token|contact/i);
+      expect(JSON.stringify(detail)).not.toMatch(/magic|password|token|contact|auth|cookie|secret/i);
 
       const th = await call(agent, "get_thresholds", { project_id: project.id });
       expect(th.json.thresholds.find((t: { metric: string }) => t.metric === "seo")).toEqual({ metric: "seo", min_score: 90, enabled: true });

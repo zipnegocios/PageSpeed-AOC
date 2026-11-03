@@ -88,6 +88,23 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   nombre del cliente. Iconos en `public/pwa` (origen: `design/icons/app-icon.svg`). No hay service worker: sin
   conexión el navegador lo dice, nunca se muestran puntuaciones viejas.
 
+## Páginas privadas (inicio de sesión)
+
+- Una ruta marcada **«Requiere sesión»** se audita con el acceso del proyecto (tarjeta *Acceso a páginas privadas* de la ficha).
+  Dos métodos: **formulario** (página de login + usuario y contraseña de prueba; selectores opcionales) o **cookies**
+  pegadas (`nombre=valor`). Usa siempre un usuario de prueba dedicado, nunca una cuenta real de administración.
+- Las credenciales se guardan **cifradas con AES-256-GCM** (`projects.auth_config_enc`) con `AUTH_ENCRYPTION_KEY`
+  (`openssl rand -base64 32`), que debe ser **la misma en el web y en el worker**. La clave solo vive en el entorno: ni la
+  base ni los respaldos la contienen. Sin ella no se pueden guardar credenciales (la tarjeta lo avisa). La pantalla nunca
+  muestra contraseñas ni valores de cookies, y ni los logs ni los errores los incluyen.
+- El worker abre Chromium, inicia sesión con `puppeteer-core` en una pestaña y Lighthouse audita **esa misma pestaña** sin
+  borrar la sesión. Las credenciales solo se escriben en páginas de **hosts permitidos** (si el login redirige a otro host,
+  se aborta) y la IP del host de login se valida y se fija igual que la de la página.
+- Si la página privada termina en el inicio de sesión (cookies caducadas o login que no dejó sesión) la auditoría falla con
+  `AUTH_FAILED`. `AUTH_NOT_CONFIGURED` (ruta privada sin acceso) y `AUTH_CONFIG` (clave que no descifra) tampoco se
+  reintentan: abren la alerta de fallo de auditoría y esperan a que alguien las corrija.
+- No admite doble factor ni captcha. Pruebas con Chromium real (opt-in): `tests/integration/lighthouse-auth-real.test.ts`.
+
 ## Agentes (MCP)
 
 - Servidor MCP en `POST /api/mcp` (Streamable HTTP, **sin sesión**: cada petición crea su servidor y lo libera).

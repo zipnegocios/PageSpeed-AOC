@@ -80,8 +80,11 @@ const workerSchema = schema
     SMTP_USER: true,
     SMTP_PASS: true,
     ALERT_EMAIL: true,
+    AUTH_ENCRYPTION_KEY: true,
   })
   .extend({
+    // Una clave mal formada no debe impedir arrancar al worker: solo falla (con un código claro) lo que la necesita.
+    AUTH_ENCRYPTION_KEY: z.string().optional(),
     SMTP_HOST: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
   });

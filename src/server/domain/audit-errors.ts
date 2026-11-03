@@ -24,3 +24,14 @@ export class ChromeError extends Error {
     this.name = "ChromeError";
   }
 }
+
+/** No se pudo entrar a una página privada. Nunca lleva credenciales en el mensaje. */
+export class AuthFailedError extends Error {
+  constructor(
+    public readonly authCode: "AUTH_FAILED" | "AUTH_NOT_CONFIGURED" | "AUTH_CONFIG",
+    message: string,
+  ) {
+    super(message);
+    this.name = "AuthFailedError";
+  }
+}

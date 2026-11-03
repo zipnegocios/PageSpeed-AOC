@@ -42,7 +42,7 @@ Tu clave solo ve las herramientas de su nivel. Si una no aparece en `tools/list`
    - Con `project_id` + `url` se crea una ruta puntual (sin monitoreo) solo si el host está permitido para ese proyecto. Hay un tope de 50 rutas puntuales por proyecto.
 5. **Antes de cambiar nada** (umbrales, rutas, monitoreo), di qué vas a cambiar y por qué, y confirma con la persona si no lo pidió de forma explícita. Tras cambiar, relee con `get_thresholds` / `get_project` y cuéntalo.
 6. **Los umbrales**: subirlos abre alertas en proyectos que hoy están bien; bajarlos o desactivar una métrica silencia el aviso. `set_thresholds` solo toca las métricas que indicas.
-7. **Si una auditoría falló** (`status: failed`), el campo `error.code` dice por qué (`TIMEOUT`, `SITE_DOWN`, `HTTP_5XX`, `FORBIDDEN_HOST`…). No reintentes en bucle: informa y, si es razonable, lanza **una** nueva más tarde.
+7. **Si una auditoría falló** (`status: failed`), el campo `error.code` dice por qué (`TIMEOUT`, `SITE_DOWN`, `HTTP_5XX`, `FORBIDDEN_HOST`…). Los `AUTH_FAILED`, `AUTH_NOT_CONFIGURED` y `AUTH_CONFIG` son de páginas privadas: las credenciales de prueba las corrige la persona administradora en el panel (tú nunca las ves ni las cambias). No reintentes en bucle: informa y, si es razonable, lanza **una** nueva más tarde.
 
 ## Cómo presentar los resultados
 

@@ -102,6 +102,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     timeoutMs: env.AUDIT_TIMEOUT_MS,
     cooldownMs: env.AUDIT_COOLDOWN_MS,
     chromePath: env.CHROME_PATH || undefined,
+    authKey: env.AUTH_ENCRYPTION_KEY || undefined,
     allowPrivate: options.allowPrivate,
   });
 

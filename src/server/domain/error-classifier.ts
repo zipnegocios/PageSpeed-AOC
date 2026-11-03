@@ -1,5 +1,5 @@
 import { isDomainError } from "./errors";
-import { AuditTimeoutError, ChromeError, LighthouseRuntimeError } from "./audit-errors";
+import { AuditTimeoutError, AuthFailedError, ChromeError, LighthouseRuntimeError } from "./audit-errors";
 
 export type ClassifiedError = {
   /** Se guarda en audit_logs.error_code. */
@@ -46,6 +46,11 @@ function fromLighthouse(code: string, message: string): ClassifiedError {
 export function classifyError(err: unknown): ClassifiedError {
   if (err instanceof AuditTimeoutError) return { code: "TIMEOUT", retryable: true, message: clip(err.message) };
   if (err instanceof LighthouseRuntimeError) return fromLighthouse(err.lhCode, err.message);
+  // Credenciales o sesión inválidas no se arreglan reintentando: se avisa y se espera a que alguien las corrija.
+  if (err instanceof AuthFailedError) return { code: err.authCode, retryable: false, message: clip(err.message) };
+  if ((err as { name?: string })?.name === "SecretBoxError") {
+    return { code: "AUTH_CONFIG", retryable: false, message: clip("No se pudo leer el acceso guardado: revisa AUTH_ENCRYPTION_KEY en el worker (debe ser la misma que en el web).") };
+  }
 
   if (isDomainError(err)) {
     if (err.code === "FORBIDDEN_HOST") return { code: "FORBIDDEN_HOST", retryable: false, message: clip(err.message) };

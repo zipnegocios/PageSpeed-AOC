@@ -7,6 +7,7 @@ import { verifySession } from "@/lib/auth/session";
 import { parsePeriod } from "@/server/domain/history";
 import { requestAudit } from "@/server/services/audits";
 import { sendProjectReport } from "@/server/services/report-email";
+import { clearProjectAuth, setProjectAuth } from "@/server/services/project-auth";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 import { discoverRoutes, importRoutes } from "@/server/services/sitemap-discovery";
@@ -167,5 +168,49 @@ export async function sendReportAction(projectId: string, _prev: ActionState, fd
     const { to } = await sendProjectReport(projectId, parsePeriod(field(fd, "dias")));
     refresh(projectId);
     return { ok: `Informe enviado a ${to}.` };
+  });
+}
+
+export async function toggleRouteAuthAction(projectId: string, routeId: string, requiresAuth: boolean, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await routes.updateRouteDetails(routeId, { requiresAuth });
+    refresh(projectId);
+  });
+}
+
+export async function saveFormAuthAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await setProjectAuth(projectId, {
+      strategy: "form",
+      loginUrl: field(fd, "loginUrl"),
+      username: field(fd, "username"),
+      password: field(fd, "password"),
+      usernameSelector: field(fd, "usernameSelector"),
+      passwordSelector: field(fd, "passwordSelector"),
+      submitSelector: field(fd, "submitSelector"),
+      successSelector: field(fd, "successSelector"),
+    });
+    refresh(projectId);
+    return { ok: "Acceso por formulario guardado (cifrado). Marca como «Requiere sesión» las rutas privadas." };
+  });
+}
+
+export async function saveCookieAuthAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await setProjectAuth(projectId, { strategy: "cookie", cookies: field(fd, "cookies") });
+    refresh(projectId);
+    return { ok: "Cookies guardadas (cifradas). Marca como «Requiere sesión» las rutas privadas." };
+  });
+}
+
+export async function clearAuthAction(projectId: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await clearProjectAuth(projectId);
+    refresh(projectId);
+    return { ok: "Acceso eliminado. Las rutas que requieren sesión fallarán hasta configurar uno nuevo." };
   });
 }

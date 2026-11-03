@@ -2,6 +2,8 @@ import { UnrecoverableError, type Job } from "bullmq";
 import type { Logger } from "pino";
 import type { Database } from "@/server/db/client";
 import { assertRouteAuditable } from "@/server/domain/audit-rules";
+import { AuthFailedError } from "@/server/domain/audit-errors";
+import { resolveProjectAuth } from "@/server/services/project-auth";
 import { classifyError } from "@/server/domain/error-classifier";
 import { LighthouseRuntimeError } from "@/server/domain/audit-errors";
 import { buildAuditKey } from "@/server/domain/r2-key";
@@ -11,6 +13,7 @@ import * as repo from "@/server/repositories/audits";
 import { evaluateAudit, evaluateFailure } from "@/server/services/alerts";
 import type { R2Store } from "@/server/storage/r2";
 import { resolvePinnedHost, type HostResolver } from "../host-pin";
+import type { ProjectAuthConfig } from "@/server/domain/project-auth";
 import type { LighthouseRunner } from "../lighthouse/runner";
 
 export type AuditProcessorDeps = {
@@ -21,6 +24,8 @@ export type AuditProcessorDeps = {
   timeoutMs: number;
   cooldownMs: number;
   chromePath?: string;
+  /** AUTH_ENCRYPTION_KEY: descifra las credenciales de las rutas privadas. */
+  authKey?: string;
   /** Solo pruebas y script de desarrollo. El producto no lo expone por entorno. */
   allowPrivate?: boolean;
   resolver?: HostResolver;
@@ -81,6 +86,22 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
         resolver: deps.resolver,
       });
 
+      // Ruta privada: se descifra el acceso del proyecto y se valida (y fija) también el host del login.
+      let auth: { config: ProjectAuthConfig; allowedHosts: string[] } | undefined;
+      let extraPinnedHosts: Awaited<ReturnType<typeof resolvePinnedHost>>[] = [];
+      if (ctx.route.requiresAuth) {
+        const config = resolveProjectAuth(ctx.project, deps.authKey);
+        if (!config) {
+          throw new AuthFailedError("AUTH_NOT_CONFIGURED", "La ruta requiere iniciar sesión, pero el proyecto no tiene el acceso configurado.");
+        }
+        auth = { config, allowedHosts: ctx.project.allowedHosts };
+        if (config.strategy === "form") {
+          assertRouteAuditable(config.loginUrl, ctx.project.allowedHosts);
+          const loginPin = await resolvePinnedHost(config.loginUrl, { allowPrivate: deps.allowPrivate, resolver: deps.resolver });
+          if (loginPin && loginPin.host !== pinnedHost?.host) extraPinnedHosts = [loginPin];
+        }
+      }
+
       launched = true;
       const { lhr } = await deps.runner({
         url: ctx.route.url,
@@ -88,6 +109,8 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
         timeoutMs: deps.timeoutMs,
         chromePath: deps.chromePath,
         pinnedHost,
+        extraPinnedHosts: extraPinnedHosts.filter((p): p is NonNullable<typeof p> => Boolean(p)),
+        auth,
       });
 
       const extracted = extractResults(lhr);
