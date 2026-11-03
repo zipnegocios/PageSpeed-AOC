@@ -8,6 +8,7 @@ import * as alerts from "@/server/services/alerts";
 import * as clients from "@/server/services/clients";
 import { averageScores, getLatestScores, getSeries } from "@/server/services/history";
 import * as portal from "@/server/services/portal";
+import { generateClientPin } from "@/server/services/portal-pin";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 import * as thresholds from "@/server/services/thresholds";
@@ -15,6 +16,7 @@ import * as thresholds from "@/server/services/thresholds";
 const dbUrl = process.env.TEST_DATABASE_URL;
 const DAY = 86_400_000;
 const NOW = new Date("2026-04-30T12:00:00Z");
+const PIN_DEPS = { secret: "s".repeat(40) };
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * DAY);
 
 describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
@@ -59,59 +61,49 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
     return row!;
   }
 
-  describe("resolvePortal", () => {
-    it("el link fijo (identificador del cliente) da acceso igual que el token, y un identificador anterior también", async () => {
+  describe("resolvePortal (identificador del cliente + PIN)", () => {
+    const withSession = async () => true;
+    const noSession = async () => false;
+
+    it("sin sesión de PIN pide el PIN; con sesión da acceso. Un identificador anterior también vale", async () => {
       const { client } = await setup();
-      expect(await portal.resolvePortal(client.slug, db)).toEqual({ state: "ok", client: { id: client.id, name: "Acme" } });
+      await generateClientPin(client.id, {}, db, PIN_DEPS);
+      expect(await portal.resolvePortal(client.slug, noSession, db)).toEqual({ state: "pin" });
+      expect(await portal.resolvePortal(client.slug, withSession, db)).toEqual({ state: "ok", client: { id: client.id, name: "Acme" } });
       await clients.renameClientSlug(client.id, "acme-corp", db);
-      expect(await portal.resolvePortal("acme-corp", db)).toMatchObject({ state: "ok" });
-      expect(await portal.resolvePortal(client.slug, db)).toMatchObject({ state: "ok" }); // el anterior sigue valiendo
-      expect(await portal.resolvePortal("no-existe", db)).toEqual({ state: "invalid" });
-      expect(await portal.resolvePortal("ACME", db)).toEqual({ state: "invalid" });
+      expect(await portal.resolvePortal("acme-corp", withSession, db)).toMatchObject({ state: "ok" });
+      expect(await portal.resolvePortal(client.slug, withSession, db)).toMatchObject({ state: "ok" }); // el anterior sigue valiendo
     });
 
-    it("suspendido, el link fijo muestra el aviso y archivado deja de existir", async () => {
+    it("sin PIN configurado no hay acceso aunque el navegador traiga una sesión", async () => {
       const { client } = await setup();
-      await clients.setClientStatus(client.id, "suspended", db);
-      expect(await portal.resolvePortal(client.slug, db)).toEqual({ state: "suspended", clientName: "Acme" });
-      await clients.setClientStatus(client.id, "active", db);
-      await clients.archiveClient(client.id, db);
-      expect(await portal.resolvePortal(client.slug, db)).toEqual({ state: "invalid" });
+      expect(await portal.resolvePortal(client.slug, withSession, db)).toEqual({ state: "pin" });
     });
 
-    it("un token vigente da acceso; uno mal formado o desconocido, no", async () => {
-      const { client } = await setup();
-      const c = await clients.getClient(client.id, db);
-      expect(await portal.resolvePortal(c.magicToken, db)).toEqual({ state: "ok", client: { id: client.id, name: "Acme" } });
-      expect(await portal.resolvePortal("corto", db)).toEqual({ state: "invalid" });
-      expect(await portal.resolvePortal("x".repeat(43), db)).toEqual({ state: "invalid" });
-      expect(await portal.resolvePortal("../".repeat(20), db)).toEqual({ state: "invalid" });
-      expect(await portal.resolvePortal("", db)).toEqual({ state: "invalid" });
+    it("un identificador que no existe se ve igual que uno que pide PIN (no revela qué clientes hay); uno mal formado es inválido", async () => {
+      expect(await portal.resolvePortal("no-existe", withSession, db)).toEqual({ state: "pin" });
+      expect(await portal.resolvePortal("ACME", withSession, db)).toEqual({ state: "invalid" });
+      expect(await portal.resolvePortal("../".repeat(20), withSession, db)).toEqual({ state: "invalid" });
+      expect(await portal.resolvePortal("", withSession, db)).toEqual({ state: "invalid" });
     });
 
-    it("suspender corta el acceso al instante y reactivar lo devuelve", async () => {
+    it("el enlace antiguo con token ya no da acceso: solo lleva al portal con PIN", async () => {
       const { client } = await setup();
       const { magicToken } = await clients.getClient(client.id, db);
+      await generateClientPin(client.id, {}, db, PIN_DEPS);
+      expect(await portal.resolvePortal(magicToken, withSession, db)).toEqual({ state: "legacy", slug: client.slug });
+      expect(await portal.resolvePortal("x".repeat(43), withSession, db)).toEqual({ state: "invalid" });
+    });
+
+    it("suspendido muestra el aviso sin pedir PIN; reactivar vuelve al PIN. Archivado deja de existir", async () => {
+      const { client } = await setup();
+      await generateClientPin(client.id, {}, db, PIN_DEPS);
       await clients.setClientStatus(client.id, "suspended", db);
-      expect(await portal.resolvePortal(magicToken, db)).toEqual({ state: "suspended", clientName: "Acme" });
+      expect(await portal.resolvePortal(client.slug, noSession, db)).toEqual({ state: "suspended", clientName: "Acme" });
       await clients.setClientStatus(client.id, "active", db);
-      expect((await portal.resolvePortal(magicToken, db)).state).toBe("ok");
-    });
-
-    it("rotar el token invalida el anterior", async () => {
-      const { client } = await setup();
-      const old = (await clients.getClient(client.id, db)).magicToken;
-      const fresh = (await clients.rotateMagicToken(client.id, db)).magicToken;
-      expect(fresh).not.toBe(old);
-      expect((await portal.resolvePortal(old, db)).state).toBe("invalid");
-      expect((await portal.resolvePortal(fresh, db)).state).toBe("ok");
-    });
-
-    it("un cliente archivado ya no entra", async () => {
-      const { client } = await setup();
-      const { magicToken } = await clients.getClient(client.id, db);
+      expect(await portal.resolvePortal(client.slug, noSession, db)).toEqual({ state: "pin" });
       await clients.archiveClient(client.id, db);
-      expect((await portal.resolvePortal(magicToken, db)).state).toBe("invalid");
+      expect(await portal.resolvePortal(client.slug, withSession, db)).toEqual({ state: "pin" }); // ya no existe, igual que cualquier otro
     });
   });
 

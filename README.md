@@ -42,12 +42,16 @@ evalúa las alertas y lo avisa en los logs.
 - **Direcciones legibles:** el panel usa el identificador (slug) del cliente y del proyecto, no UUID:
   `/admin/clientes/acme` y `/admin/clientes/acme/tienda` (el slug del proyecto solo es único dentro de su
   cliente, por eso va anidado). Los enlaces antiguos con UUID siguen funcionando y redirigen.
-- **Portal del cliente:** dos enlaces equivalentes. El **link fijo** `/c/<identificador-del-cliente>` (el que se
-  le da al cliente; no cambia mientras no cambies el identificador) y el **link privado** `/c/<token>` con una
-  clave imposible de adivinar (rotable). Ojo: quien conozca el identificador del cliente puede abrir el portal
-  fijo; si un cliente necesita más reserva, dale solo el privado y cambia su identificador a algo no obvio.
-  Suspender al cliente cubre ambos: muestra el aviso con el contacto (`src/lib/contact.ts`) y un botón de
-  WhatsApp con el mensaje ya escrito. El informe por correo usa el link fijo.
+- **Portal del cliente:** un solo enlace, fijo: `/c/<identificador-del-cliente>`, protegido con un **PIN de 6
+  dígitos**. Se genera desde la ficha del cliente («Generar PIN», o «Generar y enviar al correo»); el PIN se
+  muestra una sola vez y en la base de datos solo queda su huella (HMAC con `SESSION_SECRET`). Con el PIN correcto
+  el navegador recibe una sesión de 30 días (cookie HttpOnly, solo bajo `/c`); un PIN nuevo la cierra. El
+  cliente puede pedir un PIN nuevo desde la pantalla del PIN: le llega al correo de contacto de su ficha (máx.
+  uno cada 15 minutos por cliente y 5 por hora por IP; la respuesta no revela si el cliente o el correo existen).
+  Defensas: 5 PIN erróneos cada 15 min por IP y cliente, 25 por cliente en total, y una dirección que no existe
+  se ve igual que una real. Suspender al cliente muestra el aviso con el contacto (`src/lib/contact.ts`) y un botón
+  de WhatsApp, sin pedir PIN. El enlace antiguo con token (`/c/<token>`) ya no da acceso: solo redirige a la
+  pantalla del PIN (la columna `magic_token` se conserva solo para eso). El informe por correo usa este enlace.
 - **Renombrar identificadores:** en la ficha del cliente o del proyecto. El anterior pasa a la lista de alias
   (`slug_aliases`): sigue funcionando en los enlaces viejos y queda reservado, así nadie más puede tomarlo. Los
   informes ya guardados en R2 no se mueven (cada auditoría guarda su clave completa) y los nuevos van a la
@@ -81,29 +85,28 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 
 ## Portal del cliente e histórico
 
-- **Link mágico:** `/c/<token>`, solo lectura y sin sesión. El token (32 bytes aleatorios) está en la ficha del
-  cliente, donde se puede **rotar** (el anterior deja de funcionar) y **suspender** al cliente (el portal pasa a
-  la pantalla de servicio suspendido). Ambos cambios surten efecto en la siguiente petición: el token se vuelve
-  a comprobar siempre y las páginas no se cachean.
+- **Acceso:** `/c/<identificador-del-cliente>` con PIN (ver arriba), solo lectura. Desde la ficha del cliente se
+  genera el PIN y se **suspende** al cliente (el portal pasa al aviso de servicio suspendido). Los cambios surten
+  efecto en la siguiente petición: el acceso se vuelve a comprobar siempre y las páginas no se cachean.
 - Muestra solo los proyectos **en producción**: estado actual de cada página y perfil con su variación respecto
   a la auditoría anterior, "puntos por mejorar" (las alertas abiertas, sin códigos internos) y la evolución.
   Con un único proyecto abre directo en su detalle.
-- Cada proyecto se autoriza con el cliente del token; un proyecto de otro cliente, de desarrollo o archivado
-  responde 404, igual que un token inválido. Más de 30 enlaces inválidos desde una IP en 10 minutos cortan el
-  acceso con un aviso (limitador en memoria; hay una sola réplica web).
+- Cada proyecto se autoriza con el cliente de la sesión; un proyecto de otro cliente, de desarrollo o archivado
+  responde 404. Más de 30 enlaces mal formados desde una IP en 10 minutos cortan el acceso con un aviso
+  (limitadores en memoria; hay una sola réplica web).
 - Cabeceras de `/c/*`: `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
 - **Evolución:** gráfico sin scripts (SVG + HTML) de puntuaciones, LCP, TBT y CLS por página, perfil y periodo
   (7 días a 1 año), con la meta dibujada. Se elige con enlaces, así que cada vista tiene su URL. El mismo
   panel está en la ficha del proyecto del administrador, donde incluye también las rutas de pruebas.
 - **Informe PDF:** A4 con estado actual (y su variación), puntos por mejorar y la evolución del rendimiento por
   página y perfil, en Rajdhani y con los colores de `design/tokens.json`. Lo descarga el administrador desde la
-  ficha del proyecto (30 o 90 días) y el cliente desde su portal (`/c/<token>/<proyecto>/informe`, con la misma
+  ficha del proyecto (30 o 90 días) y el cliente desde su portal (`/c/<cliente>/<proyecto>/informe`, con la misma
   autorización que el portal). Se genera en el servicio web, de uno en uno y con una caché de 2 minutos para no
   cargar el VPS; las fuentes viajan en la imagen (`src/assets/fonts`, licencia OFL).
 - **Envío por email:** el botón «Enviar a …» de la ficha del proyecto manda el PDF adjunto al correo de contacto
   del cliente, con un enlace a su portal, y lo anota en la bitácora (`notifications`, tipo `report`). Usa el
   SMTP del servicio web, no se puede repetir antes de 5 minutos y un fallo del SMTP se registra sin detener nada.
-- **PWA:** cada portal publica su manifiesto (`/c/<token>/manifest.webmanifest`) y se puede instalar con el
+- **PWA:** cada portal publica su manifiesto (`/c/<cliente>/manifest.webmanifest`) y se puede instalar con el
   nombre del cliente. Iconos en `public/pwa` (origen: `design/icons/app-icon.svg`). No hay service worker: sin
   conexión el navegador lo dice, nunca se muestran puntuaciones viejas.
 
@@ -111,7 +114,7 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 
 - **Informe oficial de Lighthouse**: se genera desde el JSON guardado en R2 (`lighthouse/report`) y se muestra en un marco
   aislado (`sandbox` sin `allow-same-origin`, CSP sin red, solo enmarcable por la propia app). Admin:
-  `/admin/auditorias/<id>/informe`; cliente: `/c/<token>/<proyecto>/detalle/<auditoría>`. Se ocultan su menú de
+  `/admin/auditorias/<id>/informe`; cliente: `/c/<cliente>/<proyecto>/detalle/<auditoría>`. Se ocultan su menú de
   herramientas y el mapa de rectángulos externo. En rutas que exigen sesión, al cliente se le quitan capturas,
   fragmentos de HTML y textos de elementos (`redactLhr`).
 - **Idioma**: el JSON se guarda una sola vez (inglés) y se traduce al leer con `swapLocale` de Lighthouse, también
@@ -124,7 +127,7 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 
 ### Panel nativo de la auditoría
 
-- `/admin/auditorias/<id>` y, para el cliente, `/c/<token>/<proyecto>/detalle/<auditoría>` muestran el mismo visor
+- `/admin/auditorias/<id>` y, para el cliente, `/c/<cliente>/<proyecto>/detalle/<auditoría>` muestran el mismo visor
   (`src/app/_components/audit-viewer`): pestañas **Resumen**, una por categoría (Rendimiento, Accesibilidad, Buenas
   prácticas, SEO, Navegación con agentes), **Evidencias** e **Informe completo** (el oficial de Lighthouse).
 - Cada categoría sigue las reglas de Lighthouse (`src/server/domain/lhr-view.ts`, puro y con pruebas): métricas con

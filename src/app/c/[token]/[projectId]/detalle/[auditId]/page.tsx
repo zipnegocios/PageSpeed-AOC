@@ -1,3 +1,4 @@
+import { PinGateFor } from "@/app/c/_components/pin-gate";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -30,6 +31,8 @@ export default async function PortalAuditDetail({
   const access = await portalAccess(token);
   if (access.state === "blocked") return <BlockedNotice />;
   if (access.state === "suspended") return <SuspendedNotice clientName={access.clientName} />;
+  if (access.state === "legacy") notFound();
+  if (access.state === "pin") return <PinGateFor slug={token} />;
   const found = await getPortalAudit(access.client.id, projectId, auditId);
   if (!found) notFound();
   const { audit, redact } = found;

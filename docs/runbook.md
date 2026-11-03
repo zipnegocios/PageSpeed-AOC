@@ -150,3 +150,10 @@ Una semana en producción sin degradar los sitios alojados.
 - **Archivar** (ficha del cliente o del proyecto) lo oculta y detiene sus auditorías; no borra nada. Se ve y se restaura desde *Archivados* (menú superior).
 - **Eliminar definitivamente** solo está en *Archivados*, exige escribir el nombre exacto y no se puede deshacer: borra la fila con todo lo que cuelga de ella y los informes de R2. Si R2 no responde, no se elimina nada y el mensaje lo explica.
 - Si te equivocaste, los respaldos diarios de Postgres (ver «Respaldos») guardan copias de las filas durante 30 días; los informes de R2 borrados solo se recuperan con el versionado del bucket.
+
+## Acceso de los clientes (PIN)
+- Cada cliente entra por `/c/<identificador>` con un PIN de 6 dígitos. Sin PIN configurado nadie entra; se estrena con «Generar PIN» en la ficha del cliente o dejando que el propio cliente lo pida (le llega al correo de contacto).
+- Para el correo, el servicio **web** necesita `SMTP_*` y `EMAIL_FROM` (los mismos de los informes por correo). Sin SMTP, «Generar PIN» sigue funcionando y se lo entregas tú.
+- Si un cliente dice que «no le entra»: genera un PIN nuevo (anula el anterior y cierra sus sesiones) y compruébalo con él. Si ve «Demasiados intentos», espera 15 minutos o reinicia el servicio web (el contador está en memoria).
+- Tras desplegar esta versión, los clientes existentes no tienen PIN: genera uno por cliente (o pídeles que usen «Enviar un PIN nuevo a mi correo») y avísales.
+

@@ -2,7 +2,8 @@ import { getDb, type Database } from "@/server/db/client";
 import { env } from "@/server/config/env";
 import { DomainError } from "@/server/domain/errors";
 import type { Period } from "@/server/domain/history";
-import { createMailer, type Mailer } from "@/server/notify/mailer";
+import type { Mailer } from "@/server/notify/mailer";
+import { webMailer } from "@/server/notify/web-mailer";
 import { buildReportEmail } from "@/server/notify/report-email";
 import { getProjectReportPdf } from "@/server/report";
 import { insertNotification, listRecentNotifications } from "@/server/repositories/alerts";
@@ -20,11 +21,6 @@ export type SendReportDeps = {
   /** Sustituible en pruebas para no renderizar un PDF real. */
   getPdf?: typeof getProjectReportPdf;
 };
-
-function defaultMailer(): Mailer {
-  const e = env();
-  return createMailer({ host: e.SMTP_HOST, port: e.SMTP_PORT, user: e.SMTP_USER || undefined, pass: e.SMTP_PASS || undefined, from: e.EMAIL_FROM });
-}
 
 /** Envía por correo al contacto del cliente el informe PDF del proyecto y lo deja en la bitácora. */
 export async function sendProjectReport(
@@ -54,7 +50,7 @@ export async function sendProjectReport(
   });
   const record = { projectId, clientId: client.id, type: "report" as const, recipient: to, subject: mail.subject, sentAt: now };
   try {
-    await (deps.mailer ?? defaultMailer()).send({
+    await (deps.mailer ?? webMailer()).send({
       to,
       ...mail,
       attachments: [{ filename, content: pdf, contentType: "application/pdf" }],

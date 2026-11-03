@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { formatDate } from "@/lib/audit-format";
 import { appUrl, orNotFound } from "@/lib/not-found";
 import { clientPath, projectPath } from "@/lib/urls";
 import { verifySession } from "@/lib/auth/session";
@@ -11,13 +12,15 @@ import { CopyButton } from "@/lib/ui/components/copy-button";
 import { Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
+import { PinForms } from "@/app/admin/_components/pin-forms";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
 import {
   archiveClientAction,
   createProjectAction,
   renameClientSlugAction,
-  rotateMagicTokenAction,
+  generateAndEmailPinAction,
+  generatePinAction,
   setClientStatusAction,
   updateClientAction,
 } from "@/app/admin/clientes/actions";
@@ -32,7 +35,6 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   if (cliente !== client.slug) redirect(clientPath(client.slug));
   const id = client.id;
   const projects = await listProjects(id);
-  const portalUrl = `${appUrl()}/c/${client.magicToken}`;
   const fixedUrl = `${appUrl()}/c/${client.slug}`;
   const active = client.status === "active";
 
@@ -87,10 +89,10 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
         </details>
       </Card>
 
-      <Card title="Acceso del cliente" description="El cliente ve sus resultados con un link permanente, sin usuario ni contraseña.">
+      <Card title="Acceso del cliente" description="El cliente entra con un link fijo y un PIN de 6 dígitos, sin usuario ni contraseña.">
         <div className="flex flex-col gap-3">
           <label htmlFor="portal-link-fixed" className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-            Link fijo
+            Link del portal
           </label>
           <input
             id="portal-link-fixed"
@@ -99,28 +101,23 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             className="min-h-11 w-full rounded-sm border border-border-strong bg-surface-100 px-3 font-mono text-[14px] text-ink"
           />
           <div>
-            <CopyButton value={fixedUrl} label="Copiar link fijo" />
+            <CopyButton value={fixedUrl} label="Copiar link" />
           </div>
           <p className="text-[15px] leading-5 text-ink-muted">
-            Es el que conviene darle al cliente: lleva su identificador y no cambia mientras no lo cambies. Cualquier persona que lo conozca puede abrir el portal.
+            Lleva el identificador del cliente y no cambia mientras no lo cambies. Al abrirlo, pide el PIN. Con el PIN, el cliente ve sus proyectos en producción, su evolución y el informe en PDF, y puede instalarlo como app.
           </p>
         </div>
         <div className="flex flex-col gap-3 border-t border-border pt-4">
-          <label htmlFor="portal-link" className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
-            Link privado
-          </label>
-          <input
-            id="portal-link"
-            readOnly
-            value={portalUrl}
-            className="min-h-11 w-full rounded-sm border border-border-strong bg-surface-100 px-3 font-mono text-[14px] text-ink"
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <CopyButton value={portalUrl} label="Copiar link privado" />
-            <ActionForm action={rotateMagicTokenAction.bind(null, id)} submitLabel="Generar link nuevo" variant="ghost" pendingLabel="Generando…" />
-          </div>
+          <p className="text-ink">
+            PIN:{" "}
+            {client.pinHash ? <Badge tone="ok">Con PIN</Badge> : <Badge tone="neutral">Sin PIN</Badge>}{" "}
+            <span className="text-[15px] text-ink-muted">
+              {client.pinHash && client.pinUpdatedAt ? `Generado el ${formatDate(client.pinUpdatedAt)}.` : "Mientras no haya PIN, el cliente no puede entrar (él mismo puede pedir uno a su correo)."}
+            </span>
+          </p>
+          <PinForms generate={generatePinAction.bind(null, id)} generateAndEmail={generateAndEmailPinAction.bind(null, id)} canEmail={Boolean(client.contactEmail)} />
           <p className="text-[15px] leading-5 text-ink-muted">
-            Lleva una clave imposible de adivinar. Si generas un link nuevo, el privado anterior deja de funcionar al instante; el fijo no cambia. Ambos muestran lo mismo: proyectos en producción, su evolución, el informe en PDF y el portal instalable como app.
+            El PIN se muestra una sola vez; en el sistema solo queda su huella. Generar uno nuevo anula el anterior y cierra las sesiones abiertas del cliente. El cliente también puede pedir un PIN nuevo desde el portal: le llega al correo de contacto{client.contactEmail ? ` (${client.contactEmail})` : ", que aún no tiene registrado"}.
           </p>
         </div>
         <div className="flex flex-col gap-2 border-t border-border pt-4">

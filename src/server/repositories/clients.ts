@@ -48,6 +48,36 @@ export async function slugTaken(db: Database, slug: string): Promise<boolean> {
   return Boolean(row);
 }
 
+/** Guarda la huella de un PIN nuevo y sube la versión (cierra las sesiones abiertas). */
+export async function setClientPinRow(db: Database, id: string, pinHash: string, now: Date): Promise<Client | undefined> {
+  const [row] = await db
+    .update(clients)
+    .set({ pinHash, pinVersion: sql`${clients.pinVersion} + 1`, pinUpdatedAt: now })
+    .where(and(eq(clients.id, id), isNull(clients.deletedAt)))
+    .returning();
+  return row;
+}
+
+/**
+ * Reserva el envío de un PIN por correo: solo prospera si el último fue hace más de `cooldownMs`. Devuelve el valor
+ * anterior para poder devolverlo si el correo falla; null si el cliente no existe o aún está en espera.
+ */
+export async function reservePinRequest(db: Database, id: string, now: Date, cooldownMs: number): Promise<{ previous: Date | null } | null> {
+  const cutoff = new Date(now.getTime() - cooldownMs);
+  const [before] = await db.select({ at: clients.pinRequestedAt }).from(clients).where(and(eq(clients.id, id), isNull(clients.deletedAt))).limit(1);
+  if (!before) return null;
+  const rows = await db
+    .update(clients)
+    .set({ pinRequestedAt: now })
+    .where(and(eq(clients.id, id), isNull(clients.deletedAt), or(isNull(clients.pinRequestedAt), sql`${clients.pinRequestedAt} < ${cutoff}`)))
+    .returning({ id: clients.id });
+  return rows.length > 0 ? { previous: before.at } : null;
+}
+
+export async function restorePinRequest(db: Database, id: string, previous: Date | null): Promise<void> {
+  await db.update(clients).set({ pinRequestedAt: previous }).where(eq(clients.id, id));
+}
+
 /** Cambia el identificador y guarda el anterior como alias. Si se vuelve a uno anterior propio, deja de ser alias. */
 export async function setClientSlug(db: Database, id: string, slug: string, previous: string): Promise<Client | undefined> {
   const [row] = await db

@@ -58,7 +58,7 @@ describe.skipIf(!url)("servicios de dominio", () => {
       expect(c.notes).toBeNull();
     });
 
-    it("editar no cambia el identificador ni el link; suspender y rotar sí hacen su trabajo", async () => {
+    it("editar no cambia el identificador ni el token heredado; suspender sí hace su trabajo", async () => {
       const c = await newClient("Acme");
       const edited = await clients.updateClient(c.id, { name: "Acme SA", slug: "otro", magicToken: "x" }, db);
       expect(edited).toMatchObject({ name: "Acme SA", slug: "acme", magicToken: c.magicToken });
@@ -67,9 +67,6 @@ describe.skipIf(!url)("servicios de dominio", () => {
       expect((await clients.setClientStatus(c.id, "active", db)).status).toBe("active");
       await rejectsWith(clients.setClientStatus(c.id, "otro" as never, db), "INVALID");
 
-      const rotated = await clients.rotateMagicToken(c.id, db);
-      expect(rotated.magicToken).not.toBe(c.magicToken);
-      expect(rotated.magicTokenRotatedAt).toBeInstanceOf(Date);
     });
 
     it("renombrar el identificador deja el anterior como alias reservado y vuelve a funcionar al regresar a él", async () => {

@@ -29,6 +29,13 @@
       "when": 1793720249081,
       "tag": "0003_identificadores_anteriores",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793720854676,
+      "tag": "0004_pin_del_portal",
+      "breakpoints": true
     }
   ]
 }

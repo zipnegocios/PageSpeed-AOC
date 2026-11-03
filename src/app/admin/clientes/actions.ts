@@ -6,6 +6,7 @@ import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clientPath, projectPath } from "@/lib/urls";
 import * as clients from "@/server/services/clients";
+import { generateClientPin } from "@/server/services/portal-pin";
 import * as projects from "@/server/services/projects";
 
 /** Las direcciones llevan slugs: se revalida todo el panel en lugar de adivinar cada ruta. */
@@ -60,12 +61,21 @@ export async function renameClientSlugAction(id: string, _prev: ActionState, fd:
   });
 }
 
-export async function rotateMagicTokenAction(id: string, _prev: ActionState): Promise<ActionState> {
+export async function generatePinAction(id: string, _prev: ActionState): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
-    await clients.rotateMagicToken(id);
+    const { pin } = await generateClientPin(id);
     revalidateAdmin();
-    return { ok: "Se generó un link nuevo. El anterior ya no funciona." };
+    return { ok: "PIN generado. El anterior y las sesiones abiertas del cliente ya no valen.", secret: pin };
+  });
+}
+
+export async function generateAndEmailPinAction(id: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const { pin, to } = await generateClientPin(id, { email: true });
+    revalidateAdmin();
+    return { ok: `PIN generado y enviado a ${to}. El anterior y las sesiones abiertas del cliente ya no valen.`, secret: pin };
   });
 }
 

@@ -14,9 +14,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
   const access = await checkPortal(token);
   if (access.state === "blocked") return new Response("Demasiados intentos", { status: 429 });
-  if (access.state === "invalid") return new Response("Enlace no válido", { status: 404 });
+  if (access.state === "invalid" || access.state === "legacy") return new Response("Enlace no válido", { status: 404 });
 
-  const clientName = access.state === "ok" ? access.client.name : access.clientName;
+  // Sin sesión de PIN no se revela el nombre del cliente.
+  const clientName = access.state === "ok" ? access.client.name : access.state === "suspended" ? access.clientName : "tu informe";
   const body = {
     id: `/c/${token}`,
     name: `Informe de ${clientName}`.slice(0, 45),

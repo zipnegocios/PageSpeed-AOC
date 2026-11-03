@@ -1,3 +1,4 @@
+import { PinGateFor } from "@/app/c/_components/pin-gate";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -27,6 +28,9 @@ export default async function PortalHome({ params }: { params: Promise<{ token: 
   const access = await portalAccess(token);
   if (access.state === "blocked") return <BlockedNotice />;
   if (access.state === "suspended") return <SuspendedNotice clientName={access.clientName} />;
+  // Enlace antiguo con token: ya no da acceso, lleva al portal con PIN.
+  if (access.state === "legacy") redirect(`/c/${access.slug}`);
+  if (access.state === "pin") return <PinGateFor slug={token} />;
 
   const projects = await getPortalOverview(access.client.id);
   // Con un único proyecto no hay nada que elegir: se va directo a su informe.

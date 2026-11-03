@@ -16,6 +16,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   if (access.state === "blocked") return plain(429, "Demasiados intentos. Espera unos minutos.");
   if (access.state === "invalid") return plain(404, "Enlace no válido");
   if (access.state === "suspended") return plain(403, "Tu servicio está suspendido.");
+  if (access.state === "legacy") return plain(404, "Enlace no válido");
+  if (access.state === "pin") return plain(401, "Escribe tu PIN en el portal para ver este contenido.");
   const found = await getPortalAudit(access.client.id, projectId, auditId);
   if (!found) return plain(404, "Enlace no válido");
   try {

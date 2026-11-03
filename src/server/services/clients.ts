@@ -98,17 +98,6 @@ export async function renameClientSlug(id: string, rawSlug: string, db: Database
   }
 }
 
-/** Invalida el link anterior y genera uno nuevo. */
-export async function rotateMagicToken(id: string, db: Database = getDb()) {
-  assertUuid(id, "Cliente");
-  const updated = await repo.updateClient(db, id, {
-    magicToken: generateMagicToken(),
-    magicTokenRotatedAt: new Date(),
-  });
-  if (!updated) throw new DomainError("NOT_FOUND", "Cliente no encontrado.");
-  return updated;
-}
-
 /** Archiva (no borra): conserva el historial y el identificador sigue reservado. */
 export async function archiveClient(id: string, db: Database = getDb()) {
   assertUuid(id, "Cliente");

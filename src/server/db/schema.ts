@@ -78,9 +78,16 @@ export const clients = pgTable("clients", {
   // Para generar el link wa.me con el mensaje prellenado.
   contactPhone: text("contact_phone"),
   status: clientStatus("status").notNull().default("active"),
-  // Link mágico permanente: 32 bytes aleatorios en base64url. Rotable.
+  // Heredado: el link con token ya no da acceso (solo redirige al portal con PIN). Se conserva para esos enlaces viejos.
   magicToken: text("magic_token").notNull().unique(),
   magicTokenRotatedAt: timestamp("magic_token_rotated_at", { withTimezone: true }),
+  // PIN de 6 dígitos del portal: solo se guarda su huella (HMAC). `pinVersion` sube con cada PIN nuevo y
+  // con ello se cierran las sesiones abiertas del cliente.
+  pinHash: text("pin_hash"),
+  pinVersion: integer("pin_version").notNull().default(0),
+  pinUpdatedAt: timestamp("pin_updated_at", { withTimezone: true }),
+  // Último envío de PIN por correo pedido por el cliente: limita la frecuencia.
+  pinRequestedAt: timestamp("pin_requested_at", { withTimezone: true }),
   notes: text("notes"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,

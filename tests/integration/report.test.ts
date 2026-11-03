@@ -99,7 +99,6 @@ describe.skipIf(!dbUrl)("informe del proyecto y envío por correo", () => {
       expect(m.attachments).toHaveLength(1);
       expect(m.attachments![0]).toMatchObject({ filename: "informe-x.pdf", contentType: "application/pdf" });
       expect(m.attachments![0]!.content.subarray(0, 5).toString()).toBe("%PDF-");
-      const token = (await clients.getClient(client.id, db)).magicToken;
       expect(m.text).toContain(`https://app.test/c/${client.slug}/${project.slug}`);
       expect(m.text).toContain("90 días");
 

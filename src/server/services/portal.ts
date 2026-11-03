@@ -17,19 +17,34 @@ export type PortalClient = { id: string; name: string };
 
 export type PortalAccess =
   | { state: "invalid" }
+  /** Enlace antiguo con token: ya no da acceso, solo lleva al portal con PIN. */
+  | { state: "legacy"; slug: string }
   | { state: "suspended"; clientName: string }
+  /** Pide el PIN. También para un identificador que no existe: así no se puede averiguar qué clientes hay. */
+  | { state: "pin" }
   | { state: "ok"; client: PortalClient };
 
+/** ¿El navegador trae una sesión vigente para este cliente? Lo decide quien llama (lee la cookie). */
+export type SessionCheck = (client: { id: string; pinVersion: number }) => Promise<boolean>;
+
 /**
- * Resuelve el enlace del portal. Hay dos formas: el link privado (token de 43 caracteres, rotable) y el link fijo con el
- * identificador del cliente (hasta 40 caracteres, así que no se confunden). Un identificador anterior también vale.
- * Se comprueba en cada petición: rotar el token o suspender al cliente surte efecto al instante.
+ * Resuelve el enlace del portal: `/c/<identificador-del-cliente>` (un identificador anterior también vale). El acceso
+ * exige el PIN, ya validado en una sesión. Un cliente suspendido ve su aviso sin PIN. Se comprueba en cada petición,
+ * así que suspender o generar un PIN nuevo surte efecto al instante.
  */
-export async function resolvePortal(ref: string, db: Database = getDb()): Promise<PortalAccess> {
-  const client = isPlausibleToken(ref) ? await findClientByToken(db, ref) : isValidSlug(ref) ? await findClientBySlug(db, ref) : undefined;
-  if (!client) return { state: "invalid" };
+export async function resolvePortal(ref: string, hasSession: SessionCheck, db: Database = getDb()): Promise<PortalAccess> {
+  if (isPlausibleToken(ref)) {
+    const old = await findClientByToken(db, ref);
+    return old ? { state: "legacy", slug: old.slug } : { state: "invalid" };
+  }
+  if (!isValidSlug(ref)) return { state: "invalid" };
+  const client = await findClientBySlug(db, ref);
+  if (!client) return { state: "pin" };
   if (client.status === "suspended") return { state: "suspended", clientName: client.name };
-  return { state: "ok", client: { id: client.id, name: client.name } };
+  if (client.pinHash && (await hasSession({ id: client.id, pinVersion: client.pinVersion }))) {
+    return { state: "ok", client: { id: client.id, name: client.name } };
+  }
+  return { state: "pin" };
 }
 
 export type PortalProjectSummary = {
