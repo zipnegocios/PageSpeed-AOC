@@ -65,3 +65,31 @@ export async function countAuditLogs(db: Database, projectId: string): Promise<n
 }
 
 export { alertThresholds };
+
+export type ProductionProject = { id: string; auditFrequency: "weekly" | "daily" };
+
+/** Proyectos que deben tener agendador: en producción, no archivados y con cliente activo en el sistema. */
+export async function listProductionProjects(db: Database): Promise<ProductionProject[]> {
+  return db
+    .select({ id: projects.id, auditFrequency: projects.auditFrequency })
+    .from(projects)
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .where(and(eq(projects.phase, "production"), live(), isNull(clients.deletedAt)));
+}
+
+export type ProductionProjectInfo = ProductionProject & { name: string; clientId: string; clientName: string };
+
+export async function listProductionProjectsInfo(db: Database): Promise<ProductionProjectInfo[]> {
+  return db
+    .select({
+      id: projects.id,
+      auditFrequency: projects.auditFrequency,
+      name: projects.name,
+      clientId: clients.id,
+      clientName: clients.name,
+    })
+    .from(projects)
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .where(and(eq(projects.phase, "production"), live(), isNull(clients.deletedAt)))
+    .orderBy(asc(clients.name), asc(projects.name));
+}

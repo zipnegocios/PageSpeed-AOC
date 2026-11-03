@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { auditLogs, clients, projects, routes } from "@/server/db/schema";
 import type { AuditMetrics } from "@/server/domain/score-extraction";
@@ -126,4 +126,51 @@ export async function markFailed(db: Database, id: string, error: { code: string
       durationMs: sql`case when ${auditLogs.startedAt} is null then null else (extract(epoch from (now() - ${auditLogs.startedAt})) * 1000)::int end`,
     })
     .where(eq(auditLogs.id, id));
+}
+
+/** Auditorías "en curso" que empezaron antes de `before`: candidatas a haber quedado huérfanas. */
+export async function listStaleRunning(db: Database, before: Date): Promise<AuditLog[]> {
+  return db
+    .select()
+    .from(auditLogs)
+    .where(and(eq(auditLogs.status, "running"), lt(auditLogs.startedAt, before)));
+}
+
+/** Auditorías en cola desde antes de `before`: deberían tener ya su trabajo en Redis. */
+export async function listQueuedBefore(db: Database, before: Date): Promise<AuditLog[]> {
+  return db
+    .select()
+    .from(auditLogs)
+    .where(and(eq(auditLogs.status, "queued"), lt(auditLogs.queuedAt, before)));
+}
+
+/** Vuelve a dejar en cola una auditoría que figuraba como en curso (el trabajo sigue pendiente). */
+export async function markRequeued(db: Database, id: string): Promise<void> {
+  await db.update(auditLogs).set({ status: "queued", startedAt: null }).where(eq(auditLogs.id, id));
+}
+
+/**
+ * Borra las auditorías programadas de un proyecto que aún no empezaron (nunca corrieron, así que
+ * no hay historial que conservar) y devuelve sus ids para retirar los trabajos de la cola.
+ */
+export async function deleteQueuedScheduled(db: Database, projectId: string): Promise<string[]> {
+  const rows = await db
+    .delete(auditLogs)
+    .where(and(eq(auditLogs.projectId, projectId), eq(auditLogs.trigger, "scheduled"), eq(auditLogs.status, "queued")))
+    .returning({ id: auditLogs.id });
+  return rows.map((r) => r.id);
+}
+
+export type FailedAudit = AuditWithRoute & { projectName: string };
+
+export async function listRecentFailures(db: Database, limit: number): Promise<FailedAudit[]> {
+  const rows = await db
+    .select({ audit: auditLogs, routePath: routes.path, projectName: projects.name })
+    .from(auditLogs)
+    .innerJoin(routes, eq(routes.id, auditLogs.routeId))
+    .innerJoin(projects, eq(projects.id, auditLogs.projectId))
+    .where(eq(auditLogs.status, "failed"))
+    .orderBy(desc(auditLogs.finishedAt))
+    .limit(limit);
+  return rows.map((r) => ({ ...r.audit, routePath: r.routePath, projectName: r.projectName }));
 }

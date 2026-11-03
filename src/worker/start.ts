@@ -1,14 +1,17 @@
 import { access, constants } from "node:fs/promises";
-import { Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import pino, { type Logger } from "pino";
 import type { WorkerEnv } from "@/server/config/env";
 import { createDb } from "@/server/db/client";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { clearHeartbeat, writeHeartbeat } from "@/server/queue/heartbeat";
-import { LIGHTHOUSE_QUEUE } from "@/server/queue/queues";
+import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
+import { PLAN_JOB, RECONCILE_EVERY_MS, RECONCILE_JOB, RECONCILE_SCHEDULER_ID } from "@/server/queue/schedulers";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
 import { createAuditProcessor } from "./processors/audit.processor";
+import { createPlanProjectProcessor } from "./processors/plan-project.processor";
+import { reconcile } from "./reconcile";
 
 export type StartWorkerOptions = {
   env: WorkerEnv;
@@ -34,9 +37,26 @@ async function fileExists(path: string | undefined): Promise<boolean> {
   }
 }
 
+/** Si una tarea de arranque se cuelga, el worker lo dice en los logs y sigue en lugar de quedarse mudo. */
+async function withDeadline<T>(task: Promise<T>, ms: number, label: string, log: Logger): Promise<T | undefined> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      log.error({ label, ms }, `${label}: sin respuesta tras ${Math.round(ms / 1000)} s; se continúa sin esperar`);
+      resolve(undefined);
+    }, ms);
+  });
+  try {
+    return await Promise.race([task, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function startWorker(options: StartWorkerOptions): Promise<RunningWorker> {
   const { env } = options;
   const log = options.logger ?? pino({ level: env.LOG_LEVEL, base: { service: "worker" } });
+  log.info("worker iniciando");
 
   // Al vencer el plazo se cierra Chromium a la fuerza y Lighthouse deja un rechazo interno
   // ("Target closed") que no podemos atender. Se registra en lugar de tumbar el worker.
@@ -81,6 +101,50 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
   worker.on("stalled", (jobId) => log.warn({ jobId }, "trabajo detenido; se reencola"));
   worker.on("failed", (job, err) => log.debug({ jobId: job?.id, err: err.message }, "trabajo fallido"));
 
+  // Mantenimiento (cola aparte, sin Chromium): disparos de los agendadores y reconciliación.
+  const lighthouse = new Queue<AuditJobData>(LIGHTHOUSE_QUEUE, { connection: redis, prefix: QUEUE_PREFIX });
+  const maintenance = new Queue(MAINTENANCE_QUEUE, { connection: redis, prefix: QUEUE_PREFIX });
+  lighthouse.on("error", (err) => log.error({ err: err.message }, "error de la cola lighthouse"));
+  maintenance.on("error", (err) => log.error({ err: err.message }, "error de la cola maintenance"));
+
+  const planProject = createPlanProjectProcessor({ db, redis, lighthouse, maintenance, log });
+  const runReconcile = () => reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
+  const maintenanceWorker = new Worker(
+    MAINTENANCE_QUEUE,
+    async (job) => {
+      if (job.name === PLAN_JOB) return planProject(job);
+      if (job.name === RECONCILE_JOB) {
+        await runReconcile();
+        return;
+      }
+      log.warn({ name: job.name }, "trabajo de mantenimiento desconocido");
+    },
+    { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1 },
+  );
+  maintenanceWorker.on("error", (err) => log.error({ err: err.message }, "error del worker de mantenimiento"));
+  maintenanceWorker.on("failed", (job, err) => log.error({ jobId: job?.id, name: job?.name, err: err.message }, "mantenimiento fallido"));
+
+  // Al arrancar se corrigen desfases y se registran los agendadores; después, cada 15 minutos.
+  await withDeadline(
+    runReconcile().catch((err: Error) => log.error({ err: err.message }, "la reconciliación inicial falló")),
+    60_000,
+    "reconciliación inicial",
+    log,
+  );
+  // `startDate` evita que BullMQ la dispare al instante: la del arranque ya se acaba de ejecutar.
+  await withDeadline(
+    maintenance
+      .upsertJobScheduler(
+        RECONCILE_SCHEDULER_ID,
+        { every: RECONCILE_EVERY_MS, startDate: new Date(Date.now() + RECONCILE_EVERY_MS) },
+        { name: RECONCILE_JOB, data: {} },
+      )
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la reconciliación periódica")),
+    30_000,
+    "registro de la reconciliación periódica",
+    log,
+  );
+
   const beat = () =>
     writeHeartbeat(redis, { chrome: chromeOk }).catch((err: Error) => log.error({ err: err.message }, "latido fallido"));
   await beat();
@@ -99,6 +163,8 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
         process.off("unhandledRejection", onUnhandledRejection);
         // Espera a que termine la auditoría en curso antes de salir.
         await worker.close();
+        await maintenanceWorker.close();
+        await Promise.all([lighthouse.close(), maintenance.close()]).catch(() => undefined);
         await clearHeartbeat(redis).catch(() => undefined);
         await redis.quit().catch(() => undefined);
         ownR2?.destroy();

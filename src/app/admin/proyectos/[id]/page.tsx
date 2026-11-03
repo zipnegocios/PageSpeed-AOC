@@ -6,7 +6,7 @@ import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { CheckboxField, Field, SelectField } from "@/lib/ui/components/field";
 import { listAudits } from "@/server/services/audits";
-import { getProject } from "@/server/services/projects";
+import { getNextScheduledRun, getProject } from "@/server/services/projects";
 import { listRoutes } from "@/server/services/routes";
 import { getThresholds } from "@/server/services/thresholds";
 import { formatDate, formatDuration, formatSeconds, isPending, PROFILE_LABEL } from "@/lib/audit-format";
@@ -46,6 +46,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const project = await orNotFound(getProject(id));
   const [routes, thresholds, audits] = await Promise.all([listRoutes(id), getThresholds(id), listAudits(id, 20)]);
   const production = project.phase === "production";
+  const nextRun = production ? await getNextScheduledRun(id) : null;
 
   return (
     <AdminShell
@@ -63,12 +64,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         title="Fase del proyecto"
         description={
           production
-            ? "Producción: se audita en móvil y escritorio con la frecuencia elegida y las alertas están activas."
+            ? `Producción: se audita en móvil y escritorio con la frecuencia elegida y las alertas están activas. ${nextRun ? `Próxima auditoría programada: ${formatDate(nextRun)}.` : "Aún no tiene una próxima auditoría agendada; se corrige sola en unos minutos."}`
             : "Desarrollo: se audita una página a la vez bajo demanda y no se envían alertas."
         }
       >
         <ActionForm action={setPhaseAction.bind(null, id)} submitLabel="Cambiar fase" variant="secondary" className="max-w-md">
-          <SelectField label="Fase" id="phase" defaultValue={project.phase} hint="Pasar a desarrollo silencia las alertas abiertas. El agendado automático de auditorías llega con el worker.">
+          <SelectField label="Fase" id="phase" defaultValue={project.phase} hint="Pasar a desarrollo silencia las alertas abiertas, retira el agendado y cancela las auditorías programadas pendientes.">
             <option value="development">Desarrollo</option>
             <option value="production">Producción</option>
           </SelectField>

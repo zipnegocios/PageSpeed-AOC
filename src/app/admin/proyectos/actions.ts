@@ -31,15 +31,15 @@ export async function updateProjectAction(id: string, _prev: ActionState, fd: Fo
 export async function setPhaseAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
-    const { suppressedAlerts, project } = await projects.setProjectPhase(id, field(fd, "phase"));
+    const { suppressedAlerts, project, scheduler } = await projects.setProjectPhase(id, field(fd, "phase"));
     refresh(id);
     const label = project.phase === "production" ? "producción" : "desarrollo";
-    return {
-      ok:
-        suppressedAlerts > 0
-          ? `Fase cambiada a ${label}. Se silenciaron ${suppressedAlerts} alertas abiertas.`
-          : `Fase cambiada a ${label}.`,
-    };
+    const notes = [
+      suppressedAlerts > 0 ? `se silenciaron ${suppressedAlerts} alertas abiertas` : "",
+      scheduler.cancelled > 0 ? `se cancelaron ${scheduler.cancelled} auditorías programadas pendientes` : "",
+      !scheduler.ok ? "no se pudo actualizar el agendado (Redis no respondió); se corregirá solo en unos minutos" : "",
+    ].filter(Boolean);
+    return { ok: `Fase cambiada a ${label}${notes.length ? `: ${notes.join("; ")}` : ""}.` };
   });
 }
 

@@ -31,6 +31,9 @@ export function AdminShell({
           <Link href="/admin/clientes" className="text-[17px] font-semibold text-link hover:underline">
             Clientes
           </Link>
+          <Link href="/admin/cola" className="text-[17px] font-semibold text-link hover:underline">
+            Cola
+          </Link>
         </nav>
         <form action={logoutAction} className="flex items-center gap-3">
           <span className="hidden text-[15px] text-ink-muted sm:inline">{email}</span>

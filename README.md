@@ -33,6 +33,13 @@ Necesita `DATABASE_URL`, `REDIS_URL`, `R2_*` y, opcionalmente, `CHROME_PATH` y `
 - Prueba con Chromium y Lighthouse reales (opcional):
   `TEST_CHROME_PATH=/ruta/a/chrome pnpm exec vitest run --dangerouslyIgnoreUnhandledErrors tests/integration/lighthouse-real.test.ts`
 - `pnpm worker:build` compila el worker y genera su `package.json` mínimo (`scripts/worker-manifest.mjs`).
+- **Agendado:** un proyecto en producción tiene su propio cron semanal o diario (UTC, repartido por hash del
+  id). Al dispararse, el worker pide móvil y escritorio de cada ruta monitoreada. Pasar a desarrollo, cambiar
+  la frecuencia o archivar actualiza el agendador; si Redis no responde en ese momento, el cambio se guarda
+  igual y la reconciliación lo corrige.
+- **Reconciliación:** al arrancar y cada 15 minutos, el worker corrige desfases entre Postgres y Redis
+  (auditorías huérfanas, trabajos perdidos, agendadores que faltan o sobran). `/admin/cola` muestra el estado.
+- **Despliegue:** un cambio que toca `src/worker`, `src/server` o las dependencias exige redesplegar **web y worker**.
 
 ## Design System
 

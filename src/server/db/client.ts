@@ -5,7 +5,9 @@ import * as schema from "./schema";
 export type Database = NodePgDatabase<typeof schema>;
 
 export function createDb(connectionString: string, max = 5): { db: Database; pool: Pool } {
-  const pool = new Pool({ connectionString, max });
+  // Sin tiempo máximo de conexión, pg espera para siempre si la base no responde y el arranque
+  // se queda mudo. Con él, el fallo aparece en los logs a los 10 s.
+  const pool = new Pool({ connectionString, max, connectionTimeoutMillis: 10_000 });
   return { db: drizzle(pool, { schema }), pool };
 }
 

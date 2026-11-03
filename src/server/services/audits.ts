@@ -157,3 +157,20 @@ export async function getAuditReportFile(
   const base = audit.r2Key.split("/").pop() ?? `${audit.id}.json.gz`;
   return { filename: base.replace(/\.gz$/, ""), json: gunzipSync(gz) };
 }
+
+/**
+ * Retira las auditorías programadas que aún no empezaron (al pasar a desarrollo o archivar).
+ * Las que están en curso se dejan terminar. Devuelve cuántas se cancelaron.
+ */
+export async function cancelScheduledAudits(
+  projectId: string,
+  deps: { db?: Database; queue?: Queue<AuditJobData> } = {},
+): Promise<number> {
+  const db = deps.db ?? getDb();
+  assertUuid(projectId, "Proyecto");
+  const ids = await repo.deleteQueuedScheduled(db, projectId);
+  if (ids.length === 0) return 0;
+  const queue = deps.queue ?? lighthouseQueue();
+  await Promise.all(ids.map((id) => queue.remove(id).catch(() => 0)));
+  return ids.length;
+}
