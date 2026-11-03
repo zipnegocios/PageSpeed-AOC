@@ -24,7 +24,7 @@ import {
 import { createMailer, type Mailer } from "@/server/notify/mailer";
 import { resolveAlertRecipient, sweepNotifications } from "@/server/services/alerts";
 import { runBackup } from "@/server/services/backups";
-import { refreshAllFieldData, type FetchLike } from "@/server/services/crux";
+import { refreshAllFieldData, refreshOneProjectFieldData, type FetchLike } from "@/server/services/crux";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
 import { createAuditProcessor } from "./processors/audit.processor";
@@ -175,8 +175,11 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     }
   };
 
-  const runCrux = async () => {
-    const r = await refreshAllFieldData({ db, apiKey: env.CRUX_API_KEY || undefined, fetch: options.cruxFetch });
+  const runCrux = async (projectId?: string) => {
+    const apiKey = env.CRUX_API_KEY || undefined;
+    const r = projectId
+      ? await refreshOneProjectFieldData(projectId, { db, apiKey, fetch: options.cruxFetch })
+      : await refreshAllFieldData({ db, apiKey, fetch: options.cruxFetch });
     if (r.error === "NO_KEY") log.warn("CRUX_API_KEY sin definir: no se piden datos reales de usuarios");
     else if (!r.ok) log.error({ error: r.error, checked: r.checked }, "la actualización de datos reales falló");
     else log.info({ projects: r.projects, checked: r.checked, withData: r.withData }, "datos reales de usuarios actualizados");
@@ -194,7 +197,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       }
       if (job.name === NOTIFY_JOB) return runNotify();
       if (job.name === BACKUP_JOB) return runBackupJob();
-      if (job.name === CRUX_JOB) return runCrux();
+      if (job.name === CRUX_JOB) return runCrux((job.data as { projectId?: string } | undefined)?.projectId);
       log.warn({ name: job.name }, "trabajo de mantenimiento desconocido");
     },
     { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1 },

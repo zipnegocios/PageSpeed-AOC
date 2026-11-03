@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
+import { DomainError } from "@/server/domain/errors";
 import { fieldData } from "@/server/db/schema";
 import { CRUX_NAMES, FIELD_METRICS, parseRecord, type FieldMetrics } from "@/server/domain/field-data";
 import { listProductionProjects } from "@/server/repositories/projects";
@@ -15,6 +16,7 @@ const ENDPOINT = "https://chromeuxreport.googleapis.com/v1/records:queryRecord";
 /** El límite gratuito de la API es de 150 consultas por minuto: se deja margen. */
 const PAUSE_MS = 500;
 const MAX_ROUTES = 10;
+const ENQUEUE_TIMEOUT_MS = 8_000;
 
 export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string; signal: AbortSignal }) => Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>;
 
@@ -114,7 +116,7 @@ export async function refreshProjectFieldData(
   return summary;
 }
 
-export type CruxRunRecord = { at: string; ok: boolean; projects: number; checked: number; withData: number; error?: "NO_KEY" | "BAD_KEY" | "QUOTA" | "UNAVAILABLE" | "INVALID" };
+export type CruxRunRecord = { at: string; ok: boolean; projects: number; checked: number; withData: number; projectId?: string; error?: "NO_KEY" | "BAD_KEY" | "QUOTA" | "UNAVAILABLE" | "INVALID" };
 const RUN_KEY = "crux_last_run";
 
 /** Recorre los proyectos en producción y anota cómo salió, para que el panel lo explique. */
@@ -141,6 +143,30 @@ export async function refreshAllFieldData(deps: { db?: Database; apiKey: string 
     return record({ ok: false, projects: projects.length, checked, withData, error: code });
   }
   return record({ ok: true, projects: projects.length, checked, withData });
+}
+
+/**
+ * Actualización pedida desde el botón de un proyecto: va directa a ese proyecto, sea cual sea su fase
+ * (la ronda diaria solo recorre los de producción), y anota cómo salió para que el panel lo explique.
+ */
+export async function refreshOneProjectFieldData(
+  projectId: string,
+  deps: { db?: Database; apiKey: string | undefined; fetch?: FetchLike; sleep?: (ms: number) => Promise<void>; now?: () => Date },
+): Promise<CruxRunRecord> {
+  const db = deps.db ?? getDb();
+  const at = (deps.now ?? (() => new Date()))().toISOString();
+  const record = async (r: Omit<CruxRunRecord, "at" | "projectId" | "projects">) => {
+    const full: CruxRunRecord = { at, projectId, projects: 1, ...r };
+    await setSetting(db, RUN_KEY, full);
+    return full;
+  };
+  if (!deps.apiKey) return record({ ok: false, checked: 0, withData: 0, error: "NO_KEY" });
+  try {
+    const s = await refreshProjectFieldData(projectId, { db, apiKey: deps.apiKey, fetch: deps.fetch, sleep: deps.sleep, now: deps.now });
+    return record({ ok: true, checked: s.checked, withData: s.withData });
+  } catch (err) {
+    return record({ ok: false, checked: 0, withData: 0, error: err instanceof CruxError ? err.code : "UNAVAILABLE" });
+  }
 }
 
 export async function getLastCruxRun(db: Database = getDb()): Promise<CruxRunRecord | null> {
@@ -177,15 +203,32 @@ export async function findFieldData(projectId: string, target: string, formFacto
   return all.find((r) => r.target === target && r.formFactor === formFactor) ?? null;
 }
 
-/** Pide al worker actualizar los datos reales ahora. Si ya hay una petición esperando, no encola otra. */
-export async function requestFieldDataRefresh(deps: { queue?: Queue } = {}): Promise<{ queued: boolean }> {
+/** Pide al worker actualizar los datos reales de un proyecto ahora. Si ya hay una petición esperando, no encola otra. */
+export async function requestFieldDataRefresh(projectId: string, deps: { queue?: Queue } = {}): Promise<{ queued: boolean }> {
+  assertUuid(projectId, "Proyecto");
   const queue = deps.queue ?? maintenanceQueue();
-  const existing = await queue.getJob("crux-manual");
-  if (existing) {
-    const state = await existing.getState();
-    if (state === "waiting" || state === "active" || state === "delayed" || state === "prioritized") return { queued: false };
-    await existing.remove().catch(() => undefined);
+  const jobId = `crux-manual-${projectId}`;
+  // Con Redis caído las órdenes de BullMQ se quedan esperando para siempre: mejor avisar que dejar el botón colgado.
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new DomainError("UPSTREAM", "No se pudo pedir la actualización (Redis no responde). Inténtalo de nuevo.")), ENQUEUE_TIMEOUT_MS);
+  });
+  const enqueue = async (): Promise<{ queued: boolean }> => {
+    const existing = await queue.getJob(jobId);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === "waiting" || state === "active" || state === "delayed" || state === "prioritized") return { queued: false };
+      await existing.remove().catch(() => undefined);
+    }
+    await queue.add(CRUX_JOB, { projectId }, { jobId, removeOnComplete: true, removeOnFail: true });
+    return { queued: true };
+  };
+  try {
+    return await Promise.race([enqueue(), deadline]);
+  } catch (err) {
+    if (err instanceof DomainError) throw err;
+    throw new DomainError("UPSTREAM", "No se pudo pedir la actualización (Redis no responde). Inténtalo de nuevo.");
+  } finally {
+    clearTimeout(timer);
   }
-  await queue.add(CRUX_JOB, {}, { jobId: "crux-manual", removeOnComplete: true, removeOnFail: true });
-  return { queued: true };
 }

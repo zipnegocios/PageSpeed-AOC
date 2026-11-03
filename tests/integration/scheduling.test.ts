@@ -346,7 +346,7 @@ describe.skipIf(!ready)("agendado, plan-project-audit y reconciliación", () => 
         return { status: 200, ok: true, json: async () => ({ record: { metrics: { largest_contentful_paint: { histogram: [{ density: 1 }, { density: 0 }, { density: 0 }], percentiles: { p75: 1200 } } } } }) };
       }) as never;
       worker = await startWorker({ env: { ...env(), CRUX_API_KEY: "CLAVE-DE-PRUEBA" }, runner: okRunner, allowPrivate: true, logger: log, cruxFetch });
-      await maintenance.add(CRUX_JOB, {}, { jobId: "crux-manual", removeOnComplete: true });
+      await maintenance.add(CRUX_JOB, { projectId: project.id }, { jobId: `crux-manual-${project.id}`, removeOnComplete: true });
       // El worker anota el resultado al terminar la ronda (con una pausa entre consultas): se espera a eso.
       const run = await waitFor(async () => (await db.select().from(s.settings).where(eq(s.settings.key, "crux_last_run")))[0]?.value as { ok?: boolean } | undefined, 30_000);
       expect(run).toMatchObject({ ok: true, withData: 4 });

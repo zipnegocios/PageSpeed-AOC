@@ -7,7 +7,7 @@ import * as s from "@/server/db/schema";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { MAINTENANCE_QUEUE } from "@/server/queue/queues";
 import * as clients from "@/server/services/clients";
-import { findFieldData, getLastCruxRun, listFieldData, refreshAllFieldData, refreshProjectFieldData, requestFieldDataRefresh, type FetchLike } from "@/server/services/crux";
+import { findFieldData, getLastCruxRun, listFieldData, refreshAllFieldData, refreshOneProjectFieldData, refreshProjectFieldData, requestFieldDataRefresh, type FetchLike } from "@/server/services/crux";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 
@@ -112,6 +112,28 @@ describe.skipIf(!dbUrl)("datos reales de usuarios (CrUX)", () => {
     });
   });
 
+  describe("actualización pedida desde el botón de un proyecto", () => {
+    it("funciona aunque el proyecto siga en desarrollo y lo anota con su proyecto", async () => {
+      const { project } = await setup("development", ["/"]);
+      const run = await refreshOneProjectFieldData(project.id, { db, apiKey: "K", fetch: fetchFake, sleep: noSleep, now: () => NOW });
+      expect(run).toEqual({ at: NOW.toISOString(), ok: true, projects: 1, checked: 4, withData: 4, projectId: project.id });
+      expect((await listFieldData(project.id, db)).length).toBe(4);
+      expect(await getLastCruxRun(db)).toEqual(run);
+    });
+    it("sin clave anota NO_KEY y no consulta", async () => {
+      const { project } = await setup("production", ["/"]);
+      const run = await refreshOneProjectFieldData(project.id, { db, apiKey: undefined, fetch: fetchFake, now: () => NOW });
+      expect(run).toMatchObject({ ok: false, error: "NO_KEY", projectId: project.id });
+      expect(calls.length).toBe(0);
+    });
+    it("una clave rechazada se anota con su código", async () => {
+      const { project } = await setup("production", ["/"]);
+      mode = "clave";
+      const run = await refreshOneProjectFieldData(project.id, { db, apiKey: "MALA", fetch: fetchFake, sleep: noSleep, now: () => NOW });
+      expect(run).toMatchObject({ ok: false, error: "BAD_KEY", projectId: project.id });
+    });
+  });
+
   describe("actualización diaria de todos los proyectos", () => {
     it("recorre solo los proyectos en producción y anota el resultado", async () => {
       await setup("production", ["/"]);
@@ -146,9 +168,12 @@ describe.skipIf(!dbUrl)("datos reales de usuarios (CrUX)", () => {
       const queue = new Queue(MAINTENANCE_QUEUE, { connection: redis, prefix: QUEUE_PREFIX });
       try {
         await queue.obliterate({ force: true });
-        expect(await requestFieldDataRefresh({ queue })).toEqual({ queued: true });
-        expect(await requestFieldDataRefresh({ queue })).toEqual({ queued: false });
-        expect((await queue.getJob("crux-manual"))?.name).toBe("crux");
+        const id = "11111111-1111-4111-8111-111111111111";
+        expect(await requestFieldDataRefresh(id, { queue })).toEqual({ queued: true });
+        expect(await requestFieldDataRefresh(id, { queue })).toEqual({ queued: false });
+        const job = await queue.getJob(`crux-manual-${id}`);
+        expect(job?.name).toBe("crux");
+        expect(job?.data).toEqual({ projectId: id });
       } finally {
         await queue.obliterate({ force: true });
         await queue.close();

@@ -5,7 +5,7 @@ import { Card } from "@/lib/ui/components/card";
 import { SegmentedNav } from "@/lib/ui/components/segmented-nav";
 import { StatusMark } from "@/lib/ui/components/status-mark";
 import { FIELD_LABEL, FIELD_METRICS, assess, formatField, rate, type FieldMetric, type Rating } from "@/server/domain/field-data";
-import { findFieldData, getLastCruxRun } from "@/server/services/crux";
+import { findFieldData, getLastCruxRun, type CruxRunRecord } from "@/server/services/crux";
 import { listMonitoredRoutes } from "@/server/services/history";
 import { panelHref, type PanelSearch } from "./panel-search";
 
@@ -32,6 +32,28 @@ function Distribution({ good, needsImprovement, poor }: { good: number; needsImp
  * Datos reales de usuarios (Chrome UX Report): la experiencia de visitantes reales de los últimos 28 días, que el
  * laboratorio de Lighthouse no puede medir (incluido el INP). Solo lectura; `footer` es para acciones del administrador.
  */
+const RUN_ERRORS: Record<string, string> = {
+  NO_KEY: "Falta definir CRUX_API_KEY en el worker. Con la clave, los datos se piden cada día (ver el runbook).",
+  BAD_KEY: "Google rechazó la clave (BAD_KEY). Revisa que sea de la API «Chrome UX Report API» y que su restricción de aplicación permita la IP de salida del worker (o déjala en «Ninguna»).",
+  QUOTA: "Google indicó que se superó el límite de consultas (QUOTA). Espera un minuto y vuelve a intentarlo.",
+  UNAVAILABLE: "No se pudo contactar con la API de Chrome UX Report (UNAVAILABLE). Vuelve a intentarlo en unos minutos.",
+  INVALID: "La API de Chrome UX Report rechazó la consulta (INVALID). Revisa la dirección del sitio del proyecto.",
+};
+
+/** Qué decir cuando todavía no hay cifras. El administrador ve el resultado de la última ronda; el cliente, algo breve. */
+function emptyMessage(audience: "admin" | "client", projectId: string, lastRun: CruxRunRecord | null): string {
+  if (audience === "client") return "Aún no hay datos reales para este proyecto. Se actualizan cada día.";
+  // Una petición hecha desde otro proyecto no dice nada de este.
+  const run = lastRun && (!lastRun.projectId || lastRun.projectId === projectId) ? lastRun : null;
+  if (run && !run.ok) return RUN_ERRORS[run.error ?? ""] ?? `La última actualización falló (${run.error ?? "error"}). Revisa la clave y vuelve a intentarlo.`;
+  if (run) {
+    return run.checked > 0
+      ? `Última actualización: ${formatDate(new Date(run.at))}. Se hicieron ${run.checked} consultas y ${run.withData} devolvieron datos.`
+      : `Última actualización: ${formatDate(new Date(run.at))}. La ronda diaria solo recorre proyectos en producción: pulsa «Actualizar datos reales» para pedir los de este proyecto ahora.`;
+  }
+  return "Aún no hay datos reales para este proyecto. Pulsa «Actualizar datos reales»: si en un minuto sigue igual, el worker no está procesando la petición (revisa que esté desplegado con la última versión y con CRUX_API_KEY).";
+}
+
 export async function FieldDataCard({
   projectId,
   basePath,
@@ -115,13 +137,7 @@ export async function FieldDataCard({
             {scope === "origen" ? "Este sitio" : "Esta página"} no tiene suficiente tráfico en Chrome en este dispositivo para mostrar datos reales. Actualizado {formatDate(row.fetchedAt)}.
           </p>
         ) : (
-          <p className="text-ink-muted">
-            {audience === "admin" && lastRun?.error === "NO_KEY"
-              ? "Falta definir CRUX_API_KEY en el worker. Con la clave, los datos se piden cada día (ver el runbook)."
-              : audience === "admin" && lastRun && !lastRun.ok
-                ? `La última actualización falló (${lastRun.error ?? "error"}). Revisa la clave y vuelve a intentarlo.`
-                : "Aún no hay datos reales para este proyecto. Se actualizan cada día."}
-          </p>
+          <p className="text-ink-muted">{emptyMessage(audience, projectId, lastRun)}</p>
         )}
         {footer}
       </Card>

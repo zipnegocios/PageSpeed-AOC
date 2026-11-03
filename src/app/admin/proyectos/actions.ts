@@ -219,7 +219,7 @@ export async function clearAuthAction(projectId: string, _prev: ActionState): Pr
 export async function refreshFieldDataAction(projectId: string, _prev: ActionState): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
-    const { queued } = await requestFieldDataRefresh();
+    const { queued } = await requestFieldDataRefresh(projectId);
     refresh(projectId);
     return { ok: queued ? "Actualización pedida al worker. Los datos aparecerán en unos minutos." : "Ya hay una actualización en curso o esperando al worker." };
   });
