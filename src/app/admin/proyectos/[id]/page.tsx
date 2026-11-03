@@ -15,6 +15,7 @@ import { Score } from "@/lib/ui/components/score";
 import Link from "next/link";
 import { AdminShell } from "../../_components/admin-shell";
 import { AutoRefresh } from "../../_components/auto-refresh";
+import { HistoryPanel, type HistorySearch } from "../../../_components/history-panel";
 import { AlertList, NotificationList } from "../../_components/alert-list";
 import { AuditStatusBadge } from "../../_components/audit-badge";
 import {
@@ -42,9 +43,10 @@ const METRIC_LABELS = {
 
 const dateFormat = new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<HistorySearch> }) {
   const session = await verifySession();
   const { id } = await params;
+  const search = await searchParams;
   const project = await orNotFound(getProject(id));
   const [routes, thresholds, audits, alerts, notifications, whatsappLink] = await Promise.all([
     listRoutes(id),
@@ -175,6 +177,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           </div>
         ) : null}
       </Card>
+
+      <HistoryPanel projectId={id} basePath={`/admin/proyectos/${id}`} search={search} allRoutes />
 
       <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. La lista se actualiza sola mientras haya auditorías pendientes.">
         <AutoRefresh active={audits.some((a) => isPending(a.status))} />

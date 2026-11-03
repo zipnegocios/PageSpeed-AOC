@@ -60,6 +60,24 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   alertas, el registro de correos y un botón de **WhatsApp** (enlace `wa.me` con el mensaje prellenado,
   usando el teléfono del cliente) para avisarle.
 
+## Portal del cliente e histórico
+
+- **Link mágico:** `/c/<token>`, solo lectura y sin sesión. El token (32 bytes aleatorios) está en la ficha del
+  cliente, donde se puede **rotar** (el anterior deja de funcionar) y **suspender** al cliente (el portal pasa a
+  la pantalla de servicio suspendido). Ambos cambios surten efecto en la siguiente petición: el token se vuelve
+  a comprobar siempre y las páginas no se cachean.
+- Muestra solo los proyectos **en producción**: estado actual de cada página y perfil con su variación respecto
+  a la auditoría anterior, "puntos por mejorar" (las alertas abiertas, sin códigos internos) y la evolución.
+  Con un único proyecto abre directo en su detalle.
+- Cada proyecto se autoriza con el cliente del token; un proyecto de otro cliente, de desarrollo o archivado
+  responde 404, igual que un token inválido. Más de 30 enlaces inválidos desde una IP en 10 minutos cortan el
+  acceso con un aviso (limitador en memoria; hay una sola réplica web).
+- Cabeceras de `/c/*`: `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
+- **Evolución:** gráfico sin scripts (SVG + HTML) de puntuaciones, LCP, TBT y CLS por página, perfil y periodo
+  (7 días a 1 año), con la meta dibujada. Se elige con enlaces, así que cada vista tiene su URL. El mismo
+  panel está en la ficha del proyecto del administrador, donde incluye también las rutas de pruebas.
+- Pendiente (M4b): PDF bajo demanda, envío por email y PWA.
+
 ## Design System
 
 La fuente de verdad del diseño es el Design System "AOC PageSpeed" (Rajdhani, azules tecnológicos, rojos sutiles).

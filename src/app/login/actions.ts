@@ -1,8 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { clientIp } from "@/lib/auth/client-ip";
 import { createSession } from "@/lib/auth/session";
 import { loginLimiters } from "@/lib/auth/login-limiter";
 import { authenticate, normalizeEmail } from "@/server/services/admin-auth";
@@ -14,13 +14,6 @@ const schema = z.object({
   email: z.email({ error: "Escribe un correo válido." }),
   password: z.string().min(1, { error: "Escribe tu contraseña." }).max(200),
 });
-
-/** IP del cliente. Detrás de un único proxy, la última entrada es la que añade el proxy. */
-async function clientIp(): Promise<string> {
-  const h = await headers();
-  const forwarded = h.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
-  return forwarded?.at(-1) ?? h.get("x-real-ip") ?? "desconocida";
-}
 
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();

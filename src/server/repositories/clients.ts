@@ -52,3 +52,13 @@ export async function updateClient(
     .returning();
   return row;
 }
+
+/** Cliente por link mágico (solo activos o suspendidos, nunca archivados). */
+export async function findClientByToken(db: Database, token: string): Promise<Client | undefined> {
+  const [row] = await db
+    .select()
+    .from(clients)
+    .where(and(eq(clients.magicToken, token), isNull(clients.deletedAt)))
+    .limit(1);
+  return row;
+}
