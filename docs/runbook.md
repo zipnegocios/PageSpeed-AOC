@@ -145,3 +145,8 @@ Una semana en producción sin degradar los sitios alojados.
 - [ ] Una auditoría real por cliente y un portal abierto desde un móvil.
 - [ ] Correo de alerta de prueba recibido (umbral alto en un proyecto en producción).
 - [ ] Rama `main` como predeterminada en GitHub; webhook de `redis` eliminado.
+
+## Archivar y eliminar clientes y proyectos
+- **Archivar** (ficha del cliente o del proyecto) lo oculta y detiene sus auditorías; no borra nada. Se ve y se restaura desde *Archivados* (menú superior).
+- **Eliminar definitivamente** solo está en *Archivados*, exige escribir el nombre exacto y no se puede deshacer: borra la fila con todo lo que cuelga de ella y los informes de R2. Si R2 no responde, no se elimina nada y el mensaje lo explica.
+- Si te equivocaste, los respaldos diarios de Postgres (ver «Respaldos») guardan copias de las filas durante 30 días; los informes de R2 borrados solo se recuperan con el versionado del bucket.

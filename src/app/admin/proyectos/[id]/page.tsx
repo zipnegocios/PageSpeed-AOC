@@ -393,7 +393,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </ActionForm>
       </Card>
 
-      <Card title="Archivar proyecto" description="Lo oculta del panel y conserva su historial.">
+      <Card title="Archivar proyecto" description="Lo oculta del panel y detiene sus auditorías. No borra nada: lo encuentras en Archivados, donde puedes restaurarlo o eliminarlo para siempre.">
         <div>
           <ActionForm action={archiveProjectAction.bind(null, id, project.clientId)} submitLabel="Archivar proyecto" variant="secondary" pendingLabel="Archivando…" />
         </div>

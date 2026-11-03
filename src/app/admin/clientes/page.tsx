@@ -41,6 +41,13 @@ export default async function ClientsPage() {
             ))}
           </ul>
         )}
+        <p className="text-[15px] text-ink-muted">
+          ¿Buscas uno que archivaste? Está en{" "}
+          <Link href="/admin/archivados" className="font-semibold text-link hover:underline">
+            Archivados
+          </Link>
+          .
+        </p>
       </Card>
 
       <details open={clients.length === 0} className="rounded-md border border-border bg-surface-200 p-4 md:p-6">

@@ -14,7 +14,7 @@ type Props = {
   /** Texto del botón. Si se omite, el formulario no muestra botón (lo ponen los hijos). */
   submitLabel?: string;
   pendingLabel?: string;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   /** Vacía los campos cuando la acción termina bien (p. ej. "agregar ruta"). */
   resetOnSuccess?: boolean;
   className?: string;

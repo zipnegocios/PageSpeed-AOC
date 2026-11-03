@@ -31,7 +31,7 @@ export type SchedulerOutcome = {
  * retirado (y sus auditorías programadas pendientes canceladas) si no. Es de mejor esfuerzo: un
  * fallo de Redis nunca impide guardar el cambio del proyecto.
  */
-async function applyScheduler(
+export async function applyScheduler(
   project: { id: string; phase: "development" | "production"; auditFrequency: "weekly" | "daily"; deletedAt?: Date | null },
   db: Database,
   deps: SchedulerDeps,

@@ -39,6 +39,12 @@ evalúa las alertas y lo avisa en los logs.
   id). Al dispararse, el worker pide móvil y escritorio de cada ruta monitoreada. Pasar a desarrollo, cambiar
   la frecuencia o archivar actualiza el agendador; si Redis no responde en ese momento, el cambio se guarda
   igual y la reconciliación lo corrige.
+- **Archivar, restaurar y eliminar:** archivar un cliente o un proyecto es reversible: sale del panel, deja de
+  auditarse y (en un cliente) su link del portal deja de funcionar. Lo archivado se ve en `/admin/archivados`,
+  donde se puede **Restaurar** o **Eliminar definitivamente**. Eliminar solo se ofrece sobre lo ya archivado,
+  pide escribir el nombre exacto y borra, junto con la fila, todo lo que cuelga de ella (rutas, auditorías,
+  alertas, avisos, datos reales) y sus informes en R2 (`cliente/proyecto/` o `cliente/`). Si R2 falla no se
+  elimina nada. Los respaldos diarios de Postgres conservan copias anteriores hasta que vence su retención.
 - **Reconciliación:** al arrancar y cada 15 minutos, el worker corrige desfases entre Postgres y Redis
   (auditorías huérfanas, trabajos perdidos, agendadores que faltan o sobran). `/admin/cola` muestra el estado.
 - **Despliegue:** un cambio que toca `src/worker`, `src/server` o las dependencias exige redesplegar **web y worker**.

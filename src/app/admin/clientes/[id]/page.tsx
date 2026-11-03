@@ -130,7 +130,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
         </ActionForm>
       </Card>
 
-      <Card title="Archivar cliente" description="Lo oculta del panel y conserva su historial. Su identificador queda reservado.">
+      <Card title="Archivar cliente" description="Lo oculta del panel, detiene sus auditorías y desactiva su link del portal. No borra nada: lo encuentras en Archivados, donde puedes restaurarlo o eliminarlo para siempre.">
         <div>
           <ActionForm action={archiveClientAction.bind(null, id)} submitLabel="Archivar cliente" variant="secondary" pendingLabel="Archivando…" />
         </div>
