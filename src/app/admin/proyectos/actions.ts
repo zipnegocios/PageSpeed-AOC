@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
+import { parsePeriod } from "@/server/domain/history";
 import { requestAudit } from "@/server/services/audits";
+import { sendProjectReport } from "@/server/services/report-email";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 import { discoverRoutes, importRoutes } from "@/server/services/sitemap-discovery";
@@ -156,5 +158,14 @@ export async function requestAuditAction(
     refresh(projectId);
     if (result.created === 0) return { ok: "Ya había una auditoría pendiente para esta ruta." };
     return { ok: result.created === 1 ? "Auditoría en cola." : `${result.created} auditorías en cola (móvil y escritorio).` };
+  });
+}
+
+export async function sendReportAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const { to } = await sendProjectReport(projectId, parsePeriod(field(fd, "dias")));
+    refresh(projectId);
+    return { ok: `Informe enviado a ${to}.` };
   });
 }

@@ -8,6 +8,7 @@ import { CheckboxField, Field, SelectField } from "@/lib/ui/components/field";
 import { getWhatsappLinkForProject, listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
 import { listAudits } from "@/server/services/audits";
 import { getNextScheduledRun, getProject } from "@/server/services/projects";
+import { getClient } from "@/server/services/clients";
 import { listRoutes } from "@/server/services/routes";
 import { getThresholds } from "@/server/services/thresholds";
 import { formatDate, formatDuration, formatSeconds, isPending, PROFILE_LABEL } from "@/lib/audit-format";
@@ -25,6 +26,7 @@ import {
   importRoutesAction,
   removeRouteAction,
   requestAuditAction,
+  sendReportAction,
   setPhaseAction,
   setThresholdsAction,
   toggleRouteAction,
@@ -56,6 +58,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     listRecentNotifications(5, id),
     getWhatsappLinkForProject(id),
   ]);
+  const client = await getClient(project.clientId);
   const production = project.phase === "production";
   const nextRun = production ? await getNextScheduledRun(id) : null;
 
@@ -179,6 +182,33 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       </Card>
 
       <HistoryPanel projectId={id} basePath={`/admin/proyectos/${id}`} search={search} allRoutes />
+
+      <Card title="Informe" description="Resumen en PDF con el estado actual, los puntos por mejorar y la evolución del rendimiento.">
+        <div className="flex flex-wrap gap-2">
+          {([30, 90] as const).map((d) => (
+            <a
+              key={d}
+              href={`/api/admin/projects/${id}/report?dias=${d}`}
+              download
+              className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
+            >
+              Descargar PDF · {d} días
+            </a>
+          ))}
+        </div>
+        {client.contactEmail ? (
+          <ActionForm action={sendReportAction.bind(null, id)} submitLabel={`Enviar a ${client.contactEmail}`} pendingLabel="Enviando…" variant="secondary" className="max-w-md">
+            <SelectField label="Periodo del informe" id="dias" defaultValue="30">
+              <option value="30">Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+              <option value="7">Últimos 7 días</option>
+              <option value="365">Último año</option>
+            </SelectField>
+          </ActionForm>
+        ) : (
+          <p className="text-[15px] text-ink-muted">Agrega un correo de contacto en la ficha del cliente para poder enviarle el informe por email.</p>
+        )}
+      </Card>
 
       <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. La lista se actualiza sola mientras haya auditorías pendientes.">
         <AutoRefresh active={audits.some((a) => isPending(a.status))} />

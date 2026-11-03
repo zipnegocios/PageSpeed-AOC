@@ -58,7 +58,19 @@ export default async function PortalProjectPage({
         </>
       }
     >
-      <Card title="Estado actual" description="Resultado de la última auditoría de cada página, frente a la anterior.">
+      <Card
+        title="Estado actual"
+        description="Resultado de la última auditoría de cada página, frente a la anterior."
+        actions={
+          <a
+            href={`/c/${token}/${project.id}/informe`}
+            download
+            className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
+          >
+            Descargar informe (PDF)
+          </a>
+        }
+      >
         {project.latest.length === 0 ? (
           <p className="text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
         ) : (

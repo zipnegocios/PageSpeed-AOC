@@ -76,7 +76,17 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 - **Evolución:** gráfico sin scripts (SVG + HTML) de puntuaciones, LCP, TBT y CLS por página, perfil y periodo
   (7 días a 1 año), con la meta dibujada. Se elige con enlaces, así que cada vista tiene su URL. El mismo
   panel está en la ficha del proyecto del administrador, donde incluye también las rutas de pruebas.
-- Pendiente (M4b): PDF bajo demanda, envío por email y PWA.
+- **Informe PDF:** A4 con estado actual (y su variación), puntos por mejorar y la evolución del rendimiento por
+  página y perfil, en Rajdhani y con los colores de `design/tokens.json`. Lo descarga el administrador desde la
+  ficha del proyecto (30 o 90 días) y el cliente desde su portal (`/c/<token>/<proyecto>/informe`, con la misma
+  autorización que el portal). Se genera en el servicio web, de uno en uno y con una caché de 2 minutos para no
+  cargar el VPS; las fuentes viajan en la imagen (`src/assets/fonts`, licencia OFL).
+- **Envío por email:** el botón «Enviar a …» de la ficha del proyecto manda el PDF adjunto al correo de contacto
+  del cliente, con un enlace a su portal, y lo anota en la bitácora (`notifications`, tipo `report`). Usa el
+  SMTP del servicio web, no se puede repetir antes de 5 minutos y un fallo del SMTP se registra sin detener nada.
+- **PWA:** cada portal publica su manifiesto (`/c/<token>/manifest.webmanifest`) y se puede instalar con el
+  nombre del cliente. Iconos en `public/pwa` (origen: `design/icons/app-icon.svg`). No hay service worker: sin
+  conexión el navegador lo dice, nunca se muestran puntuaciones viejas.
 
 ## Design System
 

@@ -10,6 +10,18 @@ describe("createMailer", () => {
     await expect(mailer.send({ to: "a@x.test", subject: "Asunto", text: "t", html: "<p>t</p>" })).resolves.toBeUndefined();
   });
 
+  it("adjunta archivos con su nombre y tipo", async () => {
+    const transport = createTransport({ streamTransport: true, buffer: true });
+    const mailer = createMailer({ host: "h", port: 587, from: "AOC <n@x.test>" }, transport);
+    let raw = "";
+    const orig = transport.sendMail.bind(transport);
+    transport.sendMail = (async (m: never) => { const info = await orig(m); raw = (info as unknown as { message: Buffer }).message.toString("utf8"); return info; }) as never;
+    await mailer.send({ to: "a@x.test", subject: "Informe", text: "t", html: "<p>t</p>", attachments: [{ filename: "informe.pdf", content: Buffer.from("%PDF-1.7 x"), contentType: "application/pdf" }] });
+    expect(raw).toContain("Content-Type: application/pdf");
+    expect(raw).toMatch(/filename=(")?informe\.pdf/);
+    expect(raw).toContain("From: AOC <n@x.test>");
+  });
+
   it("propaga el error del transporte", async () => {
     const transport = createTransport({ jsonTransport: true });
     transport.sendMail = (async () => { throw new Error("rechazado"); }) as never;

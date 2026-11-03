@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fondo brand-deep a sangre: el sistema aplica su máscara. El dibujo cabe en la zona segura (60 % central). -->
+  <rect width="512" height="512" fill="#0b2a6e"/>
+  <path d="M171.15 346.85 A120 120 0 1 1 340.85 346.85" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round"/>
+  <line x1="256" y1="262" x2="328.8" y2="200.9" stroke="#4d8dff" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="256" cy="262" r="18" fill="#ffffff"/>
+</svg>

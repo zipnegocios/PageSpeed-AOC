@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // react-pdf se carga como paquete de Node (no se empaqueta) y las fuentes del informe viajan en la imagen.
+  serverExternalPackages: ["@react-pdf/renderer"],
+  outputFileTracingIncludes: {
+    "/api/admin/projects/[id]/report": ["./src/assets/fonts/**"],
+    "/c/[token]/[projectId]/informe": ["./src/assets/fonts/**"],
+  },
   async headers() {
     return [
       {
