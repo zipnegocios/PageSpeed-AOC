@@ -1,6 +1,6 @@
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -20,8 +20,17 @@ export type R2Store = {
   getAuditGzip(key: string): Promise<Buffer>;
   /** JSON descomprimido y ya interpretado. */
   getAuditJson<T = unknown>(key: string): Promise<T>;
+  /** Guarda bytes tal cual (respaldos). */
+  putObject(key: string, body: Buffer, contentType: string): Promise<void>;
+  /** Bytes de un objeto. */
+  getObject(key: string): Promise<Buffer>;
+  /** Objetos bajo un prefijo (todas las páginas), sin orden garantizado. */
+  listObjects(prefix: string): Promise<R2Object[]>;
+  deleteObjects(keys: string[]): Promise<void>;
   destroy(): void;
 };
+
+export type R2Object = { key: string; size: number; lastModified: Date };
 
 export function createR2(cfg: R2Config): R2Store {
   const client = new S3Client({
@@ -50,6 +59,25 @@ export function createR2(cfg: R2Config): R2Store {
       return { bytes: body.byteLength };
     },
     getAuditGzip,
+    async putObject(key, body, contentType) {
+      await client.send(new PutObjectCommand({ Bucket: cfg.bucket, Key: key, Body: body, ContentType: contentType }));
+    },
+    getObject: getAuditGzip,
+    async listObjects(prefix) {
+      const out: R2Object[] = [];
+      let token: string | undefined;
+      do {
+        const page = await client.send(new ListObjectsV2Command({ Bucket: cfg.bucket, Prefix: prefix, ContinuationToken: token }));
+        for (const o of page.Contents ?? []) {
+          if (o.Key) out.push({ key: o.Key, size: o.Size ?? 0, lastModified: o.LastModified ?? new Date(0) });
+        }
+        token = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (token);
+      return out;
+    },
+    async deleteObjects(keys) {
+      for (const key of keys) await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
+    },
     async getAuditJson<T>(key: string) {
       return JSON.parse((await gunzipAsync(await getAuditGzip(key))).toString("utf8")) as T;
     },

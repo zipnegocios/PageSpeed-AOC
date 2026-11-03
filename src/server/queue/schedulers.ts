@@ -15,6 +15,11 @@ export const NOTIFY_JOB = "notify";
 export const NOTIFY_SCHEDULER_ID = "notify";
 export const NOTIFY_EVERY_MS = 5 * 60 * 1000;
 
+/** Respaldo diario de Postgres a R2, a una hora de poco tráfico (UTC). */
+export const BACKUP_JOB = "backup";
+export const BACKUP_SCHEDULER_ID = "backup";
+export const BACKUP_CRON = "17 3 * * *";
+
 export type ProjectSchedule = { projectId: string; pattern: string | null; next: Date | null };
 
 /**

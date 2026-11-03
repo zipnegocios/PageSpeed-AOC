@@ -24,7 +24,7 @@ export function AdminShell({
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <nav aria-label="Principal" className="flex items-center gap-5">
+        <nav aria-label="Principal" className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <Link href="/admin" className="text-[13px] font-bold uppercase tracking-[0.08em] text-ink">
             AOC PageSpeed
           </Link>

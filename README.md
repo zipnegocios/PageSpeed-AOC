@@ -104,6 +104,21 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 - Probar con el inspector oficial: `npx @modelcontextprotocol/inspector` (transporte HTTP, cabecera Authorization);
   las pruebas de integración usan el cliente MCP real del SDK.
 
+## Operación, respaldos y endurecimiento
+
+- **Runbook:** `docs/runbook.md` (recursos, despliegues, incidentes, rotación de secretos, prueba de aceptación).
+- **Respaldos:** el worker copia cada día (03:17 UTC) toda la base a R2 (`_backups/postgres/...`) como NDJSON comprimido,
+  leído en una transacción con snapshot (coherente aunque se siga escribiendo) y sin depender de `pg_dump`.
+  Retención: 30 días y siempre los 5 más recientes. El estado, la lista y *Respaldar ahora* están en **Cola → Respaldos**;
+  un fallo se anota, se muestra y se avisa por correo.
+- **Restauración:** `node restore-cli.cjs --list | latest [--dry-run] | <clave> | --file <archivo>` desde la consola del
+  servicio web (`dist/restore-cli.cjs` va en la imagen). Es transaccional y exige una base vacía con las migraciones aplicadas.
+- **Cabeceras de seguridad** en toda la app (`nosniff`, `X-Frame-Options: DENY`, HSTS, Permissions-Policy, COOP); el
+  portal añade `no-referrer`, `noindex` y `no-store`. Sin CSP todavía (Next inyecta scripts en línea y necesita nonces).
+- **Imágenes:** el web limita el heap de Node (512 MB) y declara un `HEALTHCHECK` que no mira la base (una caída de
+  Postgres no reinicia el web); el worker, igual con 512 MB para Node (Chromium va aparte).
+- Para el worker, un cambio en respaldos exige **redesplegarlo a mano**; el web se despliega solo.
+
 ## Design System
 
 La fuente de verdad del diseño es el Design System "AOC PageSpeed" (Rajdhani, azules tecnológicos, rojos sutiles).

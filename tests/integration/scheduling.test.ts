@@ -11,7 +11,7 @@ import * as s from "@/server/db/schema";
 import { projectCron, schedulerId } from "@/server/domain/schedule";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
-import { NOTIFY_SCHEDULER_ID, PLAN_JOB, RECONCILE_SCHEDULER_ID, getProjectNextRun, listProjectSchedules, upsertProjectScheduler, type PlanJobData } from "@/server/queue/schedulers";
+import { BACKUP_JOB, BACKUP_SCHEDULER_ID, NOTIFY_SCHEDULER_ID, PLAN_JOB, RECONCILE_SCHEDULER_ID, getProjectNextRun, listProjectSchedules, upsertProjectScheduler, type PlanJobData } from "@/server/queue/schedulers";
 import { cancelScheduledAudits } from "@/server/services/audits";
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
@@ -334,6 +334,15 @@ describe.skipIf(!ready)("agendado, plan-project-audit y reconciliación", () => 
       expect(await maintenance.getJobScheduler(schedulerId(project.id))).toBeDefined();
       expect(await maintenance.getJobScheduler(RECONCILE_SCHEDULER_ID)).toMatchObject({ every: 15 * 60_000 });
       expect(await maintenance.getJobScheduler(NOTIFY_SCHEDULER_ID)).toMatchObject({ every: 5 * 60_000, name: "notify" });
+      expect(await maintenance.getJobScheduler(BACKUP_SCHEDULER_ID)).toMatchObject({ pattern: "17 3 * * *", tz: "UTC", name: "backup" });
+    });
+
+    it("ejecuta el respaldo pedido a la cola de mantenimiento y lo sube a R2", async () => {
+      worker = await startWorker({ env: env(), runner: okRunner, allowPrivate: true, logger: log });
+      await maintenance.add(BACKUP_JOB, {}, { jobId: "backup-manual", removeOnComplete: true });
+      await waitFor(async () => [...s3.objects.keys()].some((k) => k.startsWith("_backups/postgres/")) || undefined);
+      const [row] = await db.select().from(s.settings).where(eq(s.settings.key, "last_backup"));
+      expect((row!.value as { key: string }).key).toMatch(/^_backups\/postgres\//);
     });
 
     it("cuando el agendador se dispara, el worker encola y ejecuta las auditorías de punta a punta", async () => {

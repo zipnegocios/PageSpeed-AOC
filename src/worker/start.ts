@@ -7,6 +7,9 @@ import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { clearHeartbeat, writeHeartbeat } from "@/server/queue/heartbeat";
 import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
 import {
+  BACKUP_CRON,
+  BACKUP_JOB,
+  BACKUP_SCHEDULER_ID,
   NOTIFY_EVERY_MS,
   NOTIFY_JOB,
   NOTIFY_SCHEDULER_ID,
@@ -17,6 +20,7 @@ import {
 } from "@/server/queue/schedulers";
 import { createMailer, type Mailer } from "@/server/notify/mailer";
 import { resolveAlertRecipient, sweepNotifications } from "@/server/services/alerts";
+import { runBackup } from "@/server/services/backups";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
 import { createAuditProcessor } from "./processors/audit.processor";
@@ -29,7 +33,7 @@ export type StartWorkerOptions = {
   /** Solo pruebas: sustituye a Chromium + Lighthouse. */
   runner?: LighthouseRunner;
   /** Solo pruebas/desarrollo: sustituye al cliente de R2. */
-  r2?: Pick<R2Store, "putAuditJson">;
+  r2?: Pick<R2Store, "putAuditJson" | "putObject" | "listObjects" | "deleteObjects">;
   /** Solo pruebas y script de desarrollo: permite auditar direcciones privadas. */
   allowPrivate?: boolean;
   heartbeatIntervalMs?: number;
@@ -139,6 +143,31 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     if (r.sent || r.failed) log.info(r, "barrido de alertas");
   };
 
+  const runBackupJob = async () => {
+    try {
+      const done = await runBackup({ db, r2 });
+      log.info({ key: done.key, bytes: done.bytes, rows: done.rows, pruned: done.pruned }, "respaldo de Postgres subido a R2");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.error({ err: message }, "el respaldo de Postgres falló");
+      // Aviso por correo, de mejor esfuerzo: el panel ya muestra el fallo.
+      try {
+        const to = mailer ? await resolveAlertRecipient(env.ALERT_EMAIL, db) : null;
+        if (mailer && to) {
+          await mailer.send({
+            to,
+            subject: "Falló el respaldo de AOC PageSpeed",
+            text: `El respaldo diario de la base de datos no se pudo completar.\n\nMotivo: ${message.slice(0, 200)}\n\nRevisa el panel (Cola → Respaldos) y los logs del worker.`,
+            html: `<p>El respaldo diario de la base de datos no se pudo completar.</p><p><strong>Motivo:</strong> ${message.slice(0, 200).replace(/[<>&]/g, "")}</p><p>Revisa el panel (Cola → Respaldos) y los logs del worker.</p>`,
+          });
+        }
+      } catch {
+        // sin correo, queda en el panel y en los logs
+      }
+      throw err;
+    }
+  };
+
   const planProject = createPlanProjectProcessor({ db, redis, lighthouse, maintenance, log });
   const runReconcile = () => reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
   const maintenanceWorker = new Worker(
@@ -150,6 +179,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
         return;
       }
       if (job.name === NOTIFY_JOB) return runNotify();
+      if (job.name === BACKUP_JOB) return runBackupJob();
       log.warn({ name: job.name }, "trabajo de mantenimiento desconocido");
     },
     { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1 },
@@ -184,6 +214,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar el barrido de alertas")),
     30_000,
     "registro del barrido de alertas",
+    log,
+  );
+
+  await withDeadline(
+    maintenance
+      .upsertJobScheduler(BACKUP_SCHEDULER_ID, { pattern: BACKUP_CRON, tz: "UTC" }, { name: BACKUP_JOB, data: {} })
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar el respaldo diario")),
+    30_000,
+    "registro del respaldo diario",
     log,
   );
 
