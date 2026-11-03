@@ -45,7 +45,13 @@ export async function listSeries(db: Database, routeId: string, profile: "mobile
   return rows.filter((r): r is SeriesRow => r.finishedAt !== null);
 }
 
-export type LatestRow = SeriesRow & { routeId: string; profile: "mobile" | "desktop"; rank: number };
+export type LatestRow = SeriesRow & {
+  routeId: string;
+  profile: "mobile" | "desktop";
+  rank: number;
+  agenticPassed: number | null;
+  agenticTotal: number | null;
+};
 
 /** Las dos últimas auditorías correctas por ruta y perfil de un proyecto (rank 1 = la más reciente). */
 export async function listLatestTwo(db: Database, projectId: string): Promise<LatestRow[]> {
@@ -63,6 +69,8 @@ export async function listLatestTwo(db: Database, projectId: string): Promise<La
       lcpMs: cols.lcpMs,
       tbtMs: cols.tbtMs,
       cls: cols.cls,
+      agenticPassed: cols.agenticPassed,
+      agenticTotal: cols.agenticTotal,
       rank: sql<number>`row_number() over (partition by ${auditLogs.routeId}, ${auditLogs.profile} order by ${auditLogs.finishedAt} desc)`.as("rank"),
     })
     .from(auditLogs)

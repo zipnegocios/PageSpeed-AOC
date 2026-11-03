@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { HistoryPanel, type HistorySearch } from "@/app/_components/history-panel";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { Badge } from "@/lib/ui/components/badge";
+import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
 import { Card } from "@/lib/ui/components/card";
 import { Delta } from "@/lib/ui/components/delta";
 import { Score } from "@/lib/ui/components/score";
@@ -93,7 +94,18 @@ export default async function PortalProjectPage({
                       </dd>
                     </div>
                   ))}
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">Navegación con agentes</dt>
+                    <dd>
+                      <AgenticFraction value={l.agentic} className="text-[32px] leading-8" />
+                    </dd>
+                  </div>
                 </dl>
+                <div>
+                  <Link href={`/c/${token}/${project.id}/detalle/${l.auditId}`} className="inline-flex min-h-11 items-center font-semibold text-link hover:underline">
+                    Ver detalle técnico
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

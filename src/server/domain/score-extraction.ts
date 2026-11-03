@@ -1,3 +1,5 @@
+import { categoryFraction } from "./agentic";
+
 /** Forma mínima del resultado de Lighthouse (`lhr`) que necesitamos; el resto se ignora. */
 export type LhrLike = {
   lighthouseVersion?: string;
@@ -37,6 +39,9 @@ export type AuditMetrics = {
   ttfbMs: number | null;
   /** Lighthouse en modo navegación no mide INP (decisión D1). */
   inpMs: null;
+  /** "Navegación con agentes": comprobaciones superadas / totales (no es una nota de 0 a 100). */
+  agenticPassed: number | null;
+  agenticTotal: number | null;
   lighthouseVersion: string | null;
   finalUrl: string | null;
   httpStatus: number | null;
@@ -68,6 +73,7 @@ export function extractResults(lhr: LhrLike): ExtractResult {
     return { ok: false, code: "INVALID_RESULT", message: "Lighthouse no devolvió puntuaciones." };
   }
 
+  const agentic = categoryFraction(lhr);
   const a = lhr.audits ?? {};
   const cls = a["cumulative-layout-shift"]?.numericValue;
   const finalUrl = lhr.finalDisplayedUrl ?? lhr.finalUrl ?? null;
@@ -88,6 +94,8 @@ export function extractResults(lhr: LhrLike): ExtractResult {
       fcpMs: toMs(a["first-contentful-paint"]?.numericValue),
       ttfbMs: toMs(a["server-response-time"]?.numericValue),
       inpMs: null,
+      agenticPassed: agentic?.passed ?? null,
+      agenticTotal: agentic?.total ?? null,
       lighthouseVersion: lhr.lighthouseVersion ?? null,
       finalUrl,
       httpStatus: status,

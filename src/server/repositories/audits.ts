@@ -105,6 +105,8 @@ export async function markSucceeded(db: Database, id: string, metrics: AuditMetr
       fcpMs: metrics.fcpMs,
       ttfbMs: metrics.ttfbMs,
       inpMs: metrics.inpMs,
+      agenticPassed: metrics.agenticPassed,
+      agenticTotal: metrics.agenticTotal,
       lighthouseVersion: metrics.lighthouseVersion,
       finalUrl: metrics.finalUrl,
       httpStatus: metrics.httpStatus,

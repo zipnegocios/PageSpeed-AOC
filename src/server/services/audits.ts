@@ -12,6 +12,7 @@ import { auditJobOptions, lighthouseQueue, PRIORITY, type AuditJobData } from "@
 import * as repo from "@/server/repositories/audits";
 import { findProject } from "@/server/repositories/projects";
 import { findRoute } from "@/server/repositories/routes";
+import { localizeLhr, type UiLocale } from "@/server/report/lighthouse-report";
 import { getR2, type R2Store } from "@/server/storage/r2";
 import { assertUuid, isUniqueViolation } from "./shared";
 
@@ -135,10 +136,11 @@ export type AuditInsights = { opportunities: Opportunity[]; failed: CategoryChec
 export async function getAuditInsights(
   audit: Pick<repo.AuditDetail, "status" | "r2Key">,
   r2: Pick<R2Store, "getAuditJson"> = getR2(),
+  locale: UiLocale = "es",
 ): Promise<AuditInsights | null> {
   if (audit.status !== "succeeded" || !audit.r2Key) return null;
   try {
-    const lhr = await r2.getAuditJson<LhrLike>(audit.r2Key);
+    const lhr = localizeLhr(await r2.getAuditJson<LhrLike & Record<string, unknown>>(audit.r2Key), locale);
     return { opportunities: topOpportunities(lhr), failed: failedChecks(lhr) };
   } catch {
     return null;

@@ -5,6 +5,8 @@ import { findClientByToken } from "@/server/repositories/clients";
 import { listOpenAlerts, type AlertView } from "./alerts";
 import { averageScores, getLatestScores, type LatestScores } from "./history";
 import { assertUuid } from "./shared";
+import { getAudit, type AuditDetail } from "./audits";
+import { getRoute } from "./routes";
 
 /** El token es de 32 bytes en base64url: 43 caracteres. Todo lo demás se descarta sin tocar la base de datos. */
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -81,4 +83,25 @@ export async function getPortalProject(clientId: string, projectId: string, db: 
     latest,
     improvements: alerts.map(({ id, kind, routePath, profile, summary, openedAt }) => ({ id, kind, routePath, profile, summary, openedAt })),
   };
+}
+
+export type PortalAudit = {
+  audit: AuditDetail;
+  /** La ruta exige sesión: al cliente no se le muestran capturas ni fragmentos de HTML. */
+  redact: boolean;
+};
+
+/** Auditoría correcta de un proyecto del cliente. null si no existe, no es suya o no terminó bien. */
+export async function getPortalAudit(clientId: string, projectId: string, auditId: string, db: Database = getDb()): Promise<PortalAudit | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(auditId)) return null;
+  const project = await getPortalProject(clientId, projectId, db);
+  if (!project) return null;
+  try {
+    const audit = await getAudit(auditId, db);
+    if (audit.projectId !== project.id || audit.status !== "succeeded") return null;
+    const route = await getRoute(audit.routeId, db);
+    return { audit, redact: route.requiresAuth };
+  } catch {
+    return null;
+  }
 }

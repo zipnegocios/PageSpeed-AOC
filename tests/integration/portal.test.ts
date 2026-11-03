@@ -190,6 +190,34 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
       expect(await portal.getPortalProject(a.client.id, "00000000-0000-4000-8000-000000000000", db)).toBeNull();
     });
 
+    it("el cliente solo ve auditorías correctas de sus proyectos y se marca la redacción en rutas con sesión", async () => {
+      const a = await setup("Acme");
+      const b = await setup("Otro");
+      const ok = await audit(a.project.id, a.routes[0]!.id, "mobile", daysAgo(1));
+      const failed = await audit(a.project.id, a.routes[0]!.id, "desktop", daysAgo(1), { status: "failed" });
+      const other = await audit(b.project.id, b.routes[0]!.id, "mobile", daysAgo(1));
+
+      const mine = await portal.getPortalAudit(a.client.id, a.project.id, ok.id, db);
+      expect(mine?.audit.id).toBe(ok.id);
+      expect(mine?.redact).toBe(false);
+      expect(await portal.getPortalAudit(a.client.id, a.project.id, failed.id, db)).toBeNull(); // no terminó bien
+      expect(await portal.getPortalAudit(a.client.id, a.project.id, other.id, db)).toBeNull(); // de otro proyecto
+      expect(await portal.getPortalAudit(b.client.id, a.project.id, ok.id, db)).toBeNull(); // proyecto de otro cliente
+      expect(await portal.getPortalAudit(a.client.id, a.project.id, "no-es-uuid", db)).toBeNull();
+      expect(await portal.getPortalAudit(a.client.id, a.project.id, "00000000-0000-4000-8000-000000000000", db)).toBeNull();
+
+      await db.update(s.routes).set({ requiresAuth: true }).where(eq(s.routes.id, a.routes[0]!.id));
+      expect((await portal.getPortalAudit(a.client.id, a.project.id, ok.id, db))?.redact).toBe(true);
+    });
+
+    it("la fracción de agentes llega al resumen del cliente", async () => {
+      const a = await setup("Acme");
+      const row = await audit(a.project.id, a.routes[0]!.id, "mobile", daysAgo(1));
+      await db.update(s.auditLogs).set({ agenticPassed: 1, agenticTotal: 4 }).where(eq(s.auditLogs.id, row.id));
+      const p = (await portal.getPortalProject(a.client.id, a.project.id, db))!;
+      expect(p.latest[0]!.agentic).toEqual({ passed: 1, total: 4 });
+    });
+
     it("los puntos por mejorar no exponen datos internos", async () => {
       const a = await setup("Acme");
       await alerts.evaluateAudit((await audit(a.project.id, a.routes[0]!.id, "mobile", daysAgo(1), { s: 60 })).id, { db });

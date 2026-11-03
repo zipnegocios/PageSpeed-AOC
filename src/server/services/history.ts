@@ -52,6 +52,8 @@ export type LatestScores = {
   auditId: string;
   finishedAt: Date;
   scores: Record<(typeof METRIC_KEYS)[number], number | null>;
+  /** "Navegación con agentes": superadas / totales (null si esa auditoría no la midió). */
+  agentic: { passed: number; total: number } | null;
   /** Variación de cada puntuación respecto a la auditoría anterior (null si no hay anterior). */
   changes: Record<(typeof METRIC_KEYS)[number], Change | null>;
 };
@@ -75,6 +77,7 @@ export async function getLatestScores(projectId: string, db: Database = getDb())
         auditId: latest.id,
         finishedAt: latest.finishedAt,
         scores: Object.fromEntries(METRIC_KEYS.map((m) => [m, pick(m)])) as LatestScores["scores"],
+        agentic: latest.agenticPassed !== null && latest.agenticTotal !== null ? { passed: latest.agenticPassed, total: latest.agenticTotal } : null,
         changes: Object.fromEntries(
           METRIC_KEYS.map((m) => [m, prev ? computeChange(m, pick(m), metricValue(prev, m)) : null]),
         ) as LatestScores["changes"],

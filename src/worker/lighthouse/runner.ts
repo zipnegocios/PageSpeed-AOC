@@ -78,7 +78,7 @@ export const runLighthouse: LighthouseRunner = async (input) => {
     const flags = {
       output: "json" as const,
       logLevel: "silent" as const,
-      onlyCategories: ["performance", "accessibility", "seo", "best-practices"],
+      onlyCategories: ["performance", "accessibility", "seo", "best-practices", "agentic-browsing"],
       ...(input.profile === "mobile" ? { formFactor: "mobile" as const } : {}),
     };
     const config = input.profile === "desktop" ? desktopConfig : undefined;

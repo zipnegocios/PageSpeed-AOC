@@ -88,6 +88,21 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   nombre del cliente. Iconos en `public/pwa` (origen: `design/icons/app-icon.svg`). No hay service worker: sin
   conexión el navegador lo dice, nunca se muestran puntuaciones viejas.
 
+## Visor de auditorías (informe completo, idioma y agentes)
+
+- **Informe oficial de Lighthouse**: se genera desde el JSON guardado en R2 (`lighthouse/report`) y se muestra en un marco
+  aislado (`sandbox` sin `allow-same-origin`, CSP sin red, solo enmarcable por la propia app). Admin:
+  `/admin/auditorias/<id>/informe`; cliente: `/c/<token>/<proyecto>/detalle/<auditoría>`. Se ocultan su menú de
+  herramientas y el mapa de rectángulos externo. En rutas que exigen sesión, al cliente se le quitan capturas,
+  fragmentos de HTML y textos de elementos (`redactLhr`).
+- **Idioma**: el JSON se guarda una sola vez (inglés) y se traduce al leer con `swapLocale` de Lighthouse, también
+  para auditorías ya guardadas. Selector Español/English (cookie `aoc_lang`, español por defecto); solo cambia los
+  textos de Lighthouse.
+- **Navegación con agentes** (`agentic-browsing`, Lighthouse 13): se mide y se guarda como superadas/totales
+  (`audit_logs.agentic_passed/total`, migración `0001`). No es una nota 0-100, no tiene umbral y no genera alertas.
+- `pnpm build` ejecuta `scripts/copy-lighthouse-assets.mjs`: el rastreo de Next no incluye el generador del informe en la
+  imagen standalone, así que se copia tras compilar. **Despliega primero el web (aplica la migración) y luego el worker.**
+
 ## Páginas privadas (inicio de sesión)
 
 - Una ruta marcada **«Requiere sesión»** se audita con el acceso del proyecto (tarjeta *Acceso a páginas privadas* de la ficha).

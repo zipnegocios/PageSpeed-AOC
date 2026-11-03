@@ -187,6 +187,9 @@ export const auditLogs = pgTable(
     ttfbMs: integer("ttfb_ms"),
     // Lighthouse en modo navigation no mide INP; queda nullable (decisión D1).
     inpMs: integer("inp_ms"),
+    // "Navegación con agentes" (Lighthouse 13): superadas / totales. No es una nota de 0 a 100 y no genera alertas.
+    agenticPassed: smallint("agentic_passed"),
+    agenticTotal: smallint("agentic_total"),
     lighthouseVersion: text("lighthouse_version"),
     finalUrl: text("final_url"),
     httpStatus: smallint("http_status"),

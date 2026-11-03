@@ -67,7 +67,7 @@ describe("informe", () => {
   const day = 86_400_000;
   const pts = (n: number) => Array.from({ length: n }, (_, i) => ({ at: new Date(now.getTime() - (n - i) * day), value: 60 + i }));
   const latest = (path: string, profile: "mobile" | "desktop", p: number) => ({
-    routeId: path + profile, path, profile, auditId: "a", finishedAt: now,
+    routeId: path + profile, path, profile, auditId: "a", finishedAt: now, agentic: null,
     scores: { performance: p, seo: 93, accessibility: 88, best_practices: 100 },
     changes: { performance: computeChange("performance", p, p + 5), seo: computeChange("seo", 93, 93), accessibility: null, best_practices: null },
   });

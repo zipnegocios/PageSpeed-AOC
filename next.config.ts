@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   // react-pdf se carga como paquete de Node (no se empaqueta) y las fuentes del informe viajan en la imagen.
-  serverExternalPackages: ["@react-pdf/renderer"],
+  serverExternalPackages: ["@react-pdf/renderer", "lighthouse"],
   outputFileTracingIncludes: {
     "/api/admin/projects/[id]/report": ["./src/assets/fonts/**"],
     "/c/[token]/[projectId]/informe": ["./src/assets/fonts/**"],
@@ -23,6 +23,15 @@ const nextConfig: NextConfig = {
           { key: "Strict-Transport-Security", value: "max-age=31536000" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
         ],
+      },
+      {
+        // El informe oficial de Lighthouse se muestra en un marco de la propia aplicación.
+        source: "/api/admin/audits/:id/lighthouse",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
+      {
+        source: "/c/:token/:projectId/detalle/:auditId/informe",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
       },
       {
         // El portal lleva el secreto en la URL: nada de indexarlo, cachearlo ni filtrarlo por Referer.

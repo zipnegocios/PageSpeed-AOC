@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PROFILE_LABEL, formatDate, formatDuration, formatSeconds, isPending } from "@/lib/audit-format";
 import { verifySession } from "@/lib/auth/session";
 import { orNotFound } from "@/lib/not-found";
 import { Alert } from "@/lib/ui/components/alert";
+import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
 import { Card } from "@/lib/ui/components/card";
+import { LanguageSwitch } from "@/lib/ui/components/language-switch";
+import { getLocale } from "@/lib/locale";
 import { Score } from "@/lib/ui/components/score";
 import type { CategoryChecks } from "@/server/domain/failed-checks";
 import { getAudit, getAuditInsights } from "@/server/services/audits";
@@ -70,7 +74,8 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
   const session = await verifySession();
   const { id } = await params;
   const audit = await orNotFound(getAudit(id));
-  const insights = await getAuditInsights(audit);
+  const locale = await getLocale();
+  const insights = await getAuditInsights(audit, undefined, locale);
   const opportunities = insights?.opportunities ?? null;
   const done = audit.status === "succeeded";
 
@@ -118,14 +123,34 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
 
       {done ? (
         <>
-          <Card title="Puntuaciones" description="Lighthouse, de 0 a 100.">
-            <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <LanguageSwitch locale={locale} returnTo={`/admin/auditorias/${audit.id}`} />
+            <Link
+              href={`/admin/auditorias/${audit.id}/informe`}
+              className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
+            >
+              Ver informe completo de Lighthouse
+            </Link>
+          </div>
+
+          <Card title="Puntuaciones" description="Lighthouse, de 0 a 100. Navegación con agentes se cuenta en comprobaciones superadas.">
+            <dl className="grid grid-cols-2 gap-4 md:grid-cols-5">
               {scores.map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-1 rounded-sm border border-border p-3">
                   <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">{label}</dt>
                   <dd><Score value={value} className="text-[44px] leading-[44px]" /></dd>
                 </div>
               ))}
+              <div className="flex flex-col gap-1 rounded-sm border border-border p-3">
+                <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">Navegación con agentes</dt>
+                <dd>
+                  <AgenticFraction
+                    value={audit.agenticPassed !== null && audit.agenticTotal !== null ? { passed: audit.agenticPassed, total: audit.agenticTotal } : null}
+                    className="text-[44px] leading-[44px]"
+                    hint
+                  />
+                </dd>
+              </div>
             </dl>
           </Card>
 
