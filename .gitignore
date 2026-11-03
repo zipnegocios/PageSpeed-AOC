@@ -6,3 +6,6 @@ dist
 *.tsbuildinfo
 next-env.d.ts
 coverage
+
+# Lo regenera `next dev`; no es parte del producto
+AGENTS.md
