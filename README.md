@@ -103,6 +103,20 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 - `pnpm build` ejecuta `scripts/copy-lighthouse-assets.mjs`: el rastreo de Next no incluye el generador del informe en la
   imagen standalone, así que se copia tras compilar. **Despliega primero el web (aplica la migración) y luego el worker.**
 
+### Panel nativo de la auditoría
+
+- `/admin/auditorias/<id>` y, para el cliente, `/c/<token>/<proyecto>/detalle/<auditoría>` muestran el mismo visor
+  (`src/app/_components/audit-viewer`): pestañas **Resumen**, una por categoría (Rendimiento, Accesibilidad, Buenas
+  prácticas, SEO, Navegación con agentes), **Evidencias** e **Informe completo** (el oficial de Lighthouse).
+- Cada categoría sigue las reglas de Lighthouse (`src/server/domain/lhr-view.ts`, puro y con pruebas): métricas con
+  valoración, grupos en su orden, lo que falla primero (por ahorro), aprobadas / no aplicables / revisión manual
+  plegadas, filtro por métrica (FCP, LCP, TBT, CLS), «Ampliar todo» y consejos por tecnología (stack packs).
+- Los detalles de cada auditoría se dibujan como tablas (bytes, tiempos, URLs, elementos con selector y fragmento),
+  listas, árboles de red y listas de control; máximo 50 filas por tabla y todo se escapa (nada de HTML de la página).
+- **Evidencias**: la captura de página completa (`/api/admin/audits/<id>/captura`) con un recuadro numerado sobre cada
+  elemento de la auditoría elegida. **Mapa de scripts**: rectángulos proporcionales al tamaño (`treemap.ts`) con la
+  parte sin usar. En el portal, las rutas que exigen sesión no ofrecen capturas ni evidencias.
+
 ## Páginas privadas (inicio de sesión)
 
 - Una ruta marcada **«Requiere sesión»** se audita con el acceso del proyecto (tarjeta *Acceso a páginas privadas* de la ficha).

@@ -133,6 +133,11 @@ export type AuditInsights = { opportunities: Opportunity[]; failed: CategoryChec
  * Mejoras principales y comprobaciones fallidas, leídas del JSON completo en R2 (una sola lectura).
  * null si no hay JSON o R2 no responde.
  */
+/** Mejoras principales y comprobaciones fallidas de un resultado ya cargado. */
+export function insightsFromLhr(lhr: LhrLike): AuditInsights {
+  return { opportunities: topOpportunities(lhr), failed: failedChecks(lhr) };
+}
+
 export async function getAuditInsights(
   audit: Pick<repo.AuditDetail, "status" | "r2Key">,
   r2: Pick<R2Store, "getAuditJson"> = getR2(),
@@ -140,8 +145,7 @@ export async function getAuditInsights(
 ): Promise<AuditInsights | null> {
   if (audit.status !== "succeeded" || !audit.r2Key) return null;
   try {
-    const lhr = localizeLhr(await r2.getAuditJson<LhrLike & Record<string, unknown>>(audit.r2Key), locale);
-    return { opportunities: topOpportunities(lhr), failed: failedChecks(lhr) };
+    return insightsFromLhr(localizeLhr(await r2.getAuditJson<LhrLike & Record<string, unknown>>(audit.r2Key), locale));
   } catch {
     return null;
   }

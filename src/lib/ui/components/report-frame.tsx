@@ -4,12 +4,12 @@ import { LanguageSwitch } from "./language-switch";
  * Informe oficial de Lighthouse en un marco aislado (`sandbox`, sin acceso a la aplicación). Ocupa el alto de la
  * ventana y se desplaza por dentro; la barra superior trae el selector de idioma y abrirlo en una pestaña.
  */
-export function ReportFrame({ src, locale, returnTo, title }: { src: string; locale: "es" | "en"; returnTo: string; title: string }) {
+export function ReportFrame({ src, locale, returnTo, title, hideLanguage = false }: { src: string; locale: "es" | "en"; returnTo: string; title: string; hideLanguage?: boolean }) {
   const url = `${src}${src.includes("?") ? "&" : "?"}lang=${locale}`;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <LanguageSwitch locale={locale} returnTo={returnTo} />
+        {hideLanguage ? <span /> : <LanguageSwitch locale={locale} returnTo={returnTo} />}
         <a href={url} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300">
           Abrir en una pestaña
         </a>
