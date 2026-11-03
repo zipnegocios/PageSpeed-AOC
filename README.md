@@ -43,8 +43,10 @@ evalúa las alertas y lo avisa en los logs.
   `/admin/clientes/acme` y `/admin/clientes/acme/tienda` (el slug del proyecto solo es único dentro de su
   cliente, por eso va anidado). Los enlaces antiguos con UUID siguen funcionando y redirigen.
 - **Portal del cliente:** un solo enlace, fijo: `/c/<identificador-del-cliente>`, protegido con un **PIN de 6
-  dígitos**. Se genera desde la ficha del cliente («Generar PIN», o «Generar y enviar al correo»); el PIN se
-  muestra una sola vez y en la base de datos solo queda su huella (HMAC con `SESSION_SECRET`). Con el PIN correcto
+  dígitos**. Se genera desde la ficha del cliente («Generar PIN», o «Generar y enviar al correo») y el último PIN
+  generado queda siempre visible ahí («PIN actual»). Se guarda cifrado (AES-256-GCM con `AUTH_ENCRYPTION_KEY`, la
+  clave no está en la base ni en los respaldos) y, para validar, su huella (HMAC con `SESSION_SECRET`). Sin esa
+  clave el PIN funciona, pero la ficha dice «No disponible» hasta generar otro. Con el PIN correcto
   el navegador recibe una sesión de 30 días (cookie HttpOnly, solo bajo `/c`); un PIN nuevo la cierra. El
   cliente puede pedir un PIN nuevo desde la pantalla del PIN: le llega al correo de contacto de su ficha (máx.
   uno cada 15 minutos por cliente y 5 por hora por IP; la respuesta no revela si el cliente o el correo existen).

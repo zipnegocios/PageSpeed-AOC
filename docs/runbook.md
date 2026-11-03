@@ -156,4 +156,4 @@ Una semana en producción sin degradar los sitios alojados.
 - Para el correo, el servicio **web** necesita `SMTP_*` y `EMAIL_FROM` (los mismos de los informes por correo). Sin SMTP, «Generar PIN» sigue funcionando y se lo entregas tú.
 - Si un cliente dice que «no le entra»: genera un PIN nuevo (anula el anterior y cierra sus sesiones) y compruébalo con él. Si ve «Demasiados intentos», espera 15 minutos o reinicia el servicio web (el contador está en memoria).
 - Tras desplegar esta versión, los clientes existentes no tienen PIN: genera uno por cliente (o pídeles que usen «Enviar un PIN nuevo a mi correo») y avísales.
-
+- La ficha del cliente muestra siempre el último PIN generado. Eso requiere `AUTH_ENCRYPTION_KEY` en el web; si falta (o cambia), el PIN sigue funcionando pero la ficha dice «No disponible» y basta generar uno nuevo. Los clientes que ya tenían PIN antes de esta función también muestran «No disponible» hasta generar el siguiente.

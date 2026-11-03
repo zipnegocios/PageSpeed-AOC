@@ -49,10 +49,10 @@ export async function slugTaken(db: Database, slug: string): Promise<boolean> {
 }
 
 /** Guarda la huella de un PIN nuevo y sube la versión (cierra las sesiones abiertas). */
-export async function setClientPinRow(db: Database, id: string, pinHash: string, now: Date): Promise<Client | undefined> {
+export async function setClientPinRow(db: Database, id: string, pinHash: string, now: Date, pinEnc: Buffer | null = null): Promise<Client | undefined> {
   const [row] = await db
     .update(clients)
-    .set({ pinHash, pinVersion: sql`${clients.pinVersion} + 1`, pinUpdatedAt: now })
+    .set({ pinHash, pinEnc, pinVersion: sql`${clients.pinVersion} + 1`, pinUpdatedAt: now })
     .where(and(eq(clients.id, id), isNull(clients.deletedAt)))
     .returning();
   return row;

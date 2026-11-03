@@ -5,10 +5,11 @@ import { runMigrations } from "@/server/db/migrate";
 import * as s from "@/server/db/schema";
 import type { Mailer, MailMessage } from "@/server/notify/mailer";
 import * as clients from "@/server/services/clients";
-import { generateClientPin, PIN_REQUEST_COOLDOWN_MS, requestPinByEmail, verifyClientPin } from "@/server/services/portal-pin";
+import { generateClientPin, PIN_REQUEST_COOLDOWN_MS, readStoredPin, requestPinByEmail, verifyClientPin } from "@/server/services/portal-pin";
 
 const dbUrl = process.env.TEST_DATABASE_URL;
 const SECRET = "s".repeat(40);
+const AUTH_KEY = Buffer.alloc(32, 7).toString("base64");
 
 describe.skipIf(!dbUrl)("PIN del portal", () => {
   const { db, pool } = createDb(dbUrl ?? "", 4);
@@ -21,7 +22,7 @@ describe.skipIf(!dbUrl)("PIN del portal", () => {
     },
   };
   let clock = new Date("2026-11-03T12:00:00Z");
-  const deps = () => ({ mailer, secret: SECRET, appUrl: "https://app.test/", now: () => clock });
+  const deps = () => ({ mailer, secret: SECRET, authKey: AUTH_KEY, appUrl: "https://app.test/", now: () => clock });
   const pinIn = (m: MailMessage) => /PIN: (\d{6})/.exec(m.text)![1]!;
 
   beforeAll(async () => { await runMigrations(dbUrl!, "./drizzle"); });
@@ -83,6 +84,42 @@ describe.skipIf(!dbUrl)("PIN del portal", () => {
       const c = await clients.createClient({ name: "Sin Correo" }, db);
       await expect(generateClientPin(c.id, { email: true }, db, deps())).rejects.toThrow(/no tiene correo/);
       expect((await row(c.id)).pinHash).toBeNull();
+    });
+  });
+
+  describe("último PIN visible en el panel", () => {
+    it("guarda el PIN cifrado y se puede leer con la clave; el dato en la base no contiene el PIN", async () => {
+      const c = await newClient();
+      const { pin } = await generateClientPin(c.id, {}, db, deps());
+      const r = await row(c.id);
+      expect(r.pinEnc).toBeInstanceOf(Buffer);
+      expect(r.pinEnc!.toString("utf8")).not.toContain(pin);
+      expect(readStoredPin(r, deps())).toBe(pin);
+    });
+
+    it("siempre es el último: uno nuevo (del panel o pedido por correo) reemplaza al anterior", async () => {
+      const c = await newClient();
+      await generateClientPin(c.id, {}, db, deps());
+      const second = (await generateClientPin(c.id, { email: true }, db, deps())).pin;
+      expect(readStoredPin(await row(c.id), deps())).toBe(second);
+      clock = new Date(clock.getTime() + PIN_REQUEST_COOLDOWN_MS + 1000);
+      await requestPinByEmail("acme", db, deps());
+      expect(readStoredPin(await row(c.id), deps())).toBe(pinIn(sent.at(-1)!));
+    });
+
+    it("sin clave de cifrado el PIN funciona pero no se puede mostrar; con otra clave tampoco", async () => {
+      const c = await newClient();
+      const { pin } = await generateClientPin(c.id, {}, db, { ...deps(), authKey: undefined });
+      const r = await row(c.id);
+      expect(r.pinEnc).toBeNull();
+      expect(readStoredPin(r, deps())).toBeNull();
+      expect((await verifyClientPin("acme", pin, db, deps())).ok).toBe(true);
+      await generateClientPin(c.id, {}, db, deps());
+      expect(readStoredPin(await row(c.id), { ...deps(), authKey: Buffer.alloc(32, 9).toString("base64") })).toBeNull();
+    });
+
+    it("un cliente con PIN anterior a esta función (sin dato guardado) devuelve null", async () => {
+      expect(readStoredPin({ pinEnc: null })).toBeNull();
     });
   });
 

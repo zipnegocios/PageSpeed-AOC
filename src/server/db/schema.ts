@@ -85,6 +85,9 @@ export const clients = pgTable("clients", {
   // con ello se cierran las sesiones abiertas del cliente.
   pinHash: text("pin_hash"),
   pinVersion: integer("pin_version").notNull().default(0),
+  // El último PIN, cifrado (AES-256-GCM con AUTH_ENCRYPTION_KEY) para poder mostrarlo en el panel. La clave no está
+  // en la base ni en los respaldos. null si se generó sin clave disponible o antes de existir esta columna.
+  pinEnc: bytea("pin_enc"),
   pinUpdatedAt: timestamp("pin_updated_at", { withTimezone: true }),
   // Último envío de PIN por correo pedido por el cliente: limita la frecuencia.
   pinRequestedAt: timestamp("pin_requested_at", { withTimezone: true }),

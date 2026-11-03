@@ -7,6 +7,7 @@ import { buildPinEmail } from "@/server/notify/pin-email";
 import { webMailer } from "@/server/notify/web-mailer";
 import * as repo from "@/server/repositories/clients";
 import type { Client } from "@/server/repositories/clients";
+import { decryptJson, encryptJson } from "@/server/crypto/secret-box";
 import { assertUuid } from "./shared";
 
 /** Mínimo entre dos PIN pedidos por correo desde el portal: frena el correo no deseado y el cierre de sesiones ajenas. */
@@ -16,6 +17,8 @@ export type PinDeps = {
   mailer?: Mailer;
   appUrl?: string;
   secret?: string;
+  /** AUTH_ENCRYPTION_KEY: con ella el último PIN queda guardado (cifrado) para mostrarlo en el panel. */
+  authKey?: string;
   now?: () => Date;
 };
 
@@ -23,6 +26,26 @@ function secretOf(deps: PinDeps): string {
   const value = deps.secret ?? process.env.SESSION_SECRET;
   if (!value || value.length < 32) throw new Error("SESSION_SECRET no está definida o tiene menos de 32 caracteres");
   return value;
+}
+
+/** El PIN cifrado para guardarlo, o null si no hay clave válida (entonces el PIN funciona pero no se puede volver a mostrar). */
+function sealPin(pin: string, deps: PinDeps): Buffer | null {
+  try {
+    return encryptJson(pin, deps.authKey ?? process.env.AUTH_ENCRYPTION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** El último PIN generado, o null si no se guardó (clave ausente, PIN anterior a esta función o dato ilegible). */
+export function readStoredPin(client: { pinEnc: Buffer | null }, deps: PinDeps = {}): string | null {
+  if (!client.pinEnc) return null;
+  try {
+    const pin = decryptJson<string>(client.pinEnc, deps.authKey ?? process.env.AUTH_ENCRYPTION_KEY);
+    return isPin(pin) ? pin : null;
+  } catch {
+    return null;
+  }
 }
 
 function baseUrl(deps: PinDeps): string {
@@ -52,7 +75,7 @@ export async function generateClientPin(clientId: string, opts: { email?: boolea
   // Primero el correo: si falla, el PIN anterior sigue valiendo y no se deja al cliente sin acceso.
   if (opts.email) await sendPin(client, pin, deps);
   const now = (deps.now ?? (() => new Date()))();
-  await repo.setClientPinRow(db, client.id, hashPin(client.id, pin, secretOf(deps)), now);
+  await repo.setClientPinRow(db, client.id, hashPin(client.id, pin, secretOf(deps)), now, sealPin(pin, deps));
   return { pin, emailed: Boolean(opts.email), to: opts.email ? (client.contactEmail ?? null) : null };
 }
 
@@ -86,6 +109,6 @@ export async function requestPinByEmail(ref: string, db: Database = getDb(), dep
     await repo.restorePinRequest(db, client.id, reserved.previous);
     throw err;
   }
-  await repo.setClientPinRow(db, client.id, hashPin(client.id, pin, secret), now);
+  await repo.setClientPinRow(db, client.id, hashPin(client.id, pin, secret), now, sealPin(pin, deps));
   return { sent: true };
 }

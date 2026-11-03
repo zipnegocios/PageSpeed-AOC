@@ -64,18 +64,18 @@ export async function renameClientSlugAction(id: string, _prev: ActionState, fd:
 export async function generatePinAction(id: string, _prev: ActionState): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
-    const { pin } = await generateClientPin(id);
+    await generateClientPin(id);
     revalidateAdmin();
-    return { ok: "PIN generado. El anterior y las sesiones abiertas del cliente ya no valen.", secret: pin };
+    return { ok: "PIN generado. El anterior y las sesiones abiertas del cliente ya no valen." };
   });
 }
 
 export async function generateAndEmailPinAction(id: string, _prev: ActionState): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
-    const { pin, to } = await generateClientPin(id, { email: true });
+    const { to } = await generateClientPin(id, { email: true });
     revalidateAdmin();
-    return { ok: `PIN generado y enviado a ${to}. El anterior y las sesiones abiertas del cliente ya no valen.`, secret: pin };
+    return { ok: `PIN generado y enviado a ${to}. El anterior y las sesiones abiertas del cliente ya no valen.` };
   });
 }
 

@@ -13,6 +13,7 @@ import { Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
 import { PinForms } from "@/app/admin/_components/pin-forms";
+import { readStoredPin } from "@/server/services/portal-pin";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
 import {
@@ -36,6 +37,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   const id = client.id;
   const projects = await listProjects(id);
   const fixedUrl = `${appUrl()}/c/${client.slug}`;
+  const currentPin = readStoredPin(client);
   const active = client.status === "active";
 
   return (
@@ -115,9 +117,24 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
               {client.pinHash && client.pinUpdatedAt ? `Generado el ${formatDate(client.pinUpdatedAt)}.` : "Mientras no haya PIN, el cliente no puede entrar (él mismo puede pedir uno a su correo)."}
             </span>
           </p>
+          {client.pinHash ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">PIN actual</span>
+              {currentPin ? (
+                <>
+                  <code id="pin-actual" className="block w-fit rounded-sm bg-surface-300 px-4 py-2 font-mono text-[32px] tracking-[0.3em] text-ink select-all">{currentPin}</code>
+                  <div>
+                    <CopyButton value={currentPin} label="Copiar PIN" />
+                  </div>
+                </>
+              ) : (
+                <p className="text-[15px] leading-5 text-ink-muted">No disponible: genera un PIN nuevo para verlo aquí.</p>
+              )}
+            </div>
+          ) : null}
           <PinForms generate={generatePinAction.bind(null, id)} generateAndEmail={generateAndEmailPinAction.bind(null, id)} canEmail={Boolean(client.contactEmail)} />
           <p className="text-[15px] leading-5 text-ink-muted">
-            El PIN se muestra una sola vez; en el sistema solo queda su huella. Generar uno nuevo anula el anterior y cierra las sesiones abiertas del cliente. El cliente también puede pedir un PIN nuevo desde el portal: le llega al correo de contacto{client.contactEmail ? ` (${client.contactEmail})` : ", que aún no tiene registrado"}.
+            Se muestra aquí siempre el último PIN generado (guardado cifrado con AUTH_ENCRYPTION_KEY). Generar uno nuevo anula el anterior y cierra las sesiones abiertas del cliente. El cliente también puede pedir un PIN nuevo desde el portal: le llega al correo de contacto{client.contactEmail ? ` (${client.contactEmail})` : ", que aún no tiene registrado"}.
           </p>
         </div>
         <div className="flex flex-col gap-2 border-t border-border pt-4">
