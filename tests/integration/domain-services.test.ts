@@ -72,6 +72,15 @@ describe.skipIf(!url)("servicios de dominio", () => {
       expect(rotated.magicTokenRotatedAt).toBeInstanceOf(Date);
     });
 
+    it("un cliente se encuentra por su slug o, en enlaces antiguos, por su UUID; los archivados no", async () => {
+      const c = await newClient("Acme");
+      expect((await clients.getClientByRef("acme", db)).id).toBe(c.id);
+      expect((await clients.getClientByRef(c.id, db)).id).toBe(c.id);
+      await rejectsWith(clients.getClientByRef("otro", db), "NOT_FOUND");
+      await clients.archiveClient(c.id, db);
+      await rejectsWith(clients.getClientByRef("acme", db), "NOT_FOUND");
+    });
+
     it("archivar lo oculta pero conserva el identificador reservado", async () => {
       const c = await newClient("Acme");
       await clients.archiveClient(c.id, db);
@@ -95,6 +104,21 @@ describe.skipIf(!url)("servicios de dominio", () => {
   });
 
   describe("proyectos", () => {
+    it("un proyecto se encuentra por (cliente, proyecto) en slug o UUID, y solo dentro de su cliente", async () => {
+      const acme = await newClient("Acme");
+      const otro = await newClient("Otro");
+      const p = await projects.createProject(acme.id, { name: "Sitio web", baseUrl: "https://acme.test" }, db);
+      await projects.createProject(otro.id, { name: "Sitio web", baseUrl: "https://otro.test" }, db); // mismo slug, otro cliente
+      expect((await projects.getProjectByRef("acme", "sitio-web", db)).id).toBe(p.id);
+      expect((await projects.getProjectByRef(acme.id, p.id, db)).id).toBe(p.id);
+      expect((await projects.getProjectByRef("acme", p.id, db)).clientSlug).toBe("acme");
+      expect((await projects.getProjectByRef("otro", "sitio-web", db)).id).not.toBe(p.id);
+      await rejectsWith(projects.getProjectByRef("otro", p.id, db), "NOT_FOUND"); // UUID de un proyecto ajeno
+      await rejectsWith(projects.getProjectByRef("acme", "no-existe", db), "NOT_FOUND");
+      await projects.archiveProject(p.id, db);
+      await rejectsWith(projects.getProjectByRef("acme", "sitio-web", db), "NOT_FOUND");
+    });
+
     it("crea en desarrollo, deja solo el origen y siembra los 4 umbrales", async () => {
       const c = await newClient("Acme");
       const p = await projects.createProject(c.id, { name: "Sitio web", baseUrl: " https://WWW.Acme.test/es/inicio?x=1 " }, db);

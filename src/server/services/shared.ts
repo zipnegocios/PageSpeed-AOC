@@ -10,6 +10,8 @@ export function parseInput<S extends z.ZodType>(schema: S, raw: unknown): z.infe
   return result.data;
 }
 
+export const isUuid = (value: string): boolean => z.uuid().safeParse(value).success;
+
 export function assertUuid(id: string, what: string): void {
   if (!z.uuid().safeParse(id).success) throw new DomainError("NOT_FOUND", `${what} no encontrado.`);
 }

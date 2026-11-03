@@ -6,12 +6,12 @@ import { DomainError } from "@/server/domain/errors";
 import { requireSlug } from "@/server/domain/slug";
 import { normalizeHost, parseHttpUrl } from "@/server/domain/url-guard";
 import * as repo from "@/server/repositories/projects";
-import { findClient } from "@/server/repositories/clients";
+import { findClient, findClientBySlug } from "@/server/repositories/clients";
 import { maintenanceQueue } from "@/server/queue/queues";
 import { getProjectNextRun, removeProjectScheduler, upsertProjectScheduler } from "@/server/queue/schedulers";
 import { cancelScheduledAudits } from "./audits";
 import { phaseInput, projectInput, projectUpdateInput } from "@/server/validation/projects";
-import { assertUuid, isUniqueViolation, parseInput, uniqueSlug } from "./shared";
+import { assertUuid, isUniqueViolation, isUuid, parseInput, uniqueSlug } from "./shared";
 import { getDefaultThresholds, METRICS } from "./settings";
 
 export type { Project, ProjectWithClient } from "@/server/repositories/projects";
@@ -91,6 +91,14 @@ export async function getProject(id: string, db: Database = getDb()) {
   assertUuid(id, "Proyecto");
   const project = await repo.findProject(db, id);
   if (!project) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+  return project;
+}
+
+/** Proyecto por (cliente, proyecto) en slug o, para enlaces antiguos, en UUID. El proyecto debe ser de ese cliente. */
+export async function getProjectByRef(clientRef: string, projectRef: string, db: Database = getDb()) {
+  const client = isUuid(clientRef) ? await findClient(db, clientRef) : await findClientBySlug(db, clientRef);
+  const project = client ? (isUuid(projectRef) ? await repo.findProject(db, projectRef) : await repo.findProjectBySlug(db, client.id, projectRef)) : undefined;
+  if (!client || !project || project.clientId !== client.id) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
   return project;
 }
 

@@ -1,29 +1,34 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { appUrl, orNotFound } from "@/lib/not-found";
+import { clientPath, projectPath } from "@/lib/urls";
 import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { CopyButton } from "@/lib/ui/components/copy-button";
 import { Field, SelectField, TextareaField } from "@/lib/ui/components/field";
-import { getClient } from "@/server/services/clients";
+import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
-import { AdminShell } from "../../_components/admin-shell";
+import { AdminShell } from "@/app/admin/_components/admin-shell";
 import {
   archiveClientAction,
   createProjectAction,
   rotateMagicTokenAction,
   setClientStatusAction,
   updateClientAction,
-} from "../actions";
+} from "@/app/admin/clientes/actions";
 
 export const metadata: Metadata = { title: "Cliente · AOC PageSpeed", robots: { index: false, follow: false } };
 
-export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ClientPage({ params }: { params: Promise<{ cliente: string }> }) {
   const session = await verifySession();
-  const { id } = await params;
-  const client = await orNotFound(getClient(id));
+  const { cliente } = await params;
+  const client = await orNotFound(getClientByRef(cliente));
+  // Un enlace antiguo con UUID se lleva a la dirección legible.
+  if (cliente !== client.slug) redirect(clientPath(client.slug));
+  const id = client.id;
   const projects = await listProjects(id);
   const portalUrl = `${appUrl()}/c/${client.magicToken}`;
   const active = client.status === "active";
@@ -46,7 +51,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
           <ul className="divide-y divide-border rounded-sm border border-border">
             {projects.map((p) => (
               <li key={p.id}>
-                <Link href={`/admin/proyectos/${p.id}`} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 hover:bg-surface-300">
+                <Link href={projectPath(client.slug, p.slug)} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 hover:bg-surface-300">
                   <span className="flex min-w-0 flex-col">
                     <span className="text-[19px] font-semibold break-words text-ink">{p.name}</span>
                     <span className="text-[15px] break-all text-ink-muted">

@@ -39,6 +39,11 @@ evalúa las alertas y lo avisa en los logs.
   id). Al dispararse, el worker pide móvil y escritorio de cada ruta monitoreada. Pasar a desarrollo, cambiar
   la frecuencia o archivar actualiza el agendador; si Redis no responde en ese momento, el cambio se guarda
   igual y la reconciliación lo corrige.
+- **Direcciones legibles:** el panel usa el identificador (slug) del cliente y del proyecto, no UUID:
+  `/admin/clientes/acme` y `/admin/clientes/acme/tienda` (el slug del proyecto solo es único dentro de su
+  cliente, por eso va anidado). En el portal, `/c/<token>/tienda`. Los enlaces antiguos con UUID
+  (`/admin/proyectos/<uuid>`, `/c/<token>/<uuid>`) siguen funcionando y redirigen a la dirección legible.
+  El slug se fija al crear (forma la carpeta de R2) y no cambia al renombrar el cliente o el proyecto.
 - **Archivar, restaurar y eliminar:** archivar un cliente o un proyecto es reversible: sale del panel, deja de
   auditarse y (en un cliente) su link del portal deja de funcionar. Lo archivado se ve en `/admin/archivados`,
   donde se puede **Restaurar** o **Eliminar definitivamente**. Eliminar solo se ofrece sobre lo ya archivado,

@@ -8,6 +8,7 @@ import { getProjectReportPdf } from "@/server/report";
 import { insertNotification, listRecentNotifications } from "@/server/repositories/alerts";
 import { getClient } from "./clients";
 import { getProject } from "./projects";
+import { portalProjectPath } from "@/lib/urls";
 
 /** Mínimo entre dos envíos del informe del mismo proyecto, para no repetirlo por un doble clic. */
 export const REPORT_COOLDOWN_MS = 5 * 60_000;
@@ -49,7 +50,7 @@ export async function sendProjectReport(
     contactName: client.contactName,
     projectName: project.name,
     days,
-    portalUrl: `${base}/c/${client.magicToken}/${project.id}`,
+    portalUrl: `${base}${portalProjectPath(client.magicToken, project.slug)}`,
   });
   const record = { projectId, clientId: client.id, type: "report" as const, recipient: to, subject: mail.subject, sentAt: now };
   try {

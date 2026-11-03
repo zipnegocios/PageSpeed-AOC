@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PROFILE_LABEL, formatDate, formatDuration, formatSeconds, isPending } from "@/lib/audit-format";
 import { verifySession } from "@/lib/auth/session";
+import { clientPath, projectPath } from "@/lib/urls";
 import { orNotFound } from "@/lib/not-found";
 import { Alert } from "@/lib/ui/components/alert";
 import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
@@ -185,8 +186,8 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
       crumbs={[
         { label: "Panel", href: "/admin" },
         { label: "Clientes", href: "/admin/clientes" },
-        { label: audit.clientName, href: `/admin/clientes/${audit.clientId}` },
-        { label: audit.projectName, href: `/admin/proyectos/${audit.projectId}` },
+        { label: audit.clientName, href: clientPath(audit.clientSlug) },
+        { label: audit.projectName, href: projectPath(audit.clientSlug, audit.projectSlug) },
       ]}
       actions={<AuditStatusBadge audit={audit} />}
     >

@@ -28,6 +28,16 @@ export async function findProject(db: Database, id: string): Promise<ProjectWith
   return row ? { ...row.project, clientName: row.clientName, clientSlug: row.clientSlug } : undefined;
 }
 
+export async function findProjectBySlug(db: Database, clientId: string, slug: string): Promise<ProjectWithClient | undefined> {
+  const [row] = await db
+    .select({ project: projects, clientName: clients.name, clientSlug: clients.slug })
+    .from(projects)
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .where(and(eq(projects.clientId, clientId), eq(projects.slug, slug), live(), isNull(clients.deletedAt)))
+    .limit(1);
+  return row ? { ...row.project, clientName: row.clientName, clientSlug: row.clientSlug } : undefined;
+}
+
 export async function projectSlugTaken(db: Database, clientId: string, slug: string): Promise<boolean> {
   const [row] = await db
     .select({ id: projects.id })
@@ -77,7 +87,7 @@ export async function listProductionProjects(db: Database): Promise<ProductionPr
     .where(and(eq(projects.phase, "production"), live(), isNull(clients.deletedAt)));
 }
 
-export type ProductionProjectInfo = ProductionProject & { name: string; clientId: string; clientName: string };
+export type ProductionProjectInfo = ProductionProject & { name: string; slug: string; clientId: string; clientName: string; clientSlug: string };
 
 export async function listProductionProjectsInfo(db: Database): Promise<ProductionProjectInfo[]> {
   return db
@@ -85,8 +95,10 @@ export async function listProductionProjectsInfo(db: Database): Promise<Producti
       id: projects.id,
       auditFrequency: projects.auditFrequency,
       name: projects.name,
+      slug: projects.slug,
       clientId: clients.id,
       clientName: clients.name,
+      clientSlug: clients.slug,
     })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))

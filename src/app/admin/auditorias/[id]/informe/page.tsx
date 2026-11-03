@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PROFILE_LABEL } from "@/lib/audit-format";
 import { verifySession } from "@/lib/auth/session";
+import { clientPath, projectPath } from "@/lib/urls";
 import { getLocale } from "@/lib/locale";
 import { orNotFound } from "@/lib/not-found";
 import { Alert } from "@/lib/ui/components/alert";
@@ -25,8 +26,8 @@ export default async function AuditReportPage({ params }: { params: Promise<{ id
       subtitle={`${audit.routePath} · ${PROFILE_LABEL[audit.profile]} · ${audit.projectName}`}
       crumbs={[
         { label: "Panel", href: "/admin" },
-        { label: audit.clientName, href: `/admin/clientes/${audit.clientId}` },
-        { label: audit.projectName, href: `/admin/proyectos/${audit.projectId}` },
+        { label: audit.clientName, href: clientPath(audit.clientSlug) },
+        { label: audit.projectName, href: projectPath(audit.clientSlug, audit.projectSlug) },
         { label: "Auditoría", href: `/admin/auditorias/${audit.id}` },
       ]}
     >

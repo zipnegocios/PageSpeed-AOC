@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { verifySession } from "@/lib/auth/session";
+import { clientPath } from "@/lib/urls";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
@@ -25,7 +26,7 @@ export default async function ClientsPage() {
             {clients.map((c) => (
               <li key={c.id}>
                 <Link
-                  href={`/admin/clientes/${c.id}`}
+                  href={clientPath(c.slug)}
                   className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 hover:bg-surface-300"
                 >
                   <span className="flex min-w-0 flex-col">

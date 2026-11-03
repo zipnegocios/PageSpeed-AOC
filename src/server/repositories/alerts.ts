@@ -22,8 +22,10 @@ export type OpenAlertRow = {
   routePath: string;
   projectId: string;
   projectName: string;
+  projectSlug: string;
   clientId: string;
   clientName: string;
+  clientSlug: string;
   /** Código de error de la auditoría que abrió un fallo (null en alertas de umbral). */
   errorCode: string | null;
 };
@@ -33,8 +35,10 @@ const openAlertColumns = {
   routePath: routes.path,
   projectId: projects.id,
   projectName: projects.name,
+  projectSlug: projects.slug,
   clientId: clients.id,
   clientName: clients.name,
+  clientSlug: clients.slug,
   errorCode: auditLogs.errorCode,
 };
 

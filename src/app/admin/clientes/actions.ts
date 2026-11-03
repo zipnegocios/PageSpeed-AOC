@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
+import { clientPath, projectPath } from "@/lib/urls";
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
+
+/** Las direcciones llevan slugs: se revalida todo el panel en lugar de adivinar cada ruta. */
+const revalidateAdmin = () => revalidatePath("/admin", "layout");
 
 const contact = (fd: FormData) => ({
   name: field(fd, "name"),
@@ -20,7 +24,7 @@ export async function createClientAction(_prev: ActionState, fd: FormData): Prom
   return guarded(async () => {
     const client = await clients.createClient({ ...contact(fd), slug: field(fd, "slug") });
     revalidatePath("/admin/clientes");
-    redirect(`/admin/clientes/${client.id}`);
+    redirect(clientPath(client.slug));
   });
 }
 
@@ -28,8 +32,7 @@ export async function updateClientAction(id: string, _prev: ActionState, fd: For
   await verifySession();
   return guarded(async () => {
     await clients.updateClient(id, contact(fd));
-    revalidatePath(`/admin/clientes/${id}`);
-    revalidatePath("/admin/clientes");
+    revalidateAdmin();
     return { ok: "Datos guardados." };
   });
 }
@@ -42,8 +45,7 @@ export async function setClientStatusAction(
   await verifySession();
   return guarded(async () => {
     await clients.setClientStatus(id, status);
-    revalidatePath(`/admin/clientes/${id}`);
-    revalidatePath("/admin/clientes");
+    revalidateAdmin();
     return { ok: status === "suspended" ? "Cliente suspendido." : "Cliente activado." };
   });
 }
@@ -52,7 +54,7 @@ export async function rotateMagicTokenAction(id: string, _prev: ActionState): Pr
   await verifySession();
   return guarded(async () => {
     await clients.rotateMagicToken(id);
-    revalidatePath(`/admin/clientes/${id}`);
+    revalidateAdmin();
     return { ok: "Se generó un link nuevo. El anterior ya no funciona." };
   });
 }
@@ -61,7 +63,7 @@ export async function archiveClientAction(id: string, _prev: ActionState): Promi
   await verifySession();
   return guarded(async () => {
     await clients.archiveClient(id);
-    revalidatePath("/admin/clientes");
+    revalidateAdmin();
     redirect("/admin/clientes");
   });
 }
@@ -69,6 +71,7 @@ export async function archiveClientAction(id: string, _prev: ActionState): Promi
 export async function createProjectAction(clientId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
+    const client = await clients.getClient(clientId);
     const project = await projects.createProject(clientId, {
       name: field(fd, "name"),
       baseUrl: field(fd, "baseUrl"),
@@ -76,7 +79,7 @@ export async function createProjectAction(clientId: string, _prev: ActionState, 
       auditFrequency: field(fd, "auditFrequency") || "weekly",
       sitemapUrl: field(fd, "sitemapUrl"),
     });
-    revalidatePath(`/admin/clientes/${clientId}`);
-    redirect(`/admin/proyectos/${project.id}`);
+    revalidateAdmin();
+    redirect(projectPath(client.slug, project.slug));
   });
 }

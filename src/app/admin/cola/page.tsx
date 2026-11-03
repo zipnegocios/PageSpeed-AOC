@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { verifySession } from "@/lib/auth/session";
+import { projectPath } from "@/lib/urls";
 import { Alert } from "@/lib/ui/components/alert";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
@@ -63,7 +64,7 @@ export default async function QueuePage() {
             {status.schedules.map((s) => (
               <li key={s.projectId} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3">
                 <span className="flex min-w-0 flex-col">
-                  <Link href={`/admin/proyectos/${s.projectId}`} className="text-[19px] font-semibold break-words text-link hover:underline">
+                  <Link href={projectPath(s.clientSlug, s.projectSlug)} className="text-[19px] font-semibold break-words text-link hover:underline">
                     {s.projectName}
                   </Link>
                   <span className="text-[15px] text-ink-muted">

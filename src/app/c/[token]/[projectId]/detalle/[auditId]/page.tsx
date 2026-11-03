@@ -13,6 +13,7 @@ import { BlockedNotice } from "../../../../_components/blocked-notice";
 import { PortalShell } from "../../../../_components/portal-shell";
 import { SuspendedNotice } from "../../../../_components/suspended-notice";
 import { portalAccess } from "../../../../_lib/access";
+import { portalProjectPath } from "@/lib/urls";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Detalle técnico · AOC PageSpeed", robots: { index: false, follow: false } };
@@ -33,7 +34,7 @@ export default async function PortalAuditDetail({
   if (!found) notFound();
   const { audit, redact } = found;
   const locale = await getLocale();
-  const base = `/c/${token}/${projectId}`;
+  const base = portalProjectPath(token, found.projectSlug);
   const stored = await loadAuditLhr(audit);
   const lhr = stored ? localizeLhr(redact ? redactLhr(stored) : stored, locale) : null;
 

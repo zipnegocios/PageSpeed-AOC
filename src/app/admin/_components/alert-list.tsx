@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { projectPath } from "@/lib/urls";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { Badge } from "@/lib/ui/components/badge";
 import type { AlertView } from "@/server/services/alerts";
@@ -16,7 +17,7 @@ export function AlertList({ alerts, showProject = false }: { alerts: AlertView[]
           <p className="text-[15px] text-ink-muted">
             {showProject ? (
               <>
-                <Link href={`/admin/proyectos/${a.projectId}`} className="font-semibold text-link hover:underline">
+                <Link href={projectPath(a.clientSlug, a.projectSlug)} className="font-semibold text-link hover:underline">
                   {a.clientName} · {a.projectName}
                 </Link>{" "}
                 ·{" "}

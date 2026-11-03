@@ -30,6 +30,7 @@ export async function resolvePortal(token: string, db: Database = getDb()): Prom
 
 export type PortalProjectSummary = {
   id: string;
+  slug: string;
   name: string;
   baseUrl: string;
   lastAuditAt: Date | null;
@@ -40,7 +41,7 @@ export type PortalProjectSummary = {
 /** Solo proyectos en producción y no archivados: lo que se monitorea de verdad. */
 async function productionProjects(db: Database, clientId: string) {
   return db
-    .select({ id: projects.id, name: projects.name, baseUrl: projects.baseUrl })
+    .select({ id: projects.id, slug: projects.slug, name: projects.name, baseUrl: projects.baseUrl })
     .from(projects)
     .where(and(eq(projects.clientId, clientId), eq(projects.phase, "production"), isNull(projects.deletedAt)))
     .orderBy(asc(projects.name));
@@ -64,6 +65,7 @@ export async function getPortalOverview(clientId: string, db: Database = getDb()
 
 export type PortalProject = {
   id: string;
+  slug: string;
   name: string;
   baseUrl: string;
   latest: LatestScores[];
@@ -71,11 +73,13 @@ export type PortalProject = {
   improvements: Array<Pick<AlertView, "id" | "kind" | "routePath" | "profile" | "summary" | "openedAt">>;
 };
 
-/** null si el proyecto no es de este cliente, no está en producción o está archivado. */
-export async function getPortalProject(clientId: string, projectId: string, db: Database = getDb()): Promise<PortalProject | null> {
+/**
+ * null si el proyecto no es de este cliente, no está en producción o está archivado. `ref` es el identificador
+ * legible (slug) del proyecto o, para enlaces antiguos, su UUID.
+ */
+export async function getPortalProject(clientId: string, ref: string, db: Database = getDb()): Promise<PortalProject | null> {
   assertUuid(clientId, "Cliente");
-  if (!/^[0-9a-f-]{36}$/i.test(projectId)) return null;
-  const project = (await productionProjects(db, clientId)).find((p) => p.id === projectId);
+  const project = (await productionProjects(db, clientId)).find((p) => p.slug === ref || p.id === ref);
   if (!project) return null;
   const [latest, alerts] = await Promise.all([getLatestScores(project.id, db), listOpenAlerts(project.id, db)]);
   return {
@@ -87,6 +91,8 @@ export async function getPortalProject(clientId: string, projectId: string, db: 
 
 export type PortalAudit = {
   audit: AuditDetail;
+  /** Identificador legible del proyecto, para armar los enlaces. */
+  projectSlug: string;
   /** La ruta exige sesión: al cliente no se le muestran capturas ni fragmentos de HTML. */
   redact: boolean;
 };
@@ -100,7 +106,7 @@ export async function getPortalAudit(clientId: string, projectId: string, auditI
     const audit = await getAudit(auditId, db);
     if (audit.projectId !== project.id || audit.status !== "succeeded") return null;
     const route = await getRoute(audit.routeId, db);
-    return { audit, redact: route.requiresAuth };
+    return { audit, projectSlug: project.slug, redact: route.requiresAuth };
   } catch {
     return null;
   }

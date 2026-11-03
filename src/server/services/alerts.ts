@@ -1,3 +1,4 @@
+import { projectPath } from "@/lib/urls";
 import { eq } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { alertStates } from "@/server/db/schema";
@@ -215,7 +216,7 @@ export async function sweepNotifications(config: SweepConfig): Promise<SweepResu
     const mail = buildDigestEmail({
       projectName: first.projectName,
       clientName: first.clientName,
-      projectUrl: `${base}/admin/proyectos/${projectId}`,
+      projectUrl: `${base}${projectPath(first.clientSlug, first.projectSlug)}`,
       auditsBase: `${base}/admin/auditorias`,
       items,
       now,
@@ -279,8 +280,10 @@ export type AlertView = {
   auditId: string | null;
   projectId: string;
   projectName: string;
+  projectSlug: string;
   clientId: string;
   clientName: string;
+  clientSlug: string;
 };
 
 function toView(r: repo.OpenAlertRow): AlertView {
@@ -310,8 +313,10 @@ function toView(r: repo.OpenAlertRow): AlertView {
     auditId: s.openedByAuditId,
     projectId: r.projectId,
     projectName: r.projectName,
+    projectSlug: r.projectSlug,
     clientId: r.clientId,
     clientName: r.clientName,
+    clientSlug: r.clientSlug,
   };
 }
 

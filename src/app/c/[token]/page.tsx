@@ -10,6 +10,7 @@ import { BlockedNotice } from "../_components/blocked-notice";
 import { PortalShell } from "../_components/portal-shell";
 import { SuspendedNotice } from "../_components/suspended-notice";
 import { portalAccess } from "../_lib/access";
+import { portalProjectPath } from "@/lib/urls";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Tu informe · AOC PageSpeed", robots: { index: false, follow: false } };
@@ -29,7 +30,7 @@ export default async function PortalHome({ params }: { params: Promise<{ token: 
 
   const projects = await getPortalOverview(access.client.id);
   // Con un único proyecto no hay nada que elegir: se va directo a su informe.
-  if (projects.length === 1) redirect(`/c/${token}/${projects[0]!.id}`);
+  if (projects.length === 1) redirect(portalProjectPath(token, projects[0]!.slug));
 
   return (
     <PortalShell clientName={access.client.name} title="Tu informe" subtitle="Así van tus sitios en las últimas auditorías.">
@@ -61,7 +62,7 @@ export default async function PortalHome({ params }: { params: Promise<{ token: 
               <span className="text-[15px] text-ink-muted">Última auditoría: {formatDate(p.lastAuditAt)}</span>
             </div>
             <div>
-              <Link href={`/c/${token}/${p.id}`} className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300">
+              <Link href={portalProjectPath(token, p.slug)} className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300">
                 Ver el detalle
               </Link>
             </div>

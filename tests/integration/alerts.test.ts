@@ -211,7 +211,7 @@ describe.skipIf(!dbUrl)("alertas: evaluación, envío agrupado y recordatorios",
       expect(sent[0]!.text).toContain("SEO 69 (mínimo 90)");
       expect(sent[0]!.text).toContain("/blog · Escritorio: SEO 50");
       expect(sent[0]!.text).toContain("la auditoría falla (TIMEOUT)");
-      expect(sent[0]!.text).toContain(`https://app.test/admin/proyectos/${project.id}`);
+      expect(sent[0]!.text).toContain(`https://app.test/admin/clientes/acme/${project.slug}`);
 
       const log = await db.select().from(s.notifications);
       expect(log).toHaveLength(1);

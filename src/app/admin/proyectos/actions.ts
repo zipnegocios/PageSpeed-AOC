@@ -4,18 +4,21 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
+import { clientPath } from "@/lib/urls";
 import { parsePeriod } from "@/server/domain/history";
 import { requestAudit } from "@/server/services/audits";
 import { sendProjectReport } from "@/server/services/report-email";
 import { requestFieldDataRefresh } from "@/server/services/crux";
 import { clearProjectAuth, setProjectAuth } from "@/server/services/project-auth";
+import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 import { discoverRoutes, importRoutes } from "@/server/services/sitemap-discovery";
 import { METRICS } from "@/server/services/settings";
 import * as thresholds from "@/server/services/thresholds";
 
-const refresh = (projectId: string) => revalidatePath(`/admin/proyectos/${projectId}`);
+/** Las direcciones llevan slugs de cliente y proyecto: se revalida todo el panel en lugar de adivinar cada ruta. */
+const refresh = (_projectId?: string) => revalidatePath("/admin", "layout");
 
 export async function updateProjectAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
   await verifySession();
@@ -132,9 +135,10 @@ export async function importRoutesAction(id: string, _prev: ActionState, fd: For
 export async function archiveProjectAction(id: string, clientId: string, _prev: ActionState): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
+    const client = await clients.getClient(clientId);
     await projects.archiveProject(id);
-    revalidatePath(`/admin/clientes/${clientId}`);
-    redirect(`/admin/clientes/${clientId}`);
+    refresh();
+    redirect(clientPath(client.slug));
   });
 }
 

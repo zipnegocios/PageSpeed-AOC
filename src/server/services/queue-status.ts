@@ -13,8 +13,10 @@ export type QueueCounts = { waiting: number; active: number; delayed: number; fa
 export type ScheduleRow = {
   projectId: string;
   projectName: string;
+  projectSlug: string;
   clientId: string;
   clientName: string;
+  clientSlug: string;
   frequency: "weekly" | "daily";
   /** null: el proyecto está en producción pero aún no tiene agendador (se corrige al reconciliar). */
   next: Date | null;
@@ -56,8 +58,10 @@ export async function getQueueStatus(deps: QueueStatusDeps = {}): Promise<QueueS
       schedules: production.map((p) => ({
         projectId: p.id,
         projectName: p.name,
+        projectSlug: p.slug,
         clientId: p.clientId,
         clientName: p.clientName,
+        clientSlug: p.clientSlug,
         frequency: p.auditFrequency,
         next: nextByProject.get(p.id) ?? null,
       })),
@@ -71,8 +75,10 @@ export async function getQueueStatus(deps: QueueStatusDeps = {}): Promise<QueueS
       schedules: production.map((p) => ({
         projectId: p.id,
         projectName: p.name,
+        projectSlug: p.slug,
         clientId: p.clientId,
         clientName: p.clientName,
+        clientSlug: p.clientSlug,
         frequency: p.auditFrequency,
         next: null,
       })),

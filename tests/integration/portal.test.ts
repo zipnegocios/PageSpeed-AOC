@@ -186,6 +186,9 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
       expect(await portal.getPortalProject(a.client.id, a.project.id, db)).toMatchObject({ id: a.project.id, name: "Sitio Acme" });
       expect(await portal.getPortalProject(a.client.id, b.project.id, db)).toBeNull();
       expect(await portal.getPortalProject(dev.client.id, dev.project.id, db)).toBeNull();
+      // También se llega por el identificador legible (slug), y solo dentro del cliente dueño.
+      expect(await portal.getPortalProject(a.client.id, a.project.slug, db)).toMatchObject({ id: a.project.id, slug: a.project.slug });
+      expect(await portal.getPortalProject(a.client.id, b.project.slug, db)).toBeNull();
       expect(await portal.getPortalProject(a.client.id, "no-es-uuid", db)).toBeNull();
       expect(await portal.getPortalProject(a.client.id, "00000000-0000-4000-8000-000000000000", db)).toBeNull();
     });

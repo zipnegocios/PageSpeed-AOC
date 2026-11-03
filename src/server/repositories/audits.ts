@@ -5,7 +5,7 @@ import type { AuditMetrics } from "@/server/domain/score-extraction";
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type AuditWithRoute = AuditLog & { routePath: string };
-export type AuditDetail = AuditWithRoute & { projectName: string; clientId: string; clientName: string };
+export type AuditDetail = AuditWithRoute & { projectName: string; projectSlug: string; clientId: string; clientName: string; clientSlug: string };
 
 /** Todo lo que el worker necesita para ejecutar una auditoría. */
 export type AuditContext = {
@@ -32,8 +32,10 @@ export async function findAuditDetail(db: Database, id: string): Promise<AuditDe
       audit: auditLogs,
       routePath: routes.path,
       projectName: projects.name,
+      projectSlug: projects.slug,
       clientId: clients.id,
       clientName: clients.name,
+      clientSlug: clients.slug,
     })
     .from(auditLogs)
     .innerJoin(routes, eq(routes.id, auditLogs.routeId))
@@ -42,7 +44,7 @@ export async function findAuditDetail(db: Database, id: string): Promise<AuditDe
     .where(eq(auditLogs.id, id))
     .limit(1);
   return row
-    ? { ...row.audit, routePath: row.routePath, projectName: row.projectName, clientId: row.clientId, clientName: row.clientName }
+    ? { ...row.audit, routePath: row.routePath, projectName: row.projectName, projectSlug: row.projectSlug, clientId: row.clientId, clientName: row.clientName, clientSlug: row.clientSlug }
     : undefined;
 }
 

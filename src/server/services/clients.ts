@@ -4,7 +4,7 @@ import { DomainError } from "@/server/domain/errors";
 import { requireSlug } from "@/server/domain/slug";
 import * as repo from "@/server/repositories/clients";
 import { clientInput, clientUpdateInput } from "@/server/validation/clients";
-import { assertUuid, isUniqueViolation, parseInput, uniqueSlug } from "./shared";
+import { assertUuid, isUniqueViolation, isUuid, parseInput, uniqueSlug } from "./shared";
 
 export type { Client, ClientWithCount } from "@/server/repositories/clients";
 
@@ -15,6 +15,13 @@ export function listClients(db: Database = getDb()) {
 export async function getClient(id: string, db: Database = getDb()) {
   assertUuid(id, "Cliente");
   const client = await repo.findClient(db, id);
+  if (!client) throw new DomainError("NOT_FOUND", "Cliente no encontrado.");
+  return client;
+}
+
+/** Cliente por identificador legible (slug) o, para enlaces antiguos, por UUID. */
+export async function getClientByRef(ref: string, db: Database = getDb()) {
+  const client = isUuid(ref) ? await repo.findClient(db, ref) : await repo.findClientBySlug(db, ref);
   if (!client) throw new DomainError("NOT_FOUND", "Cliente no encontrado.");
   return client;
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FieldDataCard } from "@/app/_components/field-data-card";
 import { HistoryPanel, type HistorySearch } from "@/app/_components/history-panel";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
@@ -14,6 +14,7 @@ import { BlockedNotice } from "../../_components/blocked-notice";
 import { PortalShell } from "../../_components/portal-shell";
 import { SuspendedNotice } from "../../_components/suspended-notice";
 import { portalAccess } from "../../_lib/access";
+import { portalProjectPath } from "@/lib/urls";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Tu informe · AOC PageSpeed", robots: { index: false, follow: false } };
@@ -40,6 +41,8 @@ export default async function PortalProjectPage({
 
   const project = await getPortalProject(access.client.id, projectId);
   if (!project) notFound();
+  // Un enlace antiguo con UUID se lleva a la dirección legible.
+  if (projectId !== project.slug) redirect(portalProjectPath(token, project.slug));
   const several = (await getPortalOverview(access.client.id)).length > 1;
 
   return (
@@ -65,7 +68,7 @@ export default async function PortalProjectPage({
         description="Resultado de la última auditoría de cada página, frente a la anterior."
         actions={
           <a
-            href={`/c/${token}/${project.id}/informe`}
+            href={`${portalProjectPath(token, project.slug)}/informe`}
             download
             className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
           >
@@ -103,7 +106,7 @@ export default async function PortalProjectPage({
                   </div>
                 </dl>
                 <div>
-                  <Link href={`/c/${token}/${project.id}/detalle/${l.auditId}`} className="inline-flex min-h-11 items-center font-semibold text-link hover:underline">
+                  <Link href={`${portalProjectPath(token, project.slug)}/detalle/${l.auditId}`} className="inline-flex min-h-11 items-center font-semibold text-link hover:underline">
                     Ver detalle técnico
                   </Link>
                 </div>
@@ -135,12 +138,12 @@ export default async function PortalProjectPage({
 
       <HistoryPanel
         projectId={project.id}
-        basePath={`/c/${token}/${project.id}`}
+        basePath={portalProjectPath(token, project.slug)}
         search={search}
         description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo."
       />
 
-      <FieldDataCard projectId={project.id} basePath={`/c/${token}/${project.id}`} search={search} audience="client" />
+      <FieldDataCard projectId={project.id} basePath={portalProjectPath(token, project.slug)} search={search} audience="client" />
     </PortalShell>
   );
 }

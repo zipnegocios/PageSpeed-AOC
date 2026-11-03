@@ -28,6 +28,15 @@ export async function findClient(db: Database, id: string): Promise<Client | und
   return row;
 }
 
+export async function findClientBySlug(db: Database, slug: string): Promise<Client | undefined> {
+  const [row] = await db
+    .select()
+    .from(clients)
+    .where(and(eq(clients.slug, slug), isNull(clients.deletedAt)))
+    .limit(1);
+  return row;
+}
+
 /** Incluye clientes archivados: el slug sigue ocupado porque forma el prefijo de R2. */
 export async function slugTaken(db: Database, slug: string): Promise<boolean> {
   const [row] = await db.select({ id: clients.id }).from(clients).where(eq(clients.slug, slug)).limit(1);
