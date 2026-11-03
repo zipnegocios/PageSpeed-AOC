@@ -29,6 +29,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 | `AUDIT_COOLDOWN_MS`, `AUDIT_TIMEOUT_MS`, `AUDIT_ATTEMPTS` | — | opc. | 12000 / 90000 / 3 por defecto |
 | `LOG_LEVEL` | opc. | opc. | `info` por defecto |
 | `NODE_OPTIONS` | opc. | opc. | Las imágenes ya fijan `--max-old-space-size` (web 512, worker 512) |
+| `CRUX_API_KEY` | — | opc. | Clave de la API «Chrome UX Report API» (datos reales de usuarios). Solo el worker. Ver abajo |
 | `CHROME_PATH` | — | **no declarar** | La imagen del worker ya lo fija |
 
 ## 2. Recursos recomendados (VPS compartido)
@@ -101,6 +102,9 @@ El worker las reconcilia cada 15 minutos (las huérfanas vuelven a la cola o fal
 
 **Una ruta privada falla con `AUTH_FAILED`, `AUTH_NOT_CONFIGURED` o `AUTH_CONFIG`**
 `AUTH_FAILED`: la contraseña de prueba cambió, las cookies caducaron o el formulario es poco común (revisa los selectores). Entra a mano con ese usuario para comprobarlo y vuelve a guardar el acceso. `AUTH_NOT_CONFIGURED`: la ruta pide sesión pero el proyecto no tiene acceso. `AUTH_CONFIG`: `AUTH_ENCRYPTION_KEY` del worker no coincide con la del web (o falta). No se reintentan; la alerta de fallo queda abierta hasta que se corrija.
+
+**«Datos reales de usuarios» sin datos o con error**
+Crea la clave en Google Cloud (console.cloud.google.com): selecciona o crea un proyecto → *APIs y servicios* → *Biblioteca* → activa «Chrome UX Report API» → *Credenciales* → *Crear credenciales* → *Clave de API*, y en *Restricciones de API* déjala solo para esa API. Cárgala como `CRUX_API_KEY` en el **worker**, redespliégalo y pulsa *Actualizar datos reales* en la ficha del proyecto. Si el panel dice «Falta definir CRUX_API_KEY», no llegó al worker; si dice `BAD_KEY`, la clave no tiene permiso para esa API; `QUOTA`, se superó el límite (se reintenta al día siguiente). Un sitio o página con poco tráfico de Chrome muestra «no tiene suficiente tráfico»: es normal y no se arregla con la clave.
 
 **Muchas auditorías fallan con el mismo código**
 `TIMEOUT`/`PAGE_HUNG`: el sitio es lento o pesado; sube `AUDIT_TIMEOUT_MS` con cuidado. `SITE_DOWN`/`HTTP_5XX`: el sitio del cliente está caído (avísale). `FORBIDDEN_HOST`: el host salió de *Hosts permitidos* del proyecto. `CHROME_CRASH`: poca memoria en el worker.

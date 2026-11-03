@@ -292,6 +292,33 @@ export const notifications = pgTable(
   (t) => [index("notifications_project_sent_idx").on(t.projectId, t.sentAt.desc())],
 );
 
+// ----------------------------------------------------------- field_data
+// Datos reales de usuarios (Chrome UX Report): lo último que devolvió Google para cada sitio o página y dispositivo.
+// Es derivado y se vuelve a pedir cada día, por eso solo se guarda lo vigente y no entra en los respaldos.
+export const fieldData = pgTable(
+  "field_data",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // "origin" para todo el sitio, o el id de la ruta cuando es una página concreta.
+    target: text("target").notNull(),
+    routeId: uuid("route_id").references(() => routes.id, { onDelete: "cascade" }),
+    formFactor: auditProfile("form_factor").notNull(),
+    // ok = Google devolvió datos; no_data = el sitio o la página no tiene tráfico suficiente.
+    status: text("status").notNull(),
+    metrics: jsonb("metrics"),
+    collectionFirst: text("collection_first"),
+    collectionLast: text("collection_last"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("field_data_unique").on(t.projectId, t.target, t.formFactor),
+    check("field_data_status", sql`${t.status} in ('ok', 'no_data')`),
+  ],
+);
+
 // -------------------------------------------------------- mcp_api_keys
 export const mcpApiKeys = pgTable("mcp_api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),

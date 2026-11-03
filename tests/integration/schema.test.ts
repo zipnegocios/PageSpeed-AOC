@@ -56,6 +56,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "alert_thresholds",
       "audit_logs",
       "clients",
+      "field_data",
       "mcp_api_keys",
       "notifications",
       "projects",

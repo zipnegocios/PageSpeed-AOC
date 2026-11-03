@@ -117,6 +117,19 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   elemento de la auditoría elegida. **Mapa de scripts**: rectángulos proporcionales al tamaño (`treemap.ts`) con la
   parte sin usar. En el portal, las rutas que exigen sesión no ofrecen capturas ni evidencias.
 
+### Datos reales de usuarios (Chrome UX Report)
+
+- Tarjeta **Datos reales de usuarios** en la ficha del proyecto y en el portal: la experiencia de visitantes reales de Chrome
+  en los últimos 28 días (LCP, **INP**, CLS, FCP y TTFB, percentil 75 y reparto bueno / mejorable / deficiente) y la
+  evaluación de Core Web Vitals, para todo el sitio o una página, en móvil y escritorio. Es lo que el laboratorio de
+  Lighthouse no puede medir; no genera alertas.
+- El worker los pide a la API de CrUX cada día (04:47 UTC) para el sitio y hasta 10 páginas monitoreadas de cada proyecto en
+  producción, con una pausa entre consultas (límite gratuito: 150 por minuto), y los guarda en `field_data` (solo lo
+  vigente; no entra en los respaldos). El botón **Actualizar datos reales** lo pide ahora.
+- Requiere `CRUX_API_KEY` **solo en el worker** (clave de la API «Chrome UX Report API» de Google Cloud, restringida a esa
+  API). Va en una cabecera, nunca en la dirección. Sin ella el panel lo dice. Un sitio o página con poco tráfico en Chrome no
+  tiene datos: se muestra como «sin datos», no como un fallo.
+
 ## Páginas privadas (inicio de sesión)
 
 - Una ruta marcada **«Requiere sesión»** se audita con el acceso del proyecto (tarjeta *Acceso a páginas privadas* de la ficha).

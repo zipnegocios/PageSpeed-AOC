@@ -7,6 +7,7 @@ import { verifySession } from "@/lib/auth/session";
 import { parsePeriod } from "@/server/domain/history";
 import { requestAudit } from "@/server/services/audits";
 import { sendProjectReport } from "@/server/services/report-email";
+import { requestFieldDataRefresh } from "@/server/services/crux";
 import { clearProjectAuth, setProjectAuth } from "@/server/services/project-auth";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
@@ -212,5 +213,14 @@ export async function clearAuthAction(projectId: string, _prev: ActionState): Pr
     await clearProjectAuth(projectId);
     refresh(projectId);
     return { ok: "Acceso eliminado. Las rutas que requieren sesión fallarán hasta configurar uno nuevo." };
+  });
+}
+
+export async function refreshFieldDataAction(projectId: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const { queued } = await requestFieldDataRefresh();
+    refresh(projectId);
+    return { ok: queued ? "Actualización pedida al worker. Los datos aparecerán en unos minutos." : "Ya hay una actualización en curso o esperando al worker." };
   });
 }

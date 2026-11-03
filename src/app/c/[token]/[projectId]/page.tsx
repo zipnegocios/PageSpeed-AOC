@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FieldDataCard } from "@/app/_components/field-data-card";
 import { HistoryPanel, type HistorySearch } from "@/app/_components/history-panel";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { Badge } from "@/lib/ui/components/badge";
@@ -138,6 +139,8 @@ export default async function PortalProjectPage({
         search={search}
         description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo."
       />
+
+      <FieldDataCard projectId={project.id} basePath={`/c/${token}/${project.id}`} search={search} audience="client" />
     </PortalShell>
   );
 }

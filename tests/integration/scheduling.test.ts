@@ -11,7 +11,7 @@ import * as s from "@/server/db/schema";
 import { projectCron, schedulerId } from "@/server/domain/schedule";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
-import { BACKUP_JOB, BACKUP_SCHEDULER_ID, NOTIFY_SCHEDULER_ID, PLAN_JOB, RECONCILE_SCHEDULER_ID, getProjectNextRun, listProjectSchedules, upsertProjectScheduler, type PlanJobData } from "@/server/queue/schedulers";
+import { BACKUP_JOB, BACKUP_SCHEDULER_ID, CRUX_JOB, CRUX_SCHEDULER_ID, NOTIFY_SCHEDULER_ID, PLAN_JOB, RECONCILE_SCHEDULER_ID, getProjectNextRun, listProjectSchedules, upsertProjectScheduler, type PlanJobData } from "@/server/queue/schedulers";
 import { cancelScheduledAudits } from "@/server/services/audits";
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
@@ -335,6 +335,33 @@ describe.skipIf(!ready)("agendado, plan-project-audit y reconciliación", () => 
       expect(await maintenance.getJobScheduler(RECONCILE_SCHEDULER_ID)).toMatchObject({ every: 15 * 60_000 });
       expect(await maintenance.getJobScheduler(NOTIFY_SCHEDULER_ID)).toMatchObject({ every: 5 * 60_000, name: "notify" });
       expect(await maintenance.getJobScheduler(BACKUP_SCHEDULER_ID)).toMatchObject({ pattern: "17 3 * * *", tz: "UTC", name: "backup" });
+      expect(await maintenance.getJobScheduler(CRUX_SCHEDULER_ID)).toMatchObject({ pattern: "47 4 * * *", tz: "UTC", name: "crux" });
+    });
+
+    it("ejecuta la actualización de datos reales pedida a la cola y guarda lo que devuelve Google", async () => {
+      const { project } = await setup({ phase: "production", paths: ["/"] });
+      const seen: string[] = [];
+      const cruxFetch = (async (_u: string, init: { headers: Record<string, string>; body: string }) => {
+        seen.push(init.headers["X-Goog-Api-Key"] ?? "");
+        return { status: 200, ok: true, json: async () => ({ record: { metrics: { largest_contentful_paint: { histogram: [{ density: 1 }, { density: 0 }, { density: 0 }], percentiles: { p75: 1200 } } } } }) };
+      }) as never;
+      worker = await startWorker({ env: { ...env(), CRUX_API_KEY: "CLAVE-DE-PRUEBA" }, runner: okRunner, allowPrivate: true, logger: log, cruxFetch });
+      await maintenance.add(CRUX_JOB, {}, { jobId: "crux-manual", removeOnComplete: true });
+      // El worker anota el resultado al terminar la ronda (con una pausa entre consultas): se espera a eso.
+      const run = await waitFor(async () => (await db.select().from(s.settings).where(eq(s.settings.key, "crux_last_run")))[0]?.value as { ok?: boolean } | undefined, 30_000);
+      expect(run).toMatchObject({ ok: true, withData: 4 });
+      expect((await db.select().from(s.fieldData).where(eq(s.fieldData.projectId, project.id))).length).toBe(4);
+      expect(new Set(seen)).toEqual(new Set(["CLAVE-DE-PRUEBA"]));
+    });
+
+    it("sin CRUX_API_KEY en el worker no consulta y deja el motivo anotado", async () => {
+      await setup({ phase: "production", paths: ["/"] });
+      let called = 0;
+      worker = await startWorker({ env: env(), runner: okRunner, allowPrivate: true, logger: log, cruxFetch: (async () => (called++, { status: 200, ok: true, json: async () => ({}) })) as never });
+      await maintenance.add(CRUX_JOB, {}, { jobId: "crux-manual", removeOnComplete: true });
+      const run = await waitFor(async () => (await db.select().from(s.settings).where(eq(s.settings.key, "crux_last_run")))[0]?.value as { error?: string } | undefined, 20_000);
+      expect(run.error).toBe("NO_KEY");
+      expect(called).toBe(0);
     });
 
     it("ejecuta el respaldo pedido a la cola de mantenimiento y lo sube a R2", async () => {

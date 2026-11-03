@@ -7,8 +7,9 @@ import {
   HISTORY_METRICS, METRIC_META, PERIODS, PERIOD_LABEL, computeChange, formatMetric, parseMetric, parsePeriod,
 } from "@/server/domain/history";
 import { getSeries, listMonitoredRoutes } from "@/server/services/history";
+import { panelHref, type PanelSearch } from "./panel-search";
 
-export type HistorySearch = { ruta?: string; perfil?: string; m?: string; dias?: string };
+export type HistorySearch = PanelSearch;
 
 const dayFormat = new Intl.DateTimeFormat("es", { day: "numeric", month: "long", timeZone: "UTC" });
 
@@ -44,10 +45,8 @@ export async function HistoryPanel({
   const profile = search.perfil === "desktop" ? "desktop" : "mobile";
   const metric = parseMetric(search.m);
   const days = parsePeriod(search.dias);
-  const href = (patch: Partial<Record<keyof HistorySearch, string>>) => {
-    const q = new URLSearchParams({ ruta: route.id, perfil: profile, m: metric, dias: String(days), ...patch });
-    return `${basePath}?${q.toString()}#evolucion`;
-  };
+  const href = (patch: Partial<Record<"ruta" | "perfil" | "m" | "dias", string>>) =>
+    panelHref(basePath, search, { ruta: route.id, perfil: profile, m: metric, dias: String(days), ...patch }, "evolucion");
 
   const series = await getSeries({ projectId, routeId: route.id, profile, metric, days });
   const values = series.points.map((p) => p.value);

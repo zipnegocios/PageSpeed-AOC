@@ -18,6 +18,7 @@ import { Score } from "@/lib/ui/components/score";
 import Link from "next/link";
 import { AdminShell } from "../../_components/admin-shell";
 import { AutoRefresh } from "../../_components/auto-refresh";
+import { FieldDataCard } from "../../../_components/field-data-card";
 import { HistoryPanel, type HistorySearch } from "../../../_components/history-panel";
 import { AlertList, NotificationList } from "../../_components/alert-list";
 import { AuditStatusBadge } from "../../_components/audit-badge";
@@ -30,6 +31,7 @@ import {
   requestAuditAction,
   sendReportAction,
   clearAuthAction,
+  refreshFieldDataAction,
   saveCookieAuthAction,
   saveFormAuthAction,
   toggleRouteAuthAction,
@@ -254,6 +256,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       </Card>
 
       <HistoryPanel projectId={id} basePath={`/admin/proyectos/${id}`} search={search} allRoutes />
+
+      <FieldDataCard
+        projectId={id}
+        basePath={`/admin/proyectos/${id}`}
+        search={search}
+        audience="admin"
+        allRoutes
+        footer={<ActionForm action={refreshFieldDataAction.bind(null, id)} submitLabel="Actualizar datos reales" pendingLabel="Pidiendo…" variant="secondary" />}
+      />
 
       <Card title="Informe" description="Resumen en PDF con el estado actual, los puntos por mejorar y la evolución del rendimiento.">
         <div className="flex flex-wrap gap-2">

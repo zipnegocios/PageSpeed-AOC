@@ -10,6 +10,9 @@ import {
   BACKUP_CRON,
   BACKUP_JOB,
   BACKUP_SCHEDULER_ID,
+  CRUX_CRON,
+  CRUX_JOB,
+  CRUX_SCHEDULER_ID,
   NOTIFY_EVERY_MS,
   NOTIFY_JOB,
   NOTIFY_SCHEDULER_ID,
@@ -21,6 +24,7 @@ import {
 import { createMailer, type Mailer } from "@/server/notify/mailer";
 import { resolveAlertRecipient, sweepNotifications } from "@/server/services/alerts";
 import { runBackup } from "@/server/services/backups";
+import { refreshAllFieldData, type FetchLike } from "@/server/services/crux";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
 import { createAuditProcessor } from "./processors/audit.processor";
@@ -37,6 +41,8 @@ export type StartWorkerOptions = {
   /** Solo pruebas y script de desarrollo: permite auditar direcciones privadas. */
   allowPrivate?: boolean;
   heartbeatIntervalMs?: number;
+  /** Solo pruebas: sustituye a las consultas a la API de Chrome UX Report. */
+  cruxFetch?: FetchLike;
   /** Solo pruebas: sustituye al envío SMTP. */
   mailer?: Mailer | null;
 };
@@ -169,6 +175,13 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     }
   };
 
+  const runCrux = async () => {
+    const r = await refreshAllFieldData({ db, apiKey: env.CRUX_API_KEY || undefined, fetch: options.cruxFetch });
+    if (r.error === "NO_KEY") log.warn("CRUX_API_KEY sin definir: no se piden datos reales de usuarios");
+    else if (!r.ok) log.error({ error: r.error, checked: r.checked }, "la actualización de datos reales falló");
+    else log.info({ projects: r.projects, checked: r.checked, withData: r.withData }, "datos reales de usuarios actualizados");
+  };
+
   const planProject = createPlanProjectProcessor({ db, redis, lighthouse, maintenance, log });
   const runReconcile = () => reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
   const maintenanceWorker = new Worker(
@@ -181,6 +194,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       }
       if (job.name === NOTIFY_JOB) return runNotify();
       if (job.name === BACKUP_JOB) return runBackupJob();
+      if (job.name === CRUX_JOB) return runCrux();
       log.warn({ name: job.name }, "trabajo de mantenimiento desconocido");
     },
     { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1 },
@@ -224,6 +238,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar el respaldo diario")),
     30_000,
     "registro del respaldo diario",
+    log,
+  );
+
+  await withDeadline(
+    maintenance
+      .upsertJobScheduler(CRUX_SCHEDULER_ID, { pattern: CRUX_CRON, tz: "UTC" }, { name: CRUX_JOB, data: {} })
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la actualización diaria de datos reales")),
+    30_000,
+    "registro de datos reales",
     log,
   );
 

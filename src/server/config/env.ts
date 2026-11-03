@@ -33,6 +33,8 @@ const schema = z.object({
   // A quién se avisan las alertas. Vacío o ausente: el correo del administrador.
   ALERT_EMAIL: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.email().optional()),
 
+  // Clave de la API de Chrome UX Report (datos reales de usuarios). Solo la usa el worker; sin ella no se piden.
+  CRUX_API_KEY: z.string().optional(),
   CHROME_PATH: z.string().optional(),
   AUDIT_COOLDOWN_MS: int(12_000),
   AUDIT_TIMEOUT_MS: int(90_000),
@@ -81,6 +83,7 @@ const workerSchema = schema
     SMTP_PASS: true,
     ALERT_EMAIL: true,
     AUTH_ENCRYPTION_KEY: true,
+    CRUX_API_KEY: true,
   })
   .extend({
     // Una clave mal formada no debe impedir arrancar al worker: solo falla (con un código claro) lo que la necesita.

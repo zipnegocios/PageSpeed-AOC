@@ -20,6 +20,11 @@ export const BACKUP_JOB = "backup";
 export const BACKUP_SCHEDULER_ID = "backup";
 export const BACKUP_CRON = "17 3 * * *";
 
+/** Datos reales de usuarios (Chrome UX Report): una vez al día, cuando Google ya publicó los del día anterior. */
+export const CRUX_JOB = "crux";
+export const CRUX_SCHEDULER_ID = "crux";
+export const CRUX_CRON = "47 4 * * *";
+
 export type ProjectSchedule = { projectId: string; pattern: string | null; next: Date | null };
 
 /**
