@@ -51,7 +51,7 @@ export default async function ClientsPage() {
         </p>
       </Card>
 
-      <details open={clients.length === 0} className="rounded-md border border-border bg-surface-200 p-4 md:p-6">
+      <details open={clients.length === 0} className="glass rounded-lg p-4 md:p-6">
         <summary className="cursor-pointer text-[24px] leading-7 font-semibold text-ink">Nuevo cliente</summary>
         <ActionForm action={createClientAction} submitLabel="Crear cliente" pendingLabel="Creando…" className="mt-4">
           <Field label="Nombre" id="name" required maxLength={120} autoComplete="off" />

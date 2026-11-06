@@ -2,12 +2,18 @@
 @import "../lib/ui/tokens/tokens.css";
 @import "../lib/ui/tokens/tailwind-theme.css";
 
+/* Tema espacial: el fondo es el vacío (`space`) con tres lavados de nebulosa y un campo de estrellas, todo en CSS. */
 html {
-  background: var(--surface-100);
+  background: var(--space);
 }
 
 body {
-  background: var(--surface-100);
+  background-color: var(--space);
+  background-image:
+    radial-gradient(1100px 650px at 8% -8%, var(--nebula-a), transparent 62%),
+    radial-gradient(900px 600px at 96% 4%, var(--nebula-b), transparent 62%),
+    radial-gradient(1000px 700px at 52% 112%, var(--nebula-c), transparent 62%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-rajdhani), var(--font-sans);
   font-size: 17px;
@@ -16,7 +22,115 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Estrellas: puntos diminutos en un mosaico que se repite. Sin imágenes ni JavaScript. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 38px 52px, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 170px 118px, var(--star), transparent),
+    radial-gradient(1px 1px at 282px 36px, var(--star), transparent),
+    radial-gradient(1px 1px at 96px 214px, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 330px 250px, var(--star), transparent),
+    radial-gradient(1px 1px at 226px 300px, var(--star), transparent),
+    radial-gradient(1px 1px at 14px 340px, var(--star), transparent);
+  background-size: 380px 380px;
+  opacity: 0.55;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* ---------- Vidrio ---------- */
+/* Paneles principales y barra superior: relleno translúcido, desenfoque y borde superior de luz. */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-highlight);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(180%);
+  backdrop-filter: blur(var(--blur-glass)) saturate(180%);
+}
+
+/* Elementos pequeños y repetidos (tarjetas de la flota, filas): mismo relleno sin desenfoque, para que la página siga fluida. */
+.glass-flat {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-highlight);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-flat {
+    background: var(--surface-200);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-flat {
+    background: var(--surface-200);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass,
+  .glass-flat {
+    border-color: var(--border-strong);
+  }
+}
+
+/* ---------- Brillo: solo en datos y estado ---------- */
+.glow-primary { box-shadow: var(--glow-primary); }
+.glow-ok { box-shadow: var(--glow-ok); }
+.glow-danger { box-shadow: var(--glow-danger); }
+
+/* ---------- Movimiento ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .press {
+    transition: transform 100ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
+  .rise {
+    animation: rise 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  /* Anillo y miniatura se "dibujan" al entrar. Con movimiento reducido aparecen ya completos. */
+  .ring-arc {
+    animation: ring-draw 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .spark-line {
+    stroke-dasharray: 400;
+    animation: spark-draw 800ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes ring-draw {
+    from {
+      stroke-dasharray: 0 999;
+    }
+  }
+  @keyframes spark-draw {
+    from {
+      stroke-dashoffset: 400;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }

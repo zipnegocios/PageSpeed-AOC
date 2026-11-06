@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { formatDate } from "@/lib/audit-format";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
-import { Score } from "@/lib/ui/components/score";
+import { ScoreRing } from "@/lib/ui/components/score-ring";
 import { getPortalOverview } from "@/server/services/portal";
 import { BlockedNotice } from "../_components/blocked-notice";
 import { PortalShell } from "../_components/portal-shell";
@@ -45,13 +45,13 @@ export default async function PortalHome({ params }: { params: Promise<{ token: 
       ) : (
         projects.map((p) => (
           <Card key={p.id} title={p.name} description={p.baseUrl}>
-            <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {SCORE_LABELS.map(([key, label]) => (
-                <div key={key} className="flex flex-col gap-1 rounded-sm border border-border p-3">
-                  <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">{label}</dt>
-                  <dd>
-                    <Score value={p.averages[key]} className="text-[36px] leading-9" />
+                <div key={key} className="flex flex-col items-center gap-2 text-center">
+                  <dd className="order-1">
+                    <ScoreRing value={p.averages[key]} label={label} size={72} />
                   </dd>
+                  <dt className="order-2 text-[13px] leading-4 font-semibold tracking-[0.08em] text-ink-muted uppercase">{label}</dt>
                 </div>
               ))}
             </dl>

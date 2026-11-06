@@ -16,7 +16,7 @@ export default async function LoginPage() {
         <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">AOC PageSpeed</p>
         <h1 className="text-[32px] leading-9 font-bold text-ink">Iniciar sesión</h1>
       </header>
-      <section className="rounded-md border border-border bg-surface-200 p-4 md:p-6">
+      <section className="glass rounded-lg p-4 md:p-6">
         <LoginForm />
       </section>
     </main>

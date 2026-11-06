@@ -5,7 +5,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const src = JSON.parse(readFileSync(new URL("../design/tokens.json", import.meta.url), "utf8"));
 const outDir = new URL("../src/lib/ui/tokens/", import.meta.url);
-const [first, ...others] = src.color.themes.map((t) => t.id);
+// Tema por defecto (siempre activo). Los demás solo se activan con data-theme="<id>" (p. ej. light para el PDF).
+const ids = src.color.themes.map((t) => t.id);
+const first = src.color.defaultTheme ?? ids[0];
+const others = ids.filter((id) => id !== first);
 const ref = (v) => v.replace(/^\{(.+)\}$/, "var(--$1)");
 const valueFor = (t, theme) =>
   typeof t.value === "string" ? ref(t.value) : ref(t.value[theme] ?? t.value[first]);
@@ -21,10 +24,9 @@ const fonts = Object.entries(src.type.families)
   .join("\n");
 
 let css = `/* ${src.name} — generated from design/tokens.json (Design System mirror). Do not edit. */\n`;
-css += `:root {\n${decls(first)}\n${lengths("spacing")}\n${lengths("radius")}\n${fonts}\n  color-scheme: ${first};\n}\n`;
+css += `:root {\n${decls(first)}\n${lengths("spacing")}\n${lengths("radius")}\n${lengths("effects")}\n${fonts}\n  color-scheme: ${first};\n}\n`;
 for (const theme of others) {
   const body = decls(theme);
-  css += `@media (prefers-color-scheme: ${theme}) {\n  :root:not([data-theme="${first}"]) {\n${body.replace(/^/gm, "  ")}\n    color-scheme: ${theme};\n  }\n}\n`;
   css += `:root[data-theme="${theme}"] {\n${body}\n  color-scheme: ${theme};\n}\n`;
 }
 writeFileSync(new URL("tokens.css", outDir), css);

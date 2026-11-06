@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { lightToken } from "@/lib/tokens";
+import { darkToken } from "@/lib/tokens";
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const { token } = await params;
@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   };
 }
 
-export const viewport: Viewport = { themeColor: lightToken("brand-deep") };
+export const viewport: Viewport = { themeColor: darkToken("space") };
 
 export default function PortalLayout({ children }: { children: ReactNode }) {
   return children;

@@ -75,6 +75,11 @@ describe("informe oficial", () => {
     expect(renderOfficialReport(lhr, "es")).toContain("data:image/jpeg;base64,/9j/");
     expect(renderOfficialReport(redactLhr(lhr), "es")).not.toContain("data:image/jpeg;base64,/9j/");
   });
+  it("siempre se muestra con el tema oscuro propio de Lighthouse, como el resto de la aplicación", () => {
+    const html = renderOfficialReport(lhr, "es");
+    expect(html).toContain("lh-dark");
+    expect(html.indexOf("lh-dark")).toBeLessThan(html.indexOf("</head>"));
+  });
   it("se genera autocontenido, en el idioma pedido y sin las herramientas que sacan datos de la aplicación", () => {
     const es = renderOfficialReport(lhr, "es");
     expect(es).toMatch(/<!doctype html>/i);

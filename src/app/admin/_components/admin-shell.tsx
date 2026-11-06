@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/lib/ui/components/button";
 import { logoutAction } from "../actions";
+import { AdminNav } from "./admin-nav";
+import { ProjectSwitcherLoader } from "./project-switcher-loader";
 
 export type Crumb = { label: string; href?: string };
 
@@ -22,34 +24,27 @@ export function AdminShell({
   children: ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <nav aria-label="Principal" className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <Link href="/admin" className="text-[13px] font-bold uppercase tracking-[0.08em] text-ink">
+    <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-6 px-4 pb-10 md:px-8">
+      <header className="glass z-30 mt-3 md:sticky md:top-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg px-3 py-2">
+        <nav aria-label="Principal" className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Link href="/admin" className="press mr-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-[13px] font-bold tracking-[0.08em] text-ink uppercase">
+            <svg viewBox="0 0 24 24" className="size-6 text-primary" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden style={{ filter: "drop-shadow(0 0 4px var(--primary))" }}>
+              <path d="M5.6 18.4a9 9 0 1 1 12.8 0" />
+              <path d="m12 13 4-4" />
+            </svg>
             AOC PageSpeed
           </Link>
-          <Link href="/admin/clientes" className="text-[17px] font-semibold text-link hover:underline">
-            Clientes
-          </Link>
-          <Link href="/admin/archivados" className="text-[17px] font-semibold text-link hover:underline">
-            Archivados
-          </Link>
-          <Link href="/admin/alertas" className="text-[17px] font-semibold text-link hover:underline">
-            Alertas
-          </Link>
-          <Link href="/admin/agentes" className="text-[17px] font-semibold text-link hover:underline">
-            Agentes
-          </Link>
-          <Link href="/admin/cola" className="text-[17px] font-semibold text-link hover:underline">
-            Cola
-          </Link>
+          <AdminNav />
         </nav>
-        <form action={logoutAction} className="flex items-center gap-3">
-          <span className="hidden text-[15px] text-ink-muted sm:inline">{email}</span>
-          <Button type="submit" variant="secondary">
-            Salir
-          </Button>
-        </form>
+        <div className="flex flex-wrap items-center gap-3">
+          <ProjectSwitcherLoader />
+          <form action={logoutAction} className="flex items-center gap-3">
+            <span className="hidden text-[15px] text-ink-muted xl:inline">{email}</span>
+            <Button type="submit" variant="secondary">
+              Salir
+            </Button>
+          </form>
+        </div>
       </header>
 
       <div className="flex flex-col gap-2">
@@ -71,7 +66,7 @@ export function AdminShell({
         ) : null}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-[32px] leading-9 font-bold break-words text-ink">{title}</h1>
+            <h1 className="text-[32px] leading-[34px] font-bold tracking-[-0.02em] break-words text-ink">{title}</h1>
             {subtitle ? <div className="text-ink-muted">{subtitle}</div> : null}
           </div>
           {actions}

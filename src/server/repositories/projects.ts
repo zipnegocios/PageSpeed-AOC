@@ -119,6 +119,8 @@ export async function listProductionProjectsInfo(db: Database): Promise<Producti
 export type ProjectListing = {
   id: string;
   name: string;
+  slug: string;
+  clientSlug: string;
   baseUrl: string;
   phase: "development" | "production";
   auditFrequency: "weekly" | "daily";
@@ -132,6 +134,8 @@ export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
     .select({
       id: projects.id,
       name: projects.name,
+      slug: projects.slug,
+      clientSlug: clients.slug,
       baseUrl: projects.baseUrl,
       phase: projects.phase,
       auditFrequency: projects.auditFrequency,

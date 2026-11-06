@@ -9,7 +9,7 @@ import { Badge } from "@/lib/ui/components/badge";
 import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
 import { Card } from "@/lib/ui/components/card";
 import { Delta } from "@/lib/ui/components/delta";
-import { Score } from "@/lib/ui/components/score";
+import { ScoreRing } from "@/lib/ui/components/score-ring";
 import { getPortalOverview, getPortalProject } from "@/server/services/portal";
 import { BlockedNotice } from "../../_components/blocked-notice";
 import { PortalShell } from "../../_components/portal-shell";
@@ -95,8 +95,8 @@ export default async function PortalProjectPage({
                   {SCORES.map(([key, label]) => (
                     <div key={key} className="flex flex-col gap-1">
                       <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">{label}</dt>
-                      <dd className="flex flex-wrap items-baseline gap-x-2">
-                        <Score value={l.scores[key]} className="text-[32px] leading-8" />
+                      <dd className="flex flex-col items-start gap-1">
+                        <ScoreRing value={l.scores[key]} label={label} size={76} />
                         <Delta change={l.changes[key]} />
                       </dd>
                     </div>

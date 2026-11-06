@@ -19,7 +19,8 @@
     "worker:build": "tsup src/worker/index.ts --format esm --target node22 --out-dir dist/worker --clean && node scripts/worker-manifest.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/server/db/migrate-cli.ts",
-    "migrate:build": "tsup --config tsup.migrate.config.ts"
+    "migrate:build": "tsup --config tsup.migrate.config.ts",
+    "contrast:check": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

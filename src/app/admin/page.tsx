@@ -1,42 +1,47 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { verifySession } from "@/lib/auth/session";
-import Link from "next/link";
-import { Badge } from "@/lib/ui/components/badge";
-import { Card } from "@/lib/ui/components/card";
-import { listOpenAlerts } from "@/server/services/alerts";
 import { AdminShell } from "./_components/admin-shell";
-import { HealthPanel } from "./health-panel";
+import { AlertsPanel, FleetSection, OpsSection, RecentAuditsPanel, type PhaseFilter } from "./_components/dashboard-panels";
 
 export const metadata: Metadata = {
   title: "Panel · AOC PageSpeed",
   robots: { index: false, follow: false },
 };
 
-export default async function AdminHome() {
-  const session = await verifySession();
-  const alerts = await listOpenAlerts().catch(() => []);
+const PHASES: PhaseFilter[] = ["todos", "produccion", "desarrollo"];
+
+/** Marcador de un panel mientras llegan sus datos; cada panel carga por separado y uno lento no bloquea al resto. */
+function PanelSkeleton({ span = 1, label }: { span?: 1 | 2 | 4; label: string }) {
+  const cols = span === 4 ? "md:col-span-2 xl:col-span-4" : span === 2 ? "md:col-span-2" : "";
   return (
-    <AdminShell email={session.email} title="Panel de administración">
-      <Card title="Clientes y proyectos" description="Alta de clientes, proyectos, rutas y umbrales de alerta.">
-        <div>
-          <Link href="/admin/clientes" className="text-[17px] font-semibold text-link hover:underline">
-            Ir a clientes
-          </Link>
-        </div>
-      </Card>
-      <Card title="Alertas" description="Proyectos en producción por debajo de sus umbrales o con auditorías que fallan.">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge tone={alerts.length > 0 ? "danger" : "ok"}>
-            {alerts.length === 0 ? "Sin alertas abiertas" : `${alerts.length} ${alerts.length === 1 ? "alerta abierta" : "alertas abiertas"}`}
-          </Badge>
-          <Link href="/admin/alertas" className="text-[17px] font-semibold text-link hover:underline">
-            Ver alertas
-          </Link>
-        </div>
-      </Card>
-      <Card>
-        <HealthPanel />
-      </Card>
+    <div role="status" aria-label={`Cargando ${label}`} className={`glass min-h-40 rounded-lg motion-safe:animate-pulse ${cols}`}>
+      <span className="sr-only">Cargando {label}…</span>
+    </div>
+  );
+}
+
+export default async function AdminHome({ searchParams }: { searchParams: Promise<{ fase?: string }> }) {
+  const session = await verifySession();
+  const { fase } = await searchParams;
+  const phase = (PHASES as string[]).includes(fase ?? "") ? (fase as PhaseFilter) : "todos";
+
+  return (
+    <AdminShell email={session.email} title="Panel" subtitle="El estado de todos tus proyectos, de un vistazo.">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Suspense fallback={<PanelSkeleton span={4} label="la flota" />}>
+          <FleetSection phase={phase} />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton span={2} label="las auditorías recientes" />}>
+          <RecentAuditsPanel />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton span={2} label="las alertas" />}>
+          <AlertsPanel />
+        </Suspense>
+        <Suspense fallback={<PanelSkeleton span={4} label="la cola" />}>
+          <OpsSection />
+        </Suspense>
+      </div>
     </AdminShell>
   );
 }

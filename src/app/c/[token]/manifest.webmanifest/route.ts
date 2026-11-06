@@ -1,4 +1,4 @@
-import { lightToken } from "@/lib/tokens";
+import { darkToken } from "@/lib/tokens";
 import { checkPortal } from "../../_lib/access";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +28,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     scope: `/c/${token}`,
     display: "standalone",
     orientation: "portrait",
-    background_color: lightToken("surface-100"),
-    theme_color: lightToken("brand-deep"),
+    background_color: darkToken("space"),
+    theme_color: darkToken("space"),
     icons: [
       { src: "/pwa/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/pwa/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

@@ -27,6 +27,7 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm tokens:sync && git diff --exit-code src/lib/ui/tokens
+      - run: pnpm contrast:check
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test

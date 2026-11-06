@@ -58,10 +58,8 @@ export type LatestScores = {
   changes: Record<(typeof METRIC_KEYS)[number], Change | null>;
 };
 
-/** Última auditoría correcta de cada ruta monitoreada y perfil, con la variación respecto a la anterior. */
-export async function getLatestScores(projectId: string, db: Database = getDb()): Promise<LatestScores[]> {
-  assertUuid(projectId, "Proyecto");
-  const [routes, rows] = await Promise.all([repo.listMonitoredRoutes(db, projectId), repo.listLatestTwo(db, projectId)]);
+/** Arma las últimas puntuaciones de un proyecto a partir de sus rutas monitoreadas y de sus dos últimas auditorías por ruta y perfil. */
+function buildLatest(routes: repo.MonitoredRoute[], rows: repo.LatestRow[]): LatestScores[] {
   const out: LatestScores[] = [];
   for (const route of routes) {
     for (const profile of ["mobile", "desktop"] as const) {
@@ -85,6 +83,21 @@ export async function getLatestScores(projectId: string, db: Database = getDb())
     }
   }
   return out;
+}
+
+/** Última auditoría correcta de cada ruta monitoreada y perfil, con la variación respecto a la anterior. */
+export async function getLatestScores(projectId: string, db: Database = getDb()): Promise<LatestScores[]> {
+  assertUuid(projectId, "Proyecto");
+  const [routes, rows] = await Promise.all([repo.listMonitoredRoutes(db, projectId), repo.listLatestTwo(db, projectId)]);
+  return buildLatest(routes, rows);
+}
+
+/** Lo mismo para varios proyectos con solo dos consultas (sin repetir una por proyecto). Los proyectos sin datos dan []. */
+export async function getLatestScoresMany(projectIds: string[], db: Database = getDb()): Promise<Map<string, LatestScores[]>> {
+  const [routes, rows] = await Promise.all([repo.listMonitoredRoutesMany(db, projectIds), repo.listLatestTwoMany(db, projectIds)]);
+  return new Map(
+    projectIds.map((id) => [id, buildLatest(routes.filter((r) => r.projectId === id), rows.filter((r) => r.projectId === id))] as const),
+  );
 }
 
 /** Promedio de las últimas puntuaciones de todas las rutas y perfiles. */

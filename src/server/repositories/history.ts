@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte, sql, getTableColumns } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql, getTableColumns } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { auditLogs, routes } from "@/server/db/schema";
 
@@ -46,6 +46,7 @@ export async function listSeries(db: Database, routeId: string, profile: "mobile
 }
 
 export type LatestRow = SeriesRow & {
+  projectId: string;
   routeId: string;
   profile: "mobile" | "desktop";
   rank: number;
@@ -53,12 +54,17 @@ export type LatestRow = SeriesRow & {
   agenticTotal: number | null;
 };
 
-/** Las dos últimas auditorías correctas por ruta y perfil de un proyecto (rank 1 = la más reciente). */
-export async function listLatestTwo(db: Database, projectId: string): Promise<LatestRow[]> {
+/**
+ * Las dos últimas auditorías correctas por ruta y perfil (rank 1 = la más reciente) de uno o varios proyectos, en una
+ * sola consulta. La partición es por ruta y perfil, así que agrupar varios proyectos no cambia el resultado de cada uno.
+ */
+export async function listLatestTwoMany(db: Database, projectIds: string[]): Promise<LatestRow[]> {
+  if (projectIds.length === 0) return [];
   const cols = getTableColumns(auditLogs);
   const ranked = db
     .select({
       id: cols.id,
+      projectId: cols.projectId,
       routeId: cols.routeId,
       profile: cols.profile,
       finishedAt: cols.finishedAt,
@@ -74,7 +80,7 @@ export async function listLatestTwo(db: Database, projectId: string): Promise<La
       rank: sql<number>`row_number() over (partition by ${auditLogs.routeId}, ${auditLogs.profile} order by ${auditLogs.finishedAt} desc)`.as("rank"),
     })
     .from(auditLogs)
-    .where(and(eq(auditLogs.projectId, projectId), eq(auditLogs.status, "succeeded")))
+    .where(and(inArray(auditLogs.projectId, projectIds), eq(auditLogs.status, "succeeded")))
     .as("ranked");
   const rows = await db.select().from(ranked).where(lte(ranked.rank, 2));
   return rows
@@ -82,7 +88,39 @@ export async function listLatestTwo(db: Database, projectId: string): Promise<La
     .map((r) => ({ ...r, rank: Number(r.rank) }));
 }
 
+/** Las dos últimas auditorías correctas por ruta y perfil de un proyecto. */
+export async function listLatestTwo(db: Database, projectId: string): Promise<LatestRow[]> {
+  return listLatestTwoMany(db, [projectId]);
+}
+
 export type MonitoredRoute = { id: string; path: string };
+export type MonitoredRouteOf = MonitoredRoute & { projectId: string };
+
+/** Rutas monitoreadas de varios proyectos en una consulta. */
+export function listMonitoredRoutesMany(db: Database, projectIds: string[]): Promise<MonitoredRouteOf[]> {
+  if (projectIds.length === 0) return Promise.resolve([]);
+  return db
+    .select({ id: routes.id, path: routes.path, projectId: routes.projectId })
+    .from(routes)
+    .where(and(inArray(routes.projectId, projectIds), eq(routes.monitored, true)))
+    .orderBy(asc(routes.path));
+}
+
+export type DailyPerformance = { projectId: string; day: string; value: number };
+
+/** Rendimiento medio por día (UTC) de cada proyecto desde `since`: la serie de las miniaturas del panel. */
+export async function listDailyPerformance(db: Database, projectIds: string[], since: Date): Promise<DailyPerformance[]> {
+  if (projectIds.length === 0) return [];
+  const day = sql<string>`to_char(date_trunc('day', ${auditLogs.finishedAt} at time zone 'UTC'), 'YYYY-MM-DD')`;
+  const rows = await db
+    .select({ projectId: auditLogs.projectId, day, value: sql<number>`avg(${auditLogs.scorePerformance})::float` })
+    .from(auditLogs)
+    .where(and(inArray(auditLogs.projectId, projectIds), eq(auditLogs.status, "succeeded"), gte(auditLogs.finishedAt, since)))
+    .groupBy(auditLogs.projectId, day)
+    .orderBy(asc(day));
+  return rows.flatMap((r) => (r.value === null || Number.isNaN(Number(r.value)) ? [] : [{ projectId: r.projectId, day: r.day, value: Number(r.value) }]));
+}
+
 
 export function listMonitoredRoutes(db: Database, projectId: string, onlyMonitored = true): Promise<MonitoredRoute[]> {
   return db

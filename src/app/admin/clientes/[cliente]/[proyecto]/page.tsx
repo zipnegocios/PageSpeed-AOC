@@ -92,6 +92,55 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       ]}
       actions={<Badge tone={production ? "primary" : "neutral"}>{production ? "Producción" : "Desarrollo"}</Badge>}
     >
+      <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. Toca una ruta para abrir su auditoría. Se actualiza sola mientras haya auditorías pendientes.">
+        <AutoRefresh active={audits.some((a) => isPending(a.status))} />
+        {audits.length === 0 ? (
+          <p className="text-ink-muted">Todavía no hay auditorías. Usa el botón Auditar en una ruta.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-sm border border-border">
+            <table className="w-full min-w-[44rem] border-collapse text-left text-[15px]">
+              <thead className="bg-surface-300 text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
+                <tr>
+                  <th className="px-3 py-2">Ruta</th>
+                  <th className="px-3 py-2">Estado</th>
+                  <th className="px-3 py-2 text-right" title="Rendimiento">Rend.</th>
+                  <th className="px-3 py-2 text-right">SEO</th>
+                  <th className="px-3 py-2 text-right" title="Accesibilidad">Acces.</th>
+                  <th className="px-3 py-2 text-right" title="Buenas prácticas">B. prác.</th>
+                  <th className="px-3 py-2 text-right">LCP</th>
+                  <th className="px-3 py-2">Cuándo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {audits.map((a) => (
+                  <tr key={a.id} className="align-top">
+                    <td className="px-3 py-2">
+                      <Link href={`/admin/auditorias/${a.id}`} className="font-mono break-all text-link hover:underline">
+                        {a.routePath}
+                      </Link>
+                      <div className="text-[14px] text-ink-muted">{PROFILE_LABEL[a.profile]}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <AuditStatusBadge audit={a} />
+                      {a.attempts > 1 ? <div className="text-[14px] text-ink-muted">Intento {a.attempts}</div> : null}
+                    </td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scorePerformance} /></td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scoreSeo} /></td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scoreAccessibility} /></td>
+                    <td className="px-3 py-2 text-right"><Score value={a.scoreBestPractices} /></td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatSeconds(a.lcpMs)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {formatDate(a.finishedAt ?? a.queuedAt)}
+                      <div className="text-[14px] text-ink-muted">{formatDuration(a.durationMs)}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
       <Card
         title="Fase del proyecto"
         description={
@@ -298,55 +347,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </ActionForm>
         ) : (
           <p className="text-[15px] text-ink-muted">Agrega un correo de contacto en la ficha del cliente para poder enviarle el informe por email.</p>
-        )}
-      </Card>
-
-      <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. La lista se actualiza sola mientras haya auditorías pendientes.">
-        <AutoRefresh active={audits.some((a) => isPending(a.status))} />
-        {audits.length === 0 ? (
-          <p className="text-ink-muted">Todavía no hay auditorías. Usa el botón Auditar en una ruta.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-sm border border-border">
-            <table className="w-full min-w-[44rem] border-collapse text-left text-[15px]">
-              <thead className="bg-surface-300 text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
-                <tr>
-                  <th className="px-3 py-2">Ruta</th>
-                  <th className="px-3 py-2">Estado</th>
-                  <th className="px-3 py-2 text-right" title="Rendimiento">Rend.</th>
-                  <th className="px-3 py-2 text-right">SEO</th>
-                  <th className="px-3 py-2 text-right" title="Accesibilidad">Acces.</th>
-                  <th className="px-3 py-2 text-right" title="Buenas prácticas">B. prác.</th>
-                  <th className="px-3 py-2 text-right">LCP</th>
-                  <th className="px-3 py-2">Cuándo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {audits.map((a) => (
-                  <tr key={a.id} className="align-top">
-                    <td className="px-3 py-2">
-                      <Link href={`/admin/auditorias/${a.id}`} className="font-mono break-all text-link hover:underline">
-                        {a.routePath}
-                      </Link>
-                      <div className="text-[14px] text-ink-muted">{PROFILE_LABEL[a.profile]}</div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <AuditStatusBadge audit={a} />
-                      {a.attempts > 1 ? <div className="text-[14px] text-ink-muted">Intento {a.attempts}</div> : null}
-                    </td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scorePerformance} /></td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scoreSeo} /></td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scoreAccessibility} /></td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scoreBestPractices} /></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatSeconds(a.lcpMs)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDate(a.finishedAt ?? a.queuedAt)}
-                      <div className="text-[14px] text-ink-muted">{formatDuration(a.durationMs)}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         )}
       </Card>
 

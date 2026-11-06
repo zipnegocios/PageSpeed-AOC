@@ -30,10 +30,17 @@ export function localizeLhr<T extends Lhr>(lhr: T, locale: UiLocale): T {
 // botón de mapa de rectángulos que abre una página externa: la aplicación ofrece lo que corresponde y lo oculta.
 const HIDE_TOOLS = "<style>.lh-tools,.lh-footer__version_issue,.lh-button.lh-report-icon--treemap{display:none!important}</style>";
 
+// La app es siempre oscura: el informe oficial usa su propio tema oscuro (clase `lh-dark`), que por sí solo solo activa si el
+// navegador está en modo oscuro. Se aplica en cuanto el informe crea su raíz.
+const FORCE_DARK =
+  "<script>(function(){function a(){var r=document.querySelector('.lh-root');if(r){r.classList.add('lh-dark');return true}return false}" +
+  "if(!a()){var o=new MutationObserver(function(){if(a())o.disconnect()});o.observe(document.documentElement,{childList:true,subtree:true})}})();</script>";
+const INJECT = HIDE_TOOLS + FORCE_DARK;
+
 /** HTML autocontenido del informe oficial de Lighthouse en el idioma pedido. */
 export function renderOfficialReport(lhr: Lhr, locale: UiLocale): string {
   const html = ReportGenerator.generateReportHtml(localizeLhr(lhr, locale) as never).replace(/<html lang="[^"]*"/, `<html lang="${locale}"`);
-  return html.includes("</head>") ? html.replace("</head>", `${HIDE_TOOLS}</head>`) : HIDE_TOOLS + html;
+  return html.includes("</head>") ? html.replace("</head>", `${INJECT}</head>`) : INJECT + html;
 }
 
 /**
