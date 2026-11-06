@@ -9,7 +9,7 @@ import { Badge } from "@/lib/ui/components/badge";
 import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
 import { Card } from "@/lib/ui/components/card";
 import { Delta } from "@/lib/ui/components/delta";
-import { ScoreRing } from "@/lib/ui/components/score-ring";
+import { PortalPageCard, groupLatestByPage } from "@/app/c/_components/portal-page-card";
 import { getPortalOverview, getPortalProject } from "@/server/services/portal";
 import { BlockedNotice } from "../../_components/blocked-notice";
 import { PortalShell } from "../../_components/portal-shell";
@@ -68,7 +68,7 @@ export default async function PortalProjectPage({
     >
       <Card
         title="Estado actual"
-        description="Resultado de la última auditoría de cada página, frente a la anterior."
+        description="Resultado de la última auditoría de cada página, en móvil y en escritorio, frente a la anterior."
         actions={
           <a
             href={`${portalProjectPath(token, project.slug)}/informe`}
@@ -82,40 +82,11 @@ export default async function PortalProjectPage({
         {project.latest.length === 0 ? (
           <p className="text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
         ) : (
-          <ul className="flex flex-col gap-4">
-            {project.latest.map((l) => (
-              <li key={`${l.routeId}-${l.profile}`} className="flex flex-col gap-3 rounded-sm border border-border p-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="font-mono text-[16px] font-semibold break-all text-ink">{l.path}</span>
-                  <span className="text-[15px] text-ink-muted">
-                    {PROFILE_LABEL[l.profile]} · {formatDate(l.finishedAt)}
-                  </span>
-                </div>
-                <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  {SCORES.map(([key, label]) => (
-                    <div key={key} className="flex flex-col gap-1">
-                      <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">{label}</dt>
-                      <dd className="flex flex-col items-start gap-1">
-                        <ScoreRing value={l.scores[key]} label={label} size={76} />
-                        <Delta change={l.changes[key]} />
-                      </dd>
-                    </div>
-                  ))}
-                  <div className="flex flex-col gap-1">
-                    <dt className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">Navegación con agentes</dt>
-                    <dd>
-                      <AgenticFraction value={l.agentic} className="text-[32px] leading-8" />
-                    </dd>
-                  </div>
-                </dl>
-                <div>
-                  <Link href={`${portalProjectPath(token, project.slug)}/detalle/${l.auditId}`} className="inline-flex min-h-11 items-center font-semibold text-link hover:underline">
-                    Ver detalle técnico
-                  </Link>
-                </div>
-              </li>
+          <div className="flex flex-col gap-4">
+            {groupLatestByPage(project.latest).map((pg) => (
+              <PortalPageCard key={pg.routeId} page={pg} detailBase={portalProjectPath(token, project.slug)} />
             ))}
-          </ul>
+          </div>
         )}
       </Card>
 

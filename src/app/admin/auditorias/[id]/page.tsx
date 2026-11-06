@@ -7,11 +7,12 @@ import { Alert } from "@/lib/ui/components/alert";
 import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
 import { Card } from "@/lib/ui/components/card";
 import { getLocale } from "@/lib/locale";
+import { ProfileSwitch } from "@/lib/ui/components/profile-switch";
 import { Score } from "@/lib/ui/components/score";
 import type { CategoryChecks } from "@/server/domain/failed-checks";
 import { AuditViewer, type ViewerSearch } from "../../../_components/audit-viewer/viewer";
 import { loadAuditLhr } from "@/server/services/audit-lhr";
-import { getAudit, insightsFromLhr } from "@/server/services/audits";
+import { getAudit, getSiblingAudits, insightsFromLhr } from "@/server/services/audits";
 import { localizeLhr } from "@/server/report/lighthouse-report";
 import { AdminShell } from "../../_components/admin-shell";
 import { AuditStatusBadge } from "../../_components/audit-badge";
@@ -77,6 +78,9 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
   const { id } = await params;
   const search = await searchParams;
   const audit = await orNotFound(getAudit(id));
+  const siblings = await getSiblingAudits(id);
+  // El selector de dispositivo conserva la pestaña del visor (Resumen, Rendimiento…).
+  const qs = search.vista ? `?vista=${encodeURIComponent(search.vista)}` : "";
   const locale = await getLocale();
   const done = audit.status === "succeeded";
   const stored = done ? await loadAuditLhr(audit) : null;
@@ -192,6 +196,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
       actions={<AuditStatusBadge audit={audit} />}
     >
       <AutoRefresh active={isPending(audit.status)} />
+      <ProfileSwitch current={audit.profile} currentScore={audit.scorePerformance} siblings={siblings} currentHref={`/admin/auditorias/${audit.id}${qs}`} hrefFor={(sid) => `/admin/auditorias/${sid}${qs}`} />
 
       {audit.status === "failed" ? (
         <Alert tone="danger">

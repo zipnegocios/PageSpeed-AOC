@@ -120,6 +120,19 @@ export async function listAudits(projectId: string, limit = 20, db: Database = g
   return repo.listRecentAudits(db, projectId, Math.min(Math.max(limit, 1), 100));
 }
 
+export type SiblingAudits = Record<Profile, { id: string; finishedAt: Date; scorePerformance: number | null } | null>;
+
+/** La última auditoría correcta de cada dispositivo de la MISMA ruta que `auditId` (null si ese dispositivo no tiene). */
+export async function getSiblingAudits(auditId: string, db: Database = getDb()): Promise<SiblingAudits> {
+  const audit = await getAudit(auditId, db);
+  const rows = await repo.listLatestByRoute(db, audit.routeId);
+  const pick = (profile: Profile) => {
+    const r = rows.find((x) => x.profile === profile);
+    return r ? { id: r.id, finishedAt: r.finishedAt, scorePerformance: r.scorePerformance } : null;
+  };
+  return { mobile: pick("mobile"), desktop: pick("desktop") };
+}
+
 export async function getAudit(id: string, db: Database = getDb()) {
   assertUuid(id, "Auditoría");
   const audit = await repo.findAuditDetail(db, id);

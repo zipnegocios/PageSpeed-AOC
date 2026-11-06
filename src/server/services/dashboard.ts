@@ -24,6 +24,8 @@ export type FleetProject = {
   performanceChange: Change | null;
   /** Navegación con agentes: superadas / totales sumando rutas y perfiles que la midieron. */
   agentic: { passed: number; total: number } | null;
+  /** La última auditoría correcta de cada dispositivo (la más reciente entre sus rutas), para enlazarlas directo. */
+  lastByProfile: { mobile: { id: string; finishedAt: Date } | null; desktop: { id: string; finishedAt: Date } | null };
   /** La auditoría correcta más reciente del proyecto, para enlazarla directo. */
   lastAudit: { id: string; finishedAt: Date; routePath: string; profile: "mobile" | "desktop" } | null;
   /** Rendimiento medio diario de los últimos días (UTC), de más antiguo a más reciente. */
@@ -43,6 +45,11 @@ export function meanPerformanceChange(latest: LatestScores[]): Change | null {
   if (mean === 0) return { diff: 0, direction: "same", verdict: "same", text: "sin cambio" };
   const abs = Math.abs(mean);
   return { diff: mean, direction: mean > 0 ? "up" : "down", verdict: mean > 0 ? "better" : "worse", text: `${abs} ${abs === 1 ? "punto" : "puntos"}` };
+}
+
+function newestOf(latest: LatestScores[], profile: "mobile" | "desktop") {
+  const best = latest.filter((l) => l.profile === profile).reduce<LatestScores | null>((b, l) => (b === null || l.finishedAt > b.finishedAt ? l : b), null);
+  return best ? { id: best.auditId, finishedAt: best.finishedAt } : null;
 }
 
 function sumAgentic(latest: LatestScores[]): FleetProject["agentic"] {
@@ -81,6 +88,10 @@ export async function getFleet(db: Database = getDb(), now: Date = new Date()): 
       scores: averageScores(latest),
       performanceChange: meanPerformanceChange(latest),
       agentic: sumAgentic(latest),
+      lastByProfile: {
+        mobile: newestOf(latest, "mobile"),
+        desktop: newestOf(latest, "desktop"),
+      },
       lastAudit: newest ? { id: newest.auditId, finishedAt: newest.finishedAt, routePath: newest.path, profile: newest.profile } : null,
       sparkline: daily.filter((d) => d.projectId === p.id).map((d) => Math.round(d.value)),
       openAlerts: alertCount.get(p.id) ?? 0,
@@ -124,4 +135,42 @@ export function sortFleet(fleet: FleetProject[]): FleetProject[] {
       a.clientName.localeCompare(b.clientName, "es") ||
       a.name.localeCompare(b.name, "es"),
   );
+}
+
+/** Una página del listado reciente: sus dos dispositivos juntos (cada lado, su auditoría más reciente). */
+export type PageFeedEntry = {
+  key: string;
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  clientName: string;
+  clientSlug: string;
+  routePath: string;
+  mobile: RecentAudit | null;
+  desktop: RecentAudit | null;
+};
+
+/**
+ * Colapsa auditorías (de la más reciente a la más antigua) en una entrada por proyecto + ruta. Cada dispositivo conserva
+ * su auditoría más reciente; las entradas salen en el orden en que aparece su primera auditoría.
+ */
+export function groupAuditsByPage(rows: RecentAudit[]): PageFeedEntry[] {
+  const map = new Map<string, PageFeedEntry>();
+  for (const r of rows) {
+    const key = `${r.projectId}|${r.routePath}`;
+    let e = map.get(key);
+    if (!e) {
+      e = { key, projectId: r.projectId, projectName: r.projectName, projectSlug: r.projectSlug, clientName: r.clientName, clientSlug: r.clientSlug, routePath: r.routePath, mobile: null, desktop: null };
+      map.set(key, e);
+    }
+    if (!e[r.profile]) e[r.profile] = r;
+  }
+  return [...map.values()];
+}
+
+/** Las páginas con actividad más reciente de todos los proyectos, cada una con sus dos dispositivos. */
+export async function listRecentPagesGlobal(limit = 10, db: Database = getDb()): Promise<PageFeedEntry[]> {
+  const wanted = Math.min(Math.max(limit, 1), 30);
+  const rows = await repo.listRecentAuditsGlobal(db, wanted * 6);
+  return groupAuditsByPage(rows).slice(0, wanted);
 }

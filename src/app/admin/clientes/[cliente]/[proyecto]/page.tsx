@@ -11,6 +11,7 @@ import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/compo
 import { getWhatsappLinkForProject, listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
 import { listAudits } from "@/server/services/audits";
 import { authKeyStatus, getProjectAuthSummary } from "@/server/services/project-auth";
+import { getPageAudits } from "@/server/services/pages";
 import { getNextScheduledRun, getProjectByRef } from "@/server/services/projects";
 import { getClient } from "@/server/services/clients";
 import { listRoutes } from "@/server/services/routes";
@@ -43,6 +44,7 @@ import {
   toggleRouteAction,
   updateProjectAction,
 } from "@/app/admin/proyectos/actions";
+import { PageAuditCard } from "@/app/admin/_components/page-audit-card";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { SitemapImporter } from "./sitemap-importer";
 
@@ -66,10 +68,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   if (cliente !== project.clientSlug || proyecto !== project.slug) redirect(projectPath(project.clientSlug, project.slug));
   const id = project.id;
   const base = projectPath(project.clientSlug, project.slug);
-  const [routes, thresholds, audits, alerts, notifications, whatsappLink, authSummary] = await Promise.all([
+  const now = new Date();
+  const [routes, thresholds, audits, pages, alerts, notifications, whatsappLink, authSummary] = await Promise.all([
     listRoutes(id),
     getThresholds(id),
     listAudits(id, 20),
+    getPageAudits(id),
     listOpenAlerts(id),
     listRecentNotifications(5, id),
     getWhatsappLinkForProject(id),
@@ -92,54 +96,71 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       ]}
       actions={<Badge tone={production ? "primary" : "neutral"}>{production ? "Producción" : "Desarrollo"}</Badge>}
     >
-      <Card title="Auditorías recientes" description="Las últimas 20 ejecuciones de este proyecto. Toca una ruta para abrir su auditoría. Se actualiza sola mientras haya auditorías pendientes.">
-        <AutoRefresh active={audits.some((a) => isPending(a.status))} />
-        {audits.length === 0 ? (
-          <p className="text-ink-muted">Todavía no hay auditorías. Usa el botón Auditar en una ruta.</p>
+      <section aria-labelledby="paginas-titulo" className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 id="paginas-titulo" className="text-[24px] leading-7 font-semibold text-ink">
+            Páginas
+          </h2>
+          <p className="text-[15px] leading-5 text-ink-muted">Cada página con su versión móvil y de escritorio: cambia de pestaña para compararlas. Toca una auditoría para abrirla. Se actualiza sola mientras haya auditorías pendientes.</p>
+        </div>
+        <AutoRefresh active={pages.some((p) => p.mobile.pending || p.desktop.pending) || audits.some((a) => isPending(a.status))} />
+        {pages.length === 0 ? (
+          <p className="text-ink-muted">Todavía no hay páginas para auditar. Agrega una ruta más abajo.</p>
         ) : (
-          <div className="overflow-x-auto rounded-sm border border-border">
-            <table className="w-full min-w-[44rem] border-collapse text-left text-[15px]">
-              <thead className="bg-surface-300 text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
-                <tr>
-                  <th className="px-3 py-2">Ruta</th>
-                  <th className="px-3 py-2">Estado</th>
-                  <th className="px-3 py-2 text-right" title="Rendimiento">Rend.</th>
-                  <th className="px-3 py-2 text-right">SEO</th>
-                  <th className="px-3 py-2 text-right" title="Accesibilidad">Acces.</th>
-                  <th className="px-3 py-2 text-right" title="Buenas prácticas">B. prác.</th>
-                  <th className="px-3 py-2 text-right">LCP</th>
-                  <th className="px-3 py-2">Cuándo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {audits.map((a) => (
-                  <tr key={a.id} className="align-top">
-                    <td className="px-3 py-2">
-                      <Link href={`/admin/auditorias/${a.id}`} className="font-mono break-all text-link hover:underline">
-                        {a.routePath}
-                      </Link>
-                      <div className="text-[14px] text-ink-muted">{PROFILE_LABEL[a.profile]}</div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <AuditStatusBadge audit={a} />
-                      {a.attempts > 1 ? <div className="text-[14px] text-ink-muted">Intento {a.attempts}</div> : null}
-                    </td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scorePerformance} /></td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scoreSeo} /></td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scoreAccessibility} /></td>
-                    <td className="px-3 py-2 text-right"><Score value={a.scoreBestPractices} /></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatSeconds(a.lcpMs)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDate(a.finishedAt ?? a.queuedAt)}
-                      <div className="text-[14px] text-ink-muted">{formatDuration(a.durationMs)}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          pages.map((pg) => <PageAuditCard key={pg.route.id} page={pg} projectId={id} now={now} />)
         )}
-      </Card>
+        <details className="glass rounded-lg p-4 md:p-5">
+          <summary className="cursor-pointer text-[19px] font-semibold text-ink">Historial completo (cronológico)</summary>
+          <div className="mt-4 flex flex-col gap-4">
+            <p className="text-[15px] leading-5 text-ink-muted">Las últimas 20 ejecuciones del proyecto, de todas las páginas y dispositivos mezcladas.</p>
+            {audits.length === 0 ? (
+              <p className="text-ink-muted">Todavía no hay auditorías. Usa el botón Auditar en una ruta.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-sm border border-border">
+                <table className="w-full min-w-[44rem] border-collapse text-left text-[15px]">
+                  <thead className="bg-surface-300 text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
+                    <tr>
+                      <th className="px-3 py-2">Ruta</th>
+                      <th className="px-3 py-2">Estado</th>
+                      <th className="px-3 py-2 text-right" title="Rendimiento">Rend.</th>
+                      <th className="px-3 py-2 text-right">SEO</th>
+                      <th className="px-3 py-2 text-right" title="Accesibilidad">Acces.</th>
+                      <th className="px-3 py-2 text-right" title="Buenas prácticas">B. prác.</th>
+                      <th className="px-3 py-2 text-right">LCP</th>
+                      <th className="px-3 py-2">Cuándo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {audits.map((a) => (
+                      <tr key={a.id} className="align-top">
+                        <td className="px-3 py-2">
+                          <Link href={`/admin/auditorias/${a.id}`} className="font-mono break-all text-link hover:underline">
+                            {a.routePath}
+                          </Link>
+                          <div className="text-[14px] text-ink-muted">{PROFILE_LABEL[a.profile]}</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <AuditStatusBadge audit={a} />
+                          {a.attempts > 1 ? <div className="text-[14px] text-ink-muted">Intento {a.attempts}</div> : null}
+                        </td>
+                        <td className="px-3 py-2 text-right"><Score value={a.scorePerformance} /></td>
+                        <td className="px-3 py-2 text-right"><Score value={a.scoreSeo} /></td>
+                        <td className="px-3 py-2 text-right"><Score value={a.scoreAccessibility} /></td>
+                        <td className="px-3 py-2 text-right"><Score value={a.scoreBestPractices} /></td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatSeconds(a.lcpMs)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {formatDate(a.finishedAt ?? a.queuedAt)}
+                          <div className="text-[14px] text-ink-muted">{formatDuration(a.durationMs)}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </details>
+      </section>
 
       <Card
         title="Fase del proyecto"

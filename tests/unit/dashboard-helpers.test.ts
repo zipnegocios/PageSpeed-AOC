@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatAgo } from "@/lib/audit-format";
+import { groupAuditsByPage, type RecentAudit } from "@/server/services/dashboard";
 import { filterProjectItems, normalize, type SwitcherItem } from "@/lib/project-search";
 import { RING_ARC, ringDashes } from "@/lib/ring";
 import { sparklineLayout } from "@/lib/sparkline";
@@ -73,5 +74,37 @@ describe("formatAgo", () => {
     expect(formatAgo(ago(3 * 3_600_000), now)).toBe("hace 3 h");
     expect(formatAgo(ago(2 * 86_400_000), now)).toBe("hace 2 d");
     expect(formatAgo(null, now)).toBe("—");
+  });
+});
+
+describe("groupAuditsByPage", () => {
+  const row = (over: Partial<RecentAudit>): RecentAudit => ({
+    id: "a", status: "succeeded", profile: "mobile", routePath: "/", errorCode: null, scorePerformance: 90, scoreSeo: 90, scoreAccessibility: 90, scoreBestPractices: 90,
+    queuedAt: new Date("2026-11-06T10:00:00Z"), finishedAt: null, projectId: "p1", projectName: "Uno", projectSlug: "uno", clientName: "Acme", clientSlug: "acme", ...over,
+  });
+  it("junta móvil y escritorio de la misma página y conserva la más reciente de cada uno", () => {
+    const g = groupAuditsByPage([
+      row({ id: "m-nueva", profile: "mobile" }),
+      row({ id: "d-nueva", profile: "desktop" }),
+      row({ id: "m-vieja", profile: "mobile" }),
+      row({ id: "d-vieja", profile: "desktop" }),
+    ]);
+    expect(g).toHaveLength(1);
+    expect(g[0]!.mobile!.id).toBe("m-nueva");
+    expect(g[0]!.desktop!.id).toBe("d-nueva");
+  });
+  it("separa páginas y proyectos distintos y respeta el orden de aparición", () => {
+    const g = groupAuditsByPage([
+      row({ id: "1", projectId: "p2", projectName: "Dos" }),
+      row({ id: "2", routePath: "/contacto" }),
+      row({ id: "3", profile: "desktop", projectId: "p2", projectName: "Dos" }),
+      row({ id: "4" }),
+    ]);
+    expect(g.map((e) => `${e.projectName}${e.routePath}`)).toEqual(["Dos/", "Uno/contacto", "Uno/"]);
+    expect(g[0]!.desktop!.id).toBe("3");
+    expect(g[2]!.desktop).toBeNull();
+  });
+  it("sin filas no hay entradas", () => {
+    expect(groupAuditsByPage([])).toEqual([]);
   });
 });

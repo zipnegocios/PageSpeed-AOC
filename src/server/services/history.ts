@@ -92,6 +92,13 @@ export async function getLatestScores(projectId: string, db: Database = getDb())
   return buildLatest(routes, rows);
 }
 
+/** Igual que `getLatestScores`, pero con todas las rutas del proyecto (también las no monitoreadas, p. ej. las ad hoc). */
+export async function getLatestScoresAllRoutes(projectId: string, db: Database = getDb()): Promise<LatestScores[]> {
+  assertUuid(projectId, "Proyecto");
+  const [routes, rows] = await Promise.all([repo.listMonitoredRoutes(db, projectId, false), repo.listLatestTwo(db, projectId)]);
+  return buildLatest(routes, rows);
+}
+
 /** Lo mismo para varios proyectos con solo dos consultas (sin repetir una por proyecto). Los proyectos sin datos dan []. */
 export async function getLatestScoresMany(projectIds: string[], db: Database = getDb()): Promise<Map<string, LatestScores[]>> {
   const [routes, rows] = await Promise.all([repo.listMonitoredRoutesMany(db, projectIds), repo.listLatestTwoMany(db, projectIds)]);

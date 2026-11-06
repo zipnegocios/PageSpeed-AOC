@@ -6,7 +6,8 @@ import { getLocale } from "@/lib/locale";
 import { orNotFound } from "@/lib/not-found";
 import { Alert } from "@/lib/ui/components/alert";
 import { ReportFrame } from "@/lib/ui/components/report-frame";
-import { getAudit } from "@/server/services/audits";
+import { getAudit, getSiblingAudits } from "@/server/services/audits";
+import { ProfileSwitch } from "@/lib/ui/components/profile-switch";
 import { AdminShell } from "../../../_components/admin-shell";
 
 export const metadata: Metadata = { title: "Informe de Lighthouse · AOC PageSpeed", robots: { index: false, follow: false } };
@@ -16,6 +17,7 @@ export default async function AuditReportPage({ params }: { params: Promise<{ id
   const session = await verifySession();
   const { id } = await params;
   const audit = await orNotFound(getAudit(id));
+  const siblings = await getSiblingAudits(id);
   const locale = await getLocale();
   const ready = audit.status === "succeeded" && audit.r2Key;
 
@@ -31,6 +33,7 @@ export default async function AuditReportPage({ params }: { params: Promise<{ id
         { label: "Auditoría", href: `/admin/auditorias/${audit.id}` },
       ]}
     >
+      <ProfileSwitch current={audit.profile} currentScore={audit.scorePerformance} siblings={siblings} currentHref={`/admin/auditorias/${audit.id}/informe`} hrefFor={(sid) => `/admin/auditorias/${sid}/informe`} />
       {ready ? (
         <ReportFrame src={`/api/admin/audits/${audit.id}/lighthouse`} locale={locale} returnTo={`/admin/auditorias/${audit.id}/informe`} title="Informe oficial de Lighthouse" />
       ) : (

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, isNotNull, lt, lte, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { auditLogs, clients, projects, routes } from "@/server/db/schema";
 import type { AuditMetrics } from "@/server/domain/score-extraction";
@@ -177,4 +177,35 @@ export async function listRecentFailures(db: Database, limit: number): Promise<F
     .orderBy(desc(auditLogs.finishedAt))
     .limit(limit);
   return rows.map((r) => ({ ...r.audit, routePath: r.routePath, projectName: r.projectName }));
+}
+
+/**
+ * Las últimas `n` auditorías (de cualquier estado) por ruta y dispositivo de un proyecto, la más reciente primero. La
+ * ventana es por ruta y perfil, así que el tamaño total está acotado por rutas x 2 x n sin importar cuánto historial haya.
+ */
+export async function listRecentPerRouteProfile(db: Database, projectId: string, n: number): Promise<AuditWithRoute[]> {
+  const ranked = db
+    .select({
+      ...getTableColumns(auditLogs),
+      routePath: routes.path,
+      rank: sql<number>`row_number() over (partition by ${auditLogs.routeId}, ${auditLogs.profile} order by ${auditLogs.queuedAt} desc)`.as("rank"),
+    })
+    .from(auditLogs)
+    .innerJoin(routes, eq(routes.id, auditLogs.routeId))
+    .where(eq(auditLogs.projectId, projectId))
+    .as("ranked");
+  const rows = await db.select().from(ranked).where(lte(ranked.rank, n)).orderBy(desc(ranked.queuedAt));
+  return rows.map(({ rank: _rank, ...r }) => r as unknown as AuditWithRoute);
+}
+
+export type SiblingRow = { id: string; profile: "mobile" | "desktop"; finishedAt: Date; scorePerformance: number | null };
+
+/** La última auditoría correcta de cada dispositivo de una ruta (a lo sumo una por dispositivo). */
+export async function listLatestByRoute(db: Database, routeId: string): Promise<SiblingRow[]> {
+  const rows = await db
+    .selectDistinctOn([auditLogs.profile], { id: auditLogs.id, profile: auditLogs.profile, finishedAt: auditLogs.finishedAt, scorePerformance: auditLogs.scorePerformance })
+    .from(auditLogs)
+    .where(and(eq(auditLogs.routeId, routeId), eq(auditLogs.status, "succeeded"), isNotNull(auditLogs.finishedAt)))
+    .orderBy(auditLogs.profile, desc(auditLogs.finishedAt));
+  return rows.flatMap((r) => (r.finishedAt ? [{ ...r, finishedAt: r.finishedAt }] : []));
 }

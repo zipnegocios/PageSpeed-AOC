@@ -1,44 +1,58 @@
 import Link from "next/link";
 import { PROFILE_LABEL, formatAgo } from "@/lib/audit-format";
-import type { RecentAudit } from "@/server/services/dashboard";
+import type { PageFeedEntry, RecentAudit } from "@/server/services/dashboard";
 import { AuditStatusBadge } from "@/app/admin/_components/audit-badge";
 import { Score } from "./score";
 
+const at = (a: RecentAudit) => (a.finishedAt ?? a.queuedAt).getTime();
+
+/** Una ficha de dispositivo: puntuación de rendimiento (o el estado si no terminó bien), hora, y enlace a SU auditoría. */
+function Chip({ profile, audit, now }: { profile: "mobile" | "desktop"; audit: RecentAudit | null; now?: Date }) {
+  if (!audit) {
+    return (
+      <span className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-[15px] text-ink-muted" aria-label={`${PROFILE_LABEL[profile]}: sin auditoría`}>
+        {PROFILE_LABEL[profile]} —
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={`/admin/auditorias/${audit.id}`}
+      className="press pointer-events-auto relative inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong bg-surface-300 px-3 text-[15px] font-semibold text-ink hover:border-primary"
+    >
+      <span>{PROFILE_LABEL[profile]}</span>
+      {audit.status === "succeeded" ? <Score value={audit.scorePerformance} className="text-[18px]" /> : <AuditStatusBadge audit={audit} />}
+      <span className="font-medium text-ink-muted">{formatAgo(audit.finishedAt ?? audit.queuedAt, now)}</span>
+    </Link>
+  );
+}
+
 /**
- * Las últimas auditorías de todos los proyectos. Cada fila entera es un enlace a la auditoría: un clic desde el panel.
- * Las que no terminaron bien muestran su estado en lugar de las puntuaciones.
+ * Las páginas con actividad más reciente de todos los proyectos. Una fila por página, con sus dos dispositivos juntos: cada
+ * ficha abre su propia auditoría y el resto de la fila abre la más reciente, así que se llega a cualquiera en un clic.
  */
-export function AuditFeed({ audits, now }: { audits: RecentAudit[]; now?: Date }) {
-  if (audits.length === 0) return <p className="text-ink-muted">Todavía no hay auditorías. Lanza la primera desde la ficha de un proyecto.</p>;
+export function AuditFeed({ pages, now }: { pages: PageFeedEntry[]; now?: Date }) {
+  if (pages.length === 0) return <p className="text-ink-muted">Todavía no hay auditorías. Lanza la primera desde la ficha de un proyecto.</p>;
   return (
     <ul className="flex flex-col gap-2">
-      {audits.map((a) => (
-        <li key={a.id}>
-          <Link
-            href={`/admin/auditorias/${a.id}`}
-            className="glass-flat press flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md px-3 py-2 hover:border-primary"
-          >
-            <span className="flex min-w-0 flex-col">
+      {pages.map((p) => {
+        const newest = [p.mobile, p.desktop].filter((a): a is RecentAudit => a !== null).sort((a, b) => at(b) - at(a))[0]!;
+        return (
+          <li key={p.key} className="glass-flat press rise relative flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md px-3 py-2 hover:border-primary">
+            <Link href={`/admin/auditorias/${newest.id}`} aria-label={`Abrir la auditoría más reciente de ${p.routePath} en ${p.projectName}`} className="absolute inset-0 rounded-md" />
+            <span className="pointer-events-none relative flex min-w-0 flex-col">
               <span className="text-[17px] leading-5 font-semibold break-words text-ink">
-                {a.projectName} <span className="font-medium text-ink-muted">· {a.clientName}</span>
+                {p.projectName} <span className="font-medium text-ink-muted">· {p.clientName}</span>
               </span>
-              <span className="text-[14px] leading-5 text-ink-muted">
-                <span className="font-mono break-all">{a.routePath}</span> · {PROFILE_LABEL[a.profile]} · {formatAgo(a.finishedAt ?? a.queuedAt, now)}
-              </span>
+              <span className="font-mono text-[14px] leading-5 break-all text-ink-muted">{p.routePath}</span>
             </span>
-            {a.status === "succeeded" ? (
-              <span className="flex items-center gap-3 text-[18px] tabular-nums" aria-label="Rendimiento, SEO, Accesibilidad y Buenas prácticas">
-                <Score value={a.scorePerformance} />
-                <Score value={a.scoreSeo} className="hidden sm:inline" />
-                <Score value={a.scoreAccessibility} className="hidden sm:inline" />
-                <Score value={a.scoreBestPractices} className="hidden sm:inline" />
-              </span>
-            ) : (
-              <AuditStatusBadge audit={a} />
-            )}
-          </Link>
-        </li>
-      ))}
+            <span className="pointer-events-none relative flex flex-wrap items-center gap-2">
+              <Chip profile="mobile" audit={p.mobile} now={now} />
+              <Chip profile="desktop" audit={p.desktop} now={now} />
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

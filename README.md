@@ -44,6 +44,14 @@ evalúa las alertas y lo avisa en los logs.
   tarjeta por proyecto (anillos de puntuación, agentes, miniatura de 30 días, última auditoría), auditorías recientes de
   todos los proyectos (un clic abre la auditoría), alertas, cola/worker y últimos fallos. Cada panel carga por separado
   (Suspense). Los datos salen de `services/dashboard.ts`: `getFleet` hace 5 consultas sea cual sea el número de proyectos.
+- **Auditorías por página, con pestañas Móvil / Escritorio:** en la ficha del proyecto hay una tarjeta por página
+  (inicio, contacto…) con sus dos dispositivos en pestañas: puntuaciones con su variación, agentes, LCP/TBT/CLS, las
+  últimas 5 auditorías de ese dispositivo y «Auditar este dispositivo». Cambiar de pestaña no recarga (ambos paneles ya
+  están en la página; teclado: flechas, Inicio y Fin). Dentro de una auditoría, «Móvil 86 | Escritorio 92» pasa a la
+  versión del otro dispositivo de la misma página. Lo mismo en el portal del cliente (tarjeta por página con pestañas y
+  selector en el detalle técnico) y en el panel de inicio (una fila por página con las dos fichas). El historial
+  cronológico completo sigue en la ficha, plegado. Datos: `services/pages.ts` (`getPageAudits`: 3 consultas),
+  `getSiblingAudits`, `getPortalSiblings` y `groupAuditsByPage`.
 - **Acceso directo a un proyecto:** menú «Proyectos» (`/admin/proyectos`, con búsqueda y filtro de fase) y el
   conmutador «Ir a un proyecto» de la barra superior (`/` o Ctrl/Cmd+K, busca por proyecto o cliente sin acentos, flechas
   y Enter). En la ficha del proyecto las «Auditorías recientes» van al principio.

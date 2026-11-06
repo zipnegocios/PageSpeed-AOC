@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatAgo } from "@/lib/audit-format";
+import { PROFILE_LABEL, formatAgo } from "@/lib/audit-format";
 import { projectPath } from "@/lib/urls";
 import type { FleetProject } from "@/server/services/dashboard";
 import { AgenticFraction } from "./agentic-fraction";
@@ -60,13 +60,19 @@ export function ProjectCard({ project: p, now }: { project: FleetProject; now?: 
         </div>
 
         <footer className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
-          {p.lastAudit ? (
-            <Link
-              href={`/admin/auditorias/${p.lastAudit.id}`}
-              className="pointer-events-auto relative inline-flex min-h-11 items-center text-[15px] font-semibold text-link hover:underline"
-            >
-              Última auditoría · {formatAgo(p.lastAudit.finishedAt, now)}
-            </Link>
+          {p.lastByProfile.mobile || p.lastByProfile.desktop ? (
+            (["mobile", "desktop"] as const).map((profile) => {
+              const last = p.lastByProfile[profile];
+              return last ? (
+                <Link
+                  key={profile}
+                  href={`/admin/auditorias/${last.id}`}
+                  className="pointer-events-auto relative inline-flex min-h-11 items-center text-[15px] font-semibold text-link hover:underline"
+                >
+                  {PROFILE_LABEL[profile]} · {formatAgo(last.finishedAt, now)}
+                </Link>
+              ) : null;
+            })
           ) : (
             <span className="inline-flex min-h-11 items-center text-[15px] text-ink-muted">Sin auditorías</span>
           )}

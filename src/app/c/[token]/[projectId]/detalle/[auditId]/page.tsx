@@ -9,7 +9,8 @@ import { Alert } from "@/lib/ui/components/alert";
 import { redactLhr } from "@/server/domain/lhr-redact";
 import { localizeLhr } from "@/server/report/lighthouse-report";
 import { loadAuditLhr } from "@/server/services/audit-lhr";
-import { getPortalAudit } from "@/server/services/portal";
+import { getPortalAudit, getPortalSiblings } from "@/server/services/portal";
+import { ProfileSwitch } from "@/lib/ui/components/profile-switch";
 import { BlockedNotice } from "../../../../_components/blocked-notice";
 import { PortalShell } from "../../../../_components/portal-shell";
 import { SuspendedNotice } from "../../../../_components/suspended-notice";
@@ -36,8 +37,10 @@ export default async function PortalAuditDetail({
   const found = await getPortalAudit(access.client.id, projectId, auditId);
   if (!found) notFound();
   const { audit, redact } = found;
+  const siblings = await getPortalSiblings(access.client.id, projectId, auditId);
   const locale = await getLocale();
   const base = portalProjectPath(token, found.projectSlug);
+  const qs = search.vista ? `?vista=${encodeURIComponent(search.vista)}` : "";
   const stored = await loadAuditLhr(audit);
   const lhr = stored ? localizeLhr(redact ? redactLhr(stored) : stored, locale) : null;
 
@@ -55,6 +58,15 @@ export default async function PortalAuditDetail({
         </>
       }
     >
+      {siblings ? (
+        <ProfileSwitch
+          current={audit.profile}
+          currentScore={audit.scorePerformance}
+          siblings={siblings}
+          currentHref={`${base}/detalle/${audit.id}${qs}`}
+          hrefFor={(sid) => `${base}/detalle/${sid}${qs}`}
+        />
+      ) : null}
       {redact ? <Alert tone="info">Las capturas de páginas con sesión no se muestran.</Alert> : null}
       {lhr ? (
         <AuditViewer

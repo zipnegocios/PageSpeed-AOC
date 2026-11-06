@@ -6,7 +6,7 @@ import { findClientBySlug, findClientByToken } from "@/server/repositories/clien
 import { listOpenAlerts, type AlertView } from "./alerts";
 import { averageScores, getLatestScores, type LatestScores } from "./history";
 import { assertUuid } from "./shared";
-import { getAudit, type AuditDetail } from "./audits";
+import { getAudit, getSiblingAudits, type AuditDetail, type SiblingAudits } from "./audits";
 import { getRoute } from "./routes";
 
 /** El token es de 32 bytes en base64url: 43 caracteres. Todo lo demás se descarta sin tocar la base de datos. */
@@ -130,4 +130,13 @@ export async function getPortalAudit(clientId: string, projectId: string, auditI
   } catch {
     return null;
   }
+}
+
+/**
+ * El otro dispositivo de la misma página, para el selector del detalle técnico. Las mismas barreras que `getPortalAudit`
+ * (proyecto del cliente, en producción, auditoría correcta); null si no se puede ver.
+ */
+export async function getPortalSiblings(clientId: string, projectId: string, auditId: string, db: Database = getDb()): Promise<SiblingAudits | null> {
+  const found = await getPortalAudit(clientId, projectId, auditId, db);
+  return found ? getSiblingAudits(auditId, db) : null;
 }

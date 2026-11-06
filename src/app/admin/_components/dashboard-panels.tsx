@@ -8,7 +8,7 @@ import { ProjectCard } from "@/lib/ui/components/project-card";
 import { ScoreRing } from "@/lib/ui/components/score-ring";
 import { SegmentedNav } from "@/lib/ui/components/segmented-nav";
 import { listOpenAlerts } from "@/server/services/alerts";
-import { getFleet, listRecentAuditsGlobal, sortFleet, summarizeFleet } from "@/server/services/dashboard";
+import { getFleet, listRecentPagesGlobal, sortFleet, summarizeFleet } from "@/server/services/dashboard";
 import { getQueueStatus } from "@/server/services/queue-status";
 import { HealthPanel } from "../health-panel";
 import { AlertList } from "./alert-list";
@@ -111,10 +111,10 @@ export async function FleetSection({ phase }: { phase: PhaseFilter }) {
 }
 
 export async function RecentAuditsPanel() {
-  const audits = await listRecentAuditsGlobal(10).catch(() => null);
+  const pages = await listRecentPagesGlobal(10).catch(() => null);
   return (
-    <Panel id="auditorias" title="Auditorías recientes" description="De todos tus proyectos. Un clic abre la auditoría." span={2}>
-      {audits === null ? <p className="text-ink-muted">No se pudieron leer las auditorías.</p> : <AuditFeed audits={audits} now={new Date()} />}
+    <Panel id="auditorias" title="Auditorías recientes" description="Por página, con móvil y escritorio juntos. Un clic abre la auditoría." span={2}>
+      {pages === null ? <p className="text-ink-muted">No se pudieron leer las auditorías.</p> : <AuditFeed pages={pages} now={new Date()} />}
     </Panel>
   );
 }
