@@ -30,7 +30,6 @@ export function ScoreRing({ value, label, size = 112, className }: { value: numb
               stroke={`var(--${tone})`}
               strokeWidth="8"
               strokeDasharray={dashes.arc}
-              style={{ filter: `drop-shadow(0 0 5px var(--${tone}))` }}
             />
           ) : null}
         </g>

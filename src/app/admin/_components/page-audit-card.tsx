@@ -72,7 +72,7 @@ function DevicePanel({ block, page, projectId, now }: { block: ProfileBlock; pag
           <ul className="flex flex-col gap-2">
             {recent.map((a) => (
               <li key={a.id}>
-                <Link href={`/admin/auditorias/${a.id}`} className="glass-flat press flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-md px-3 py-2 hover:border-primary">
+                <Link href={`/admin/auditorias/${a.id}`} className="hud-flat press flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-md px-3 py-2 hover:border-primary">
                   <span className="text-[15px] text-ink">
                     {formatDate(a.finishedAt ?? a.queuedAt)} <span className="text-ink-muted">· {formatAgo(a.finishedAt ?? a.queuedAt, now)}</span>
                   </span>
@@ -115,7 +115,7 @@ export function PageAuditCard({ page, projectId, now }: { page: PageAudits; proj
     return { profile, label: PROFILE_LABEL[profile], badge: tabBadge(block), content: <DevicePanel block={block} page={page} projectId={projectId} now={now} /> };
   });
   return (
-    <section aria-label={`Página ${page.route.path}`} className="glass rise flex min-w-0 flex-col gap-4 rounded-lg p-4 md:p-5">
+    <section aria-label={`Página ${page.route.path}`} className="hud rise flex min-w-0 flex-col gap-4 rounded-lg p-4 md:p-5">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h3 className="font-mono text-[19px] leading-6 font-semibold break-all text-ink">{page.route.path}</h3>
         {page.route.label ? <span className="text-[15px] text-ink-muted">{page.route.label}</span> : null}

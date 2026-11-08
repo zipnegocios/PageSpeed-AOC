@@ -73,7 +73,7 @@ export function PortalPageCard({ page, detailBase }: { page: PortalPage; detailB
     };
   });
   return (
-    <section aria-label={`Página ${page.path}`} className="glass-flat flex min-w-0 flex-col gap-4 rounded-lg p-4">
+    <section aria-label={`Página ${page.path}`} className="hud-flat flex min-w-0 flex-col gap-4 rounded-lg p-4">
       <h3 className="font-mono text-[18px] leading-6 font-semibold break-all text-ink">{page.path}</h3>
       <ProfileTabs label={`Dispositivo de ${page.path}`} defaultProfile={portalDefaultProfile(page)} tabs={tabs} />
     </section>

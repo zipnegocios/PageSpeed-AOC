@@ -15,7 +15,7 @@ const PHASES: PhaseFilter[] = ["todos", "produccion", "desarrollo"];
 function PanelSkeleton({ span = 1, label }: { span?: 1 | 2 | 4; label: string }) {
   const cols = span === 4 ? "md:col-span-2 xl:col-span-4" : span === 2 ? "md:col-span-2" : "";
   return (
-    <div role="status" aria-label={`Cargando ${label}`} className={`glass min-h-40 rounded-lg motion-safe:animate-pulse ${cols}`}>
+    <div role="status" aria-label={`Cargando ${label}`} className={`hud min-h-40 rounded-lg motion-safe:animate-pulse ${cols}`}>
       <span className="sr-only">Cargando {label}…</span>
     </div>
   );

@@ -109,7 +109,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         ) : (
           pages.map((pg) => <PageAuditCard key={pg.route.id} page={pg} projectId={id} now={now} />)
         )}
-        <details className="glass rounded-lg p-4 md:p-5">
+        <details className="hud rounded-lg p-4 md:p-5">
           <summary className="cursor-pointer text-[19px] font-semibold text-ink">Historial completo (cronológico)</summary>
           <div className="mt-4 flex flex-col gap-4">
             <p className="text-[15px] leading-5 text-ink-muted">Las últimas 20 ejecuciones del proyecto, de todas las páginas y dispositivos mezcladas.</p>

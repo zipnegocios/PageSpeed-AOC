@@ -38,7 +38,7 @@ export function AuditFeed({ pages, now }: { pages: PageFeedEntry[]; now?: Date }
       {pages.map((p) => {
         const newest = [p.mobile, p.desktop].filter((a): a is RecentAudit => a !== null).sort((a, b) => at(b) - at(a))[0]!;
         return (
-          <li key={p.key} className="glass-flat press rise relative flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md px-3 py-2 hover:border-primary">
+          <li key={p.key} className="hud-flat press rise relative flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md px-3 py-2 hover:border-primary">
             <Link href={`/admin/auditorias/${newest.id}`} aria-label={`Abrir la auditoría más reciente de ${p.routePath} en ${p.projectName}`} className="absolute inset-0 rounded-md" />
             <span className="pointer-events-none relative flex min-w-0 flex-col">
               <span className="text-[17px] leading-5 font-semibold break-words text-ink">

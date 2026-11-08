@@ -76,7 +76,7 @@ export function ProjectSwitcher({ items }: { items: SwitcherItem[] }) {
         onClick={open}
         aria-haspopup="dialog"
         aria-keyshortcuts="/ Control+K Meta+K"
-        className="press glass-flat inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 text-[17px] font-semibold text-ink hover:border-primary"
+        className="press hud-flat inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 text-[17px] font-semibold text-ink hover:border-primary"
       >
         <svg viewBox="0 0 24 24" className="size-5 text-ink-muted" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
           <circle cx="11" cy="11" r="6.5" />
@@ -90,7 +90,7 @@ export function ProjectSwitcher({ items }: { items: SwitcherItem[] }) {
         ref={dialogRef}
         aria-label="Ir a un proyecto"
         onClick={(e) => e.target === dialogRef.current && dialogRef.current.close()}
-        className="glass m-auto mt-[12vh] w-[min(92vw,36rem)] max-w-none overflow-hidden rounded-lg p-0 text-ink backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+        className="hud m-auto mt-[12vh] w-[min(92vw,36rem)] max-w-none overflow-hidden rounded-lg p-0 text-ink backdrop:bg-black/60 backdrop:backdrop-blur-sm"
       >
         <div className="flex flex-col">
           <input
@@ -123,7 +123,7 @@ export function ProjectSwitcher({ items }: { items: SwitcherItem[] }) {
                   aria-selected={i === active}
                   onMouseMove={() => active !== i && setActive(i)}
                   onClick={() => go(item)}
-                  className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 ${i === active ? "bg-primary-subtle text-on-primary-subtle" : ""}`}
+                  className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 ${i === active ? "bg-primary text-on-primary" : ""}`}
                 >
                   <span className="min-w-0 break-words">
                     <span className="font-semibold">{item.name}</span>

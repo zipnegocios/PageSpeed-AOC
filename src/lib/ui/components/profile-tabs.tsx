@@ -58,11 +58,12 @@ export function ProfileTabs({ tabs, defaultProfile, label }: { tabs: ProfileTab[
               onKeyDown={onKeyDown}
               className={cx(
                 "press inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-4 text-[17px] font-semibold",
-                selected ? "border-primary bg-primary-subtle text-on-primary-subtle" : "border-border bg-surface-300 text-ink-muted hover:text-ink",
+                selected ? "border-primary bg-primary text-on-primary" : "border-border bg-surface-300 text-ink-muted hover:text-ink",
               )}
             >
               <span>{t.label}</span>
-              {t.badge}
+              {/* Sobre el relleno lima la puntuación (lima, ámbar o roja) no se leería: va en una pastilla navy. */}
+              {t.badge ? <span className={cx("inline-flex items-center rounded-sm", selected && "bg-surface-100 px-1.5")}>{t.badge}</span> : null}
             </button>
           );
         })}

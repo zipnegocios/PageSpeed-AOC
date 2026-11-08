@@ -6,7 +6,7 @@ import { checkContrast, contrast, over, parseColor } from "../../scripts/check-c
 type Row = { fg: string; bg: string; ratio: number; min: number; ok: boolean };
 
 describe("contraste del tema espacial", () => {
-  it("todos los pares de texto, bordes, foco y series cumplen su mínimo, también sobre el vidrio", () => {
+  it("todos los pares de texto, bordes, foco y series cumplen su mínimo sobre las tres superficies", () => {
     const rows: Row[] = checkContrast();
     expect(rows.length).toBeGreaterThan(40);
     const bad = rows.filter((r) => !r.ok).map((r) => `${r.fg} sobre ${r.bg}: ${r.ratio.toFixed(2)}:1 (mín. ${r.min})`);
@@ -24,11 +24,13 @@ describe("tokens generados", () => {
   const css = readFileSync("src/lib/ui/tokens/tokens.css", "utf8");
   it("el tema oscuro es el de :root y no depende de la preferencia del sistema", () => {
     expect(css).not.toContain("prefers-color-scheme");
-    expect(css).toMatch(/:root \{[\s\S]*--space: #04070f;[\s\S]*color-scheme: dark;/);
+    expect(css).toMatch(/:root \{[\s\S]*--surface-100: #111827;[\s\S]*--primary: #A3E635;[\s\S]*color-scheme: dark;/);
   });
-  it("el tema claro solo existe bajo data-theme (PDF y correos) y los efectos están definidos", () => {
+  it("el tema claro solo existe bajo data-theme (PDF y correos) y los tokens del HUD están definidos", () => {
     expect(css).toMatch(/:root\[data-theme="light"\]/);
-    for (const name of ["--glass", "--glass-border", "--glow-primary", "--blur-glass", "--chart-1", "--chart-2", "--chart-3", "--ok-subtle"]) {
+    // El estilo ya no usa vidrio, desenfoque, nebulosa ni brillo.
+    for (const gone of ["--glass", "--nebula", "--glow-", "--blur-glass", "--space:", "--star:"]) expect(css).not.toContain(gone);
+    for (const name of ["--grid-line", "--grid-line-strong", "--hud-mark", "--chart-1", "--chart-2", "--chart-3", "--ok-subtle", "--on-primary"]) {
       expect(css).toContain(`${name}:`);
     }
   });

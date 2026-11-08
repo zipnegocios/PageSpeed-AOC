@@ -20,7 +20,7 @@ export function SegmentedNav({ label, items }: { label: string; items: Segmented
       {items.map((item) => {
         const className = cx(
           "inline-flex min-h-11 items-center rounded-sm px-3 text-[15px] font-semibold",
-          item.disabled ? "cursor-not-allowed bg-surface-300 text-ink-muted opacity-70" : item.current ? "bg-primary-subtle text-on-primary-subtle" : "bg-surface-300 text-ink hover:bg-border",
+          item.disabled ? "cursor-not-allowed bg-surface-300 text-ink-muted opacity-70" : item.current ? "bg-primary text-on-primary" : "bg-surface-300 text-ink hover:bg-border",
         );
         if (item.disabled) {
           return (

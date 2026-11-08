@@ -39,8 +39,8 @@ evalúa las alertas y lo avisa en los logs.
   id). Al dispararse, el worker pide móvil y escritorio de cada ruta monitoreada. Pasar a desarrollo, cambiar
   la frecuencia o archivar actualiza el agendador; si Redis no responde en ese momento, el cambio se guarda
   igual y la reconciliación lo corrige.
-- **Panel de inicio (`/admin`):** el primer pantallazo tras el login, organizado en paneles de vidrio sobre un fondo
-  espacial: resumen de la flota (rendimiento medio, SEO/Accesibilidad/Buenas prácticas, alertas, en curso), una
+- **Panel de inicio (`/admin`):** el primer pantallazo tras el login, organizado en paneles sólidos con esquinas HUD sobre una
+  retícula técnica: resumen de la flota (rendimiento medio, SEO/Accesibilidad/Buenas prácticas, alertas, en curso), una
   tarjeta por proyecto (anillos de puntuación, agentes, miniatura de 30 días, última auditoría), auditorías recientes de
   todos los proyectos (un clic abre la auditoría), alertas, cola/worker y últimos fallos. Cada panel carga por separado
   (Suspense). Los datos salen de `services/dashboard.ts`: `getFleet` hace 5 consultas sea cual sea el número de proyectos.
@@ -55,11 +55,15 @@ evalúa las alertas y lo avisa en los logs.
 - **Acceso directo a un proyecto:** menú «Proyectos» (`/admin/proyectos`, con búsqueda y filtro de fase) y el
   conmutador «Ir a un proyecto» de la barra superior (`/` o Ctrl/Cmd+K, busca por proyecto o cliente sin acentos, flechas
   y Enter). En la ficha del proyecto las «Auditorías recientes» van al principio.
-- **Tema espacial:** una sola apariencia, siempre oscura, para el panel y el portal (los valores `light` de
-  `design/tokens.json` solo los usan el PDF y los correos). Vidrio (`backdrop-filter`) con respaldo opaco si el
-  navegador pide menos transparencia, brillo solo en datos y estado, y movimiento que se apaga con `prefers-reduced-motion`.
-  Gráficos en SVG desde el servidor (anillos y miniaturas), con paleta de series validada (`chart-1..3`).
-  `pnpm contrast:check` (también en CI y en `tests/unit/contrast.test.ts`) comprueba los contrastes, incluido el vidrio.
+- **Estilo HUD (Midnight Navy + Electric Lime):** una sola apariencia, siempre oscura, para el panel, el portal y el login
+  (los valores `light` de `design/tokens.json` solo los usan el PDF y los correos). Fondo `#111827` con retícula técnica
+  y marcas de mira en CSS, paneles sólidos con borde de 1 px y corchetes lima en dos esquinas, títulos en mayúsculas con
+  corte lima, microtexto técnico en los paneles del inicio y radios casi rectos. Tipografía: Rajdhani. Lima = acento y
+  estado sano; ámbar = mejorable; rojo = deficiente (siempre con número y palabra). Sin vidrio, desenfoque ni brillo;
+  el movimiento se apaga con `prefers-reduced-motion`. Gráficos en SVG desde el servidor (anillos y miniaturas), con
+  paleta de series `chart-1..3`. `pnpm contrast:check` (también en CI y en `tests/unit/contrast.test.ts`) comprueba los
+  contrastes. El icono PWA (`design/icons/app-icon.svg`) se rasteriza a `public/pwa/*.png` con Playwright
+  (`chromium` + `page.screenshot` a 192, 512 y 180 px).
 - **Direcciones legibles:** el panel usa el identificador (slug) del cliente y del proyecto, no UUID:
   `/admin/clientes/acme` y `/admin/clientes/acme/tienda` (el slug del proyecto solo es único dentro de su
   cliente, por eso va anidado). Los enlaces antiguos con UUID siguen funcionando y redirigen.

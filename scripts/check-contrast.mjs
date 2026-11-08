@@ -1,6 +1,5 @@
 // Comprueba el contraste WCAG de los pares de color del tema oscuro (el tema de la app) leyendo design/tokens.json.
-// Texto >= 4.5:1; bordes, anillo de foco y marcas de gráficos >= 3:1. El vidrio se calcula sobre el peor fondo posible:
-// el vacío (`space`) con las tres nebulosas encima.
+// Texto >= 4.5:1; bordes, anillo de foco y marcas de gráficos >= 3:1, sobre las tres superficies sólidas del tema.
 // Uso: node scripts/check-contrast.mjs   (sale con código 1 si algo falla)
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -44,24 +43,19 @@ export function checkContrast(tokens = JSON.parse(readFileSync(tokensPath, "utf8
     return ref ? raw(ref[1]) : v;
   };
   const solid = (name) => parseColor(raw(name));
-
-  // Peor fondo bajo el vidrio: el vacío con las tres nebulosas apiladas.
-  let backdrop = solid("space");
-  for (const n of ["nebula-a", "nebula-b", "nebula-c"]) backdrop = over(parseColor(raw(n)), backdrop);
-  const glass = over(parseColor(raw("glass")), backdrop);
-  const surfaces = { "surface-100": solid("surface-100"), "surface-200": solid("surface-200"), "surface-300": solid("surface-300"), space: solid("space"), glass };
+  const surfaces = { "surface-100": solid("surface-100"), "surface-200": solid("surface-200"), "surface-300": solid("surface-300") };
 
   const rows = [];
   const add = (fg, bgName, bg, min, kind) => rows.push({ fg, bg: bgName, ratio: contrast(solid(fg), bg), min, kind });
+  // Texto (4.5:1) sobre cada superficie: el texto principal y el secundario, el enlace y los colores de estado.
   for (const [bgName, bg] of Object.entries(surfaces)) {
-    for (const fg of ["ink", "ink-muted"]) add(fg, bgName, bg, 4.5, "texto");
+    for (const fg of ["ink", "ink-muted", "link", "primary", "ok", "warning", "danger"]) add(fg, bgName, bg, 4.5, "texto");
   }
-  for (const bgName of ["surface-100", "surface-200", "glass", "space"]) {
-    for (const fg of ["link", "danger", "ok", "warning"]) add(fg, bgName, surfaces[bgName], 4.5, "texto");
+  // No texto (3:1): bordes de controles, anillo de foco y marcas de gráficos.
+  for (const [bgName, bg] of Object.entries(surfaces)) {
+    for (const fg of ["border-strong", "focus-ring", "chart-1", "chart-2", "chart-3"]) add(fg, bgName, bg, 3, "no texto");
   }
-  for (const bgName of ["surface-100", "surface-200", "glass"]) {
-    for (const fg of ["border-strong", "focus-ring", "chart-1", "chart-2", "chart-3"]) add(fg, bgName, surfaces[bgName], 3, "no texto");
-  }
+  // Texto sobre rellenos de color.
   for (const [fg, bg] of [["on-primary", "primary"], ["on-primary", "primary-hover"], ["on-primary-subtle", "primary-subtle"], ["on-danger-subtle", "danger-subtle"], ["on-ok-subtle", "ok-subtle"]]) {
     add(fg, bg, solid(bg), 4.5, "texto");
   }

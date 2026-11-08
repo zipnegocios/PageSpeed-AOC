@@ -1,5 +1,6 @@
 import { swapLocale } from "lighthouse/shared/localization/swap-locale.js";
 import { ReportGenerator } from "lighthouse/report/generator/report-generator.js";
+import { darkToken } from "@/lib/tokens";
 
 export type UiLocale = "es" | "en";
 export const DEFAULT_LOCALE: UiLocale = "es";
@@ -35,7 +36,16 @@ const HIDE_TOOLS = "<style>.lh-tools,.lh-footer__version_issue,.lh-button.lh-rep
 const FORCE_DARK =
   "<script>(function(){function a(){var r=document.querySelector('.lh-root');if(r){r.classList.add('lh-dark');return true}return false}" +
   "if(!a()){var o=new MutationObserver(function(){if(a())o.disconnect()});o.observe(document.documentElement,{childList:true,subtree:true})}})();</script>";
-const INJECT = HIDE_TOOLS + FORCE_DARK;
+
+// El marco del informe oficial (fondo, textos, líneas, barra superior y enlaces) toma los colores del sistema; sus colores de
+// aprobado / mejorable / falla son del propio informe y se dejan como están.
+const RETINT =
+  `<style>.lh-root.lh-dark{--report-background-color:${darkToken("surface-100")};--report-text-color:${darkToken("ink")};` +
+  `--report-text-color-secondary:${darkToken("ink-muted")};--report-border-color-secondary:${darkToken("border")};` +
+  `--topbar-background-color:${darkToken("surface-200")};--link-color:${darkToken("link")};--color-gray-200:${darkToken("surface-300")};` +
+  `--color-gray-800:${darkToken("surface-300")};--env-item-background-color:${darkToken("surface-300")};` +
+  `--plugin-badge-background-color:${darkToken("surface-300")};--locale-selector-background-color:${darkToken("surface-300")}}</style>`;
+const INJECT = HIDE_TOOLS + RETINT + FORCE_DARK;
 
 /** HTML autocontenido del informe oficial de Lighthouse en el idioma pedido. */
 export function renderOfficialReport(lhr: Lhr, locale: UiLocale): string {

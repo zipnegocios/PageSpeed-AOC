@@ -1,3 +1,4 @@
+import { PageTitle } from "@/lib/ui/components/page-title";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
@@ -14,9 +15,9 @@ export default async function LoginPage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-4 py-12">
       <header className="flex flex-col gap-2">
         <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-muted">AOC PageSpeed</p>
-        <h1 className="text-[32px] leading-9 font-bold text-ink">Iniciar sesión</h1>
+        <PageTitle>Iniciar sesión</PageTitle>
       </header>
-      <section className="glass rounded-lg p-4 md:p-6">
+      <section className="hud hud-brackets relative rounded-lg p-4 md:p-6">
         <LoginForm />
       </section>
     </main>

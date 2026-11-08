@@ -15,7 +15,7 @@ import { Sparkline } from "./sparkline";
 export function ProjectCard({ project: p, now }: { project: FleetProject; now?: Date }) {
   const href = projectPath(p.clientSlug, p.slug);
   return (
-    <article className="glass-flat press rise relative flex min-w-0 flex-col gap-4 rounded-lg p-4 focus-within:border-primary hover:border-primary">
+    <article className="hud-flat press rise relative flex min-w-0 flex-col gap-4 rounded-lg p-4 focus-within:border-primary hover:border-primary">
       <Link href={href} aria-label={`Abrir el proyecto ${p.name} de ${p.clientName}`} className="absolute inset-0 rounded-lg" />
       <div className="pointer-events-none relative flex min-w-0 flex-col gap-4">
         <header className="flex items-start justify-between gap-3">

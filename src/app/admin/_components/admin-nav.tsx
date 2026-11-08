@@ -37,7 +37,7 @@ export function AdminNav() {
               aria-current={active ? "page" : undefined}
               className={cx(
                 "press inline-flex min-h-11 items-center rounded-md px-3 text-[17px] font-semibold",
-                active ? "bg-primary-subtle text-on-primary-subtle" : "text-ink-muted hover:bg-surface-300 hover:text-ink",
+                active ? "bg-primary text-on-primary" : "text-ink-muted hover:bg-surface-300 hover:text-ink",
               )}
             >
               {item.label}

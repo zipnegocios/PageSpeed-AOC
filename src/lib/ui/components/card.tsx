@@ -16,7 +16,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={cx("glass flex flex-col gap-4 rounded-lg p-4 md:p-6", className)}>
+    <section className={cx("hud hud-brackets relative flex flex-col gap-4 rounded-lg p-4 md:p-6", className)}>
       {title || actions ? (
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">

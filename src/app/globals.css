@@ -2,17 +2,22 @@
 @import "../lib/ui/tokens/tokens.css";
 @import "../lib/ui/tokens/tailwind-theme.css";
 
-/* Tema espacial: el fondo es el vacío (`space`) con tres lavados de nebulosa y un campo de estrellas, todo en CSS. */
+/*
+ * Estilo HUD: Midnight Navy como suelo, con una retícula técnica dibujada en CSS (líneas finas cada 32 px, más marcadas
+ * cada 128 px) y marcas de mira en algunas intersecciones. Sin imágenes, sin scripts y sin desenfoque.
+ */
 html {
-  background: var(--space);
+  background: var(--surface-100);
 }
 
 body {
-  background-color: var(--space);
+  background-color: var(--surface-100);
   background-image:
-    radial-gradient(1100px 650px at 8% -8%, var(--nebula-a), transparent 62%),
-    radial-gradient(900px 600px at 96% 4%, var(--nebula-b), transparent 62%),
-    radial-gradient(1000px 700px at 52% 112%, var(--nebula-c), transparent 62%);
+    linear-gradient(var(--grid-line-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 128px 128px, 128px 128px, 32px 32px, 32px 32px;
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-rajdhani), var(--font-sans);
@@ -22,23 +27,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Estrellas: puntos diminutos en un mosaico que se repite. Sin imágenes ni JavaScript. */
+/* Marcas de mira: una cruz de 11 px en cada cuarta intersección de la retícula (cada 256 px). Se dibuja como máscara
+   para poder colorearla con el token `hud-mark`. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    radial-gradient(1px 1px at 38px 52px, var(--star), transparent),
-    radial-gradient(1.5px 1.5px at 170px 118px, var(--star), transparent),
-    radial-gradient(1px 1px at 282px 36px, var(--star), transparent),
-    radial-gradient(1px 1px at 96px 214px, var(--star), transparent),
-    radial-gradient(1.5px 1.5px at 330px 250px, var(--star), transparent),
-    radial-gradient(1px 1px at 226px 300px, var(--star), transparent),
-    radial-gradient(1px 1px at 14px 340px, var(--star), transparent);
-  background-size: 380px 380px;
+  background: var(--hud-mark);
   opacity: 0.55;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cpath d='M123 128h11M128.5 123v11' stroke='%23000' stroke-width='1' fill='none'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cpath d='M123 128h11M128.5 123v11' stroke='%23000' stroke-width='1' fill='none'/%3E%3C/svg%3E");
+  -webkit-mask-size: 256px 256px;
+  mask-size: 256px 256px;
 }
 
 :focus-visible {
@@ -46,50 +48,64 @@ body::before {
   outline-offset: 2px;
 }
 
-/* ---------- Vidrio ---------- */
-/* Paneles principales y barra superior: relleno translúcido, desenfoque y borde superior de luz. */
-.glass {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-top-color: var(--glass-highlight);
-  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(180%);
-  backdrop-filter: blur(var(--blur-glass)) saturate(180%);
-}
-
-/* Elementos pequeños y repetidos (tarjetas de la flota, filas): mismo relleno sin desenfoque, para que la página siga fluida. */
-.glass-flat {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-top-color: var(--glass-highlight);
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass,
-  .glass-flat {
+@layer components {
+  /* Panel sólido: superficie + línea de 1 px. */
+  .hud,
+  .hud-flat {
     background: var(--surface-200);
+    border: 1px solid var(--border);
   }
-}
 
-@media (prefers-reduced-transparency: reduce) {
-  .glass,
-  .glass-flat {
-    background: var(--surface-200);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+  /* Corchetes en dos esquinas (arriba a la izquierda y abajo a la derecha). El elemento debe estar posicionado
+     (`relative`); los paneles y tarjetas lo añaden. */
+  .hud-brackets::before,
+  .hud-brackets::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border: 0 solid var(--hud-mark);
+    pointer-events: none;
+  }
+  .hud-brackets::before {
+    top: -1px;
+    left: -1px;
+    border-top-width: 2px;
+    border-left-width: 2px;
+  }
+  .hud-brackets::after {
+    right: -1px;
+    bottom: -1px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+  }
+
+  /* Corte lima detrás de la primera palabra de un título: un bloque cortado en diagonal. Decorativo; el texto encima usa
+     `on-primary` (navy) para conservar el contraste. */
+  .title-cut {
+    position: relative;
+    display: inline-block;
+    isolation: isolate;
+    padding: 0 0.3em 0 0.2em;
+    margin-right: 0.15em;
+    color: var(--on-primary);
+  }
+  .title-cut::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0.08em 0 0.02em 0;
+    background: var(--primary);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 0.35em) 100%, 0.25em 100%);
   }
 }
 
 @media (prefers-contrast: more) {
-  .glass,
-  .glass-flat {
+  .hud,
+  .hud-flat {
     border-color: var(--border-strong);
   }
 }
-
-/* ---------- Brillo: solo en datos y estado ---------- */
-.glow-primary { box-shadow: var(--glow-primary); }
-.glow-ok { box-shadow: var(--glow-ok); }
-.glow-danger { box-shadow: var(--glow-danger); }
 
 /* ---------- Movimiento ---------- */
 @media (prefers-reduced-motion: no-preference) {

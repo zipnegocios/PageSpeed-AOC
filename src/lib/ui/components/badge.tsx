@@ -3,7 +3,7 @@ import { cx } from "@/lib/ui/cx";
 
 const tones = {
   neutral: "bg-surface-300 text-ink",
-  primary: "bg-primary-subtle text-on-primary-subtle",
+  primary: "bg-primary text-on-primary",
   ok: "bg-ok-subtle text-on-ok-subtle",
   danger: "bg-danger-subtle text-on-danger-subtle",
 } as const;

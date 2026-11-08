@@ -44,7 +44,7 @@ export async function FleetSection({ phase }: { phase: PhaseFilter }) {
   const href = (p: PhaseFilter) => (p === "todos" ? "/admin" : `/admin?fase=${p}`);
   return (
     <>
-      <Panel id="resumen" title="Resumen de la flota" description="Promedio de las últimas auditorías de todos tus proyectos." span={4}>
+      <Panel id="resumen" tag="SYS.01 // FLOTA" title="Resumen de la flota" description="Promedio de las últimas auditorías de todos tus proyectos." span={4}>
         <div className="grid items-center gap-6 md:grid-cols-[auto_1fr]">
           <div className="flex items-center gap-5">
             <ScoreRing value={sum.performance} label="Rendimiento medio" size={168} />
@@ -80,6 +80,7 @@ export async function FleetSection({ phase }: { phase: PhaseFilter }) {
 
       <Panel
         id="flota"
+        tag="SYS.02 // PROYECTOS"
         title="Proyectos"
         description="Lo que necesita atención va primero. Toca un proyecto para abrirlo."
         span={4}
@@ -113,7 +114,7 @@ export async function FleetSection({ phase }: { phase: PhaseFilter }) {
 export async function RecentAuditsPanel() {
   const pages = await listRecentPagesGlobal(10).catch(() => null);
   return (
-    <Panel id="auditorias" title="Auditorías recientes" description="Por página, con móvil y escritorio juntos. Un clic abre la auditoría." span={2}>
+    <Panel id="auditorias" tag="AUD.03 // RECIENTES" title="Auditorías recientes" description="Por página, con móvil y escritorio juntos. Un clic abre la auditoría." span={2}>
       {pages === null ? <p className="text-ink-muted">No se pudieron leer las auditorías.</p> : <AuditFeed pages={pages} now={new Date()} />}
     </Panel>
   );
@@ -124,6 +125,7 @@ export async function AlertsPanel() {
   return (
     <Panel
       id="alertas"
+      tag="ALR.04 // ABIERTAS"
       title="Alertas abiertas"
       description="Proyectos en producción por debajo de sus umbrales o con auditorías que fallan."
       span={2}
@@ -160,6 +162,7 @@ export async function OpsSection() {
     <>
       <Panel
         id="sistema"
+        tag="SYS.05 // COLA"
         title="Cola y sistema"
         description="Las auditorías corren de una en una."
         span={2}
@@ -188,14 +191,14 @@ export async function OpsSection() {
         <HealthPanel />
       </Panel>
 
-      <Panel id="fallos" title="Últimos fallos" description="Auditorías que terminaron en error." span={2}>
+      <Panel id="fallos" tag="ERR.06 // FALLOS" title="Últimos fallos" description="Auditorías que terminaron en error." span={2}>
         {!status || status.recentFailures.length === 0 ? (
           <p className="text-ink-muted">No hay auditorías fallidas.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {status.recentFailures.slice(0, 5).map((f) => (
               <li key={f.id}>
-                <Link href={`/admin/auditorias/${f.id}`} className="glass-flat press flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-md px-3 py-2 hover:border-primary">
+                <Link href={`/admin/auditorias/${f.id}`} className="hud-flat press flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-md px-3 py-2 hover:border-primary">
                   <span className="flex min-w-0 flex-col">
                     <span className="font-mono text-[15px] break-all text-ink">{f.routePath}</span>
                     <span className="text-[14px] text-ink-muted">

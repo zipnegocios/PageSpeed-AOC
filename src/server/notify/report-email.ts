@@ -1,3 +1,4 @@
+import { EMAIL, emailBrandBand, emailButton } from "./email-theme";
 import { PERIOD_LABEL, type Period } from "@/server/domain/history";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -16,12 +17,12 @@ export function buildReportEmail(input: {
   const portal = "También puedes ver siempre el estado actualizado en tu portal:";
   const text = [greeting, "", line, "", portal, input.portalUrl, "", "AOC PageSpeed"].join("\n");
   const html =
-    `<div style="font-family:Arial,Helvetica,sans-serif;color:#0b1b33;max-width:560px">` +
-    `<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#45587a;margin:0">AOC PageSpeed</p>` +
+    `<div style="font-family:Arial,Helvetica,sans-serif;color:${EMAIL.ink};max-width:560px">` +
+    emailBrandBand() +
     `<p style="margin:16px 0 0">${esc(greeting)}</p>` +
     `<p>${esc(line)}</p>` +
     `<p>${esc(portal)}</p>` +
-    `<p style="margin:20px 0"><a href="${esc(input.portalUrl)}" style="display:inline-block;background:#0a5cff;color:#fff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Abrir mi portal</a></p>` +
+    `<p style="margin:20px 0">${emailButton(esc(input.portalUrl), "Abrir mi portal")}</p>` +
     `</div>`;
   return { subject, text, html };
 }

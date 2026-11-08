@@ -1,3 +1,4 @@
+import { EMAIL, emailBrandBand, emailButton } from "./email-theme";
 import { PROFILE_TEXT, METRIC_TEXT } from "./labels";
 
 export type DigestItem = {
@@ -87,11 +88,11 @@ export function buildDigestEmail(input: DigestInput): DigestEmail {
     }
     textLines.push("");
     htmlParts.push(
-      `<h2 style="font-size:16px;margin:20px 0 8px;color:#0b1b3a">${esc(title)}</h2><ul style="padding-left:18px;margin:0">` +
+      `<h2 style="font-size:16px;margin:20px 0 8px;color:${EMAIL.ink}">${esc(title)}</h2><ul style="padding-left:18px;margin:0">` +
         items
           .map((i) => {
-            const link = i.auditId ? ` <a href="${esc(`${input.auditsBase}/${i.auditId}`)}" style="color:#0b5cd5">ver auditoría</a>` : "";
-            const since = i.status === "reminder" ? ` <span style="color:#5b6b8a">(abierta desde ${esc(fmtDate(i.openedAt))})</span>` : "";
+            const link = i.auditId ? ` <a href="${esc(`${input.auditsBase}/${i.auditId}`)}" style="color:${EMAIL.link}">ver auditoría</a>` : "";
+            const since = i.status === "reminder" ? ` <span style="color:${EMAIL.muted}">(abierta desde ${esc(fmtDate(i.openedAt))})</span>` : "";
             return `<li style="margin:4px 0">${esc(describeItem(i))}${since}${link}</li>`;
           })
           .join("") +
@@ -101,12 +102,12 @@ export function buildDigestEmail(input: DigestInput): DigestEmail {
   textLines.push(`Abrir el proyecto: ${input.projectUrl}`);
 
   const html =
-    `<div style="font-family:Arial,Helvetica,sans-serif;color:#0b1b3a;max-width:560px">` +
-    `<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#5b6b8a;margin:0">AOC PageSpeed</p>` +
-    `<h1 style="font-size:20px;margin:4px 0 0">${esc(input.projectName)}</h1>` +
-    `<p style="margin:2px 0 0;color:#5b6b8a">${esc(input.clientName)}</p>` +
+    `<div style="font-family:Arial,Helvetica,sans-serif;color:${EMAIL.ink};max-width:560px">` +
+    emailBrandBand() +
+    `<h1 style="font-size:20px;margin:16px 0 0">${esc(input.projectName)}</h1>` +
+    `<p style="margin:2px 0 0;color:${EMAIL.muted}">${esc(input.clientName)}</p>` +
     htmlParts.join("") +
-    `<p style="margin:24px 0 0"><a href="${esc(input.projectUrl)}" style="display:inline-block;background:#0b5cd5;color:#fff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Abrir el proyecto</a></p>` +
+    `<p style="margin:24px 0 0">${emailButton(esc(input.projectUrl), "Abrir el proyecto")}</p>` +
     `</div>`;
 
   return { type, subject, text: textLines.join("\n"), html };

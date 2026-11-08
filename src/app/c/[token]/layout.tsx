@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   };
 }
 
-export const viewport: Viewport = { themeColor: darkToken("space") };
+export const viewport: Viewport = { themeColor: darkToken("surface-100") };
 
 export default function PortalLayout({ children }: { children: ReactNode }) {
   return children;

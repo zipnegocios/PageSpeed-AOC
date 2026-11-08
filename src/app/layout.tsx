@@ -21,7 +21,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // Un solo tema: el espacial, siempre oscuro (también la barra del navegador y los controles nativos).
   colorScheme: "dark",
-  themeColor: darkToken("space"),
+  themeColor: darkToken("surface-100"),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

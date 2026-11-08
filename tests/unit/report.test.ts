@@ -129,8 +129,8 @@ describe("utilidades del informe", () => {
     expect(scoreBand(49)).toEqual({ tone: "danger", word: "deficiente" });
   });
   it("los colores salen de tokens.json (tema claro)", () => {
-    expect(lightToken("brand-deep")).toBe("#0b2a6e");
-    expect(lightToken("primary")).toBe("#0a5cff");
+    expect(lightToken("brand-deep")).toBe("#111827");
+    expect(lightToken("primary")).toBe("#4D7C0F");
     expect(lightToken("no-existe")).toBe("#000000");
   });
 });
