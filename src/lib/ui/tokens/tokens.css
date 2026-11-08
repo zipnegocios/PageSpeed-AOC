@@ -1,4 +1,4 @@
-/* AOC PageSpeed — generated from design/tokens.json (Design System mirror). Do not edit. */
+/* PageSpeed — generated from design/tokens.json (Design System mirror). Do not edit. */
 :root {
   --surface-100: #111827;
   --surface-200: #1F2937;
@@ -14,6 +14,7 @@
   --on-primary-subtle: #D9F99D;
   --link: #BEF264;
   --brand-deep: #1F2937;
+  --brand-frame: #4B5563;
   --danger: #F87171;
   --danger-subtle: #3B1D22;
   --on-danger-subtle: #FECACA;
@@ -58,6 +59,7 @@
   --on-primary-subtle: #365314;
   --link: #3F6212;
   --brand-deep: #111827;
+  --brand-frame: #9CA3AF;
   --danger: #B91C1C;
   --danger-subtle: #FEE2E2;
   --on-danger-subtle: #7F1D1D;

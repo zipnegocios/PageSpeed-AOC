@@ -4,7 +4,7 @@ import { BACKUP_PREFIX, backupKey, isBackupKey, selectBackupsToPrune } from "@/s
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-11-03T12:00:00Z");
-const obj = (daysAgo: number, name = `aoc-${daysAgo}`) => ({
+const obj = (daysAgo: number, name = `pagespeed-${daysAgo}`) => ({
   key: `${BACKUP_PREFIX}2026/10/${name}.ndjson.gz`,
   size: 1000,
   lastModified: new Date(NOW.getTime() - daysAgo * DAY),
@@ -12,7 +12,7 @@ const obj = (daysAgo: number, name = `aoc-${daysAgo}`) => ({
 
 describe("claves de respaldo", () => {
   it("llevan el prefijo propio, la fecha UTC y no chocan con claves de auditorías", () => {
-    expect(backupKey(new Date("2026-11-03T03:17:09Z"))).toBe("_backups/postgres/2026/11/aoc-20261103T031709Z.ndjson.gz");
+    expect(backupKey(new Date("2026-11-03T03:17:09Z"))).toBe("_backups/postgres/2026/11/pagespeed-20261103T031709Z.ndjson.gz");
     expect(isBackupKey(backupKey(NOW))).toBe(true);
     expect(isBackupKey("acme/tienda/2026/11/x.json.gz")).toBe(false);
     expect(isBackupKey(`${BACKUP_PREFIX}notas.txt`)).toBe(false);

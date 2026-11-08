@@ -3,14 +3,14 @@ import { parseEnv } from "@/server/config/env";
 
 const base = {
   SESSION_SECRET: "x".repeat(32),
-  DATABASE_URL: "postgres://aoc:aoc@localhost:5432/aoc",
+  DATABASE_URL: "postgres://pagespeed:pagespeed@localhost:5432/pagespeed",
   REDIS_URL: "redis://localhost:6379",
   R2_ENDPOINT: "http://localhost:9000",
-  R2_BUCKET: "aoc",
+  R2_BUCKET: "pagespeed",
   R2_ACCESS_KEY_ID: "a",
   R2_SECRET_ACCESS_KEY: "b",
   SMTP_HOST: "localhost",
-  EMAIL_FROM: "AOC <no-reply@localhost>",
+  EMAIL_FROM: "PageSpeed <no-reply@localhost>",
 };
 
 describe("parseEnv", () => {

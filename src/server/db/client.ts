@@ -12,16 +12,16 @@ export function createDb(connectionString: string, max = 5): { db: Database; poo
 }
 
 // En desarrollo Next recarga módulos; el singleton evita abrir pools sin límite.
-const globalForDb = globalThis as unknown as { __aocDb?: { db: Database; pool: Pool } };
+const globalForDb = globalThis as unknown as { __pagespeedDb?: { db: Database; pool: Pool } };
 
 /** Base de datos compartida del proceso (web o worker). */
 export function getDb(): Database {
-  if (!globalForDb.__aocDb) {
+  if (!globalForDb.__pagespeedDb) {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL no está definida");
-    globalForDb.__aocDb = createDb(url);
+    globalForDb.__pagespeedDb = createDb(url);
   }
-  return globalForDb.__aocDb.db;
+  return globalForDb.__pagespeedDb.db;
 }
 
 export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];

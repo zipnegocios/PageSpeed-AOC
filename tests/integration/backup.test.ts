@@ -87,14 +87,14 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     it("sube un archivo comprimido a R2 bajo su propio prefijo y lo registra", async () => {
       await seed();
       const done = await runBackup({ db, r2, now: () => NOW });
-      expect(done.key).toBe("_backups/postgres/2026/11/aoc-20261103T031700Z.ndjson.gz");
+      expect(done.key).toBe("_backups/postgres/2026/11/pagespeed-20261103T031700Z.ndjson.gz");
       expect(s3.objects.has(done.key)).toBe(true);
       expect(done.bytes).toBe(s3.objects.get(done.key)!.length);
       expect(done.rows).toBeGreaterThan(8);
 
       const text = (await gunzipAsync(s3.objects.get(done.key)!)).toString("utf8");
       const lines = text.split("\n");
-      expect(JSON.parse(lines[0]!)).toMatchObject({ _: "aoc-backup", format: 1 });
+      expect(JSON.parse(lines[0]!)).toMatchObject({ _: "pagespeed-backup", format: 1 });
       expect(JSON.parse(lines.at(-1)!)).toMatchObject({ _: "end" });
       expect(lines.slice(1, -1).every((l) => l.startsWith('{"t":"'))).toBe(true);
 
@@ -126,7 +126,7 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
 
     it("aplica la retención: borra lo viejo y conserva los más recientes", async () => {
       for (const d of [100, 90, 80, 70, 60, 50, 40]) {
-        const key = `${BACKUP_PREFIX}2026/07/aoc-viejo-${d}.ndjson.gz`;
+        const key = `${BACKUP_PREFIX}2026/07/pagespeed-viejo-${d}.ndjson.gz`;
         s3.objects.set(key, Buffer.from("x"));
         s3.mtimes.set(key, new Date(NOW.getTime() - d * DAY));
       }

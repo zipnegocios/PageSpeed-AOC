@@ -4,8 +4,9 @@ import { Card } from "@/lib/ui/components/card";
 import { listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
 import { AdminShell } from "../_components/admin-shell";
 import { AlertList, NotificationList } from "../_components/alert-list";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Alertas · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Alertas"), robots: { index: false, follow: false } };
 
 export default async function AlertsPage() {
   const session = await verifySession();

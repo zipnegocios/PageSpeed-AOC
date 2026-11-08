@@ -1,6 +1,6 @@
 import { jwtVerify, SignJWT } from "jose";
 
-const ISSUER = "aoc-pagespeed";
+const ISSUER = "pagespeed";
 const AUDIENCE = "portal";
 /** Cuánto dura la sesión del cliente tras escribir su PIN. */
 export const PORTAL_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;

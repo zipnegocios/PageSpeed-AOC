@@ -1,5 +1,6 @@
 import type { Redis } from "ioredis";
 
+// Mismo motivo que QUEUE_PREFIX: espacio de claves histórico, no visible para nadie.
 export const HEARTBEAT_KEY = "aoc:worker:heartbeat";
 /** El latido expira solo: si el worker se detiene, en 30 s deja de verse en línea. */
 export const HEARTBEAT_TTL_SECONDS = 30;

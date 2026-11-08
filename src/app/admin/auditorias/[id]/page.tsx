@@ -17,8 +17,9 @@ import { localizeLhr } from "@/server/report/lighthouse-report";
 import { AdminShell } from "../../_components/admin-shell";
 import { AuditStatusBadge } from "../../_components/audit-badge";
 import { AutoRefresh } from "../../_components/auto-refresh";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Auditoría · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Auditoría"), robots: { index: false, follow: false } };
 
 function FailedChecksCard({ categories }: { categories: CategoryChecks[] | null }) {
   const total = categories?.reduce((n, c) => n + c.failedCount, 0) ?? 0;

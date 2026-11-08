@@ -21,7 +21,7 @@ export async function parseBackup(gz: Buffer): Promise<{ header: BackupHeader; r
   }
   const lines = text.split("\n").filter(Boolean);
   const header = decodeRow<BackupHeader>(lines[0] ?? "{}");
-  if (header._ !== "aoc-backup") throw new RestoreError("El archivo no es un respaldo de AOC PageSpeed.");
+  if (header._ !== "pagespeed-backup") throw new RestoreError("El archivo no es un respaldo de PageSpeed.");
   if (header.format !== BACKUP_FORMAT) throw new RestoreError(`Formato de respaldo ${header.format} no soportado (se esperaba ${BACKUP_FORMAT}).`);
   const footer = decodeRow<BackupFooter>(lines.at(-1) ?? "{}");
   if (footer._ !== "end") throw new RestoreError("El respaldo está incompleto (falta el pie con los totales).");

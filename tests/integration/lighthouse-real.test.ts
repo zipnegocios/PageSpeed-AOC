@@ -17,7 +17,7 @@ const PAGE = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta n
 
 const chromeProcesses = () => {
   try {
-    return Number(execSync("pgrep -fc 'aoc-chrome[-]' || true").toString().trim()) || 0;
+    return Number(execSync("pgrep -fc 'pagespeed-chrome[-]' || true").toString().trim()) || 0;
   } catch {
     return 0;
   }

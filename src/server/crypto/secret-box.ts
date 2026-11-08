@@ -16,6 +16,8 @@ export class SecretBoxError extends Error {
 }
 
 const VERSION = 1;
+// OJO: este valor conserva el nombre histórico del producto («aoc») a propósito. Es dato autenticado del cifrado AES-GCM:
+// cambiarlo dejaría ilegibles las credenciales ya guardadas. No renombrar sin migrar esos datos.
 const AAD = Buffer.from("aoc-auth-v1");
 
 /** Clave de 32 bytes en base64 (`openssl rand -base64 32`). */

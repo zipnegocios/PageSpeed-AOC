@@ -25,8 +25,9 @@ import {
   setClientStatusAction,
   updateClientAction,
 } from "@/app/admin/clientes/actions";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Cliente · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Cliente"), robots: { index: false, follow: false } };
 
 export default async function ClientPage({ params }: { params: Promise<{ cliente: string }> }) {
   const session = await verifySession();

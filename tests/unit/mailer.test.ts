@@ -6,20 +6,20 @@ import { parseWorkerEnv } from "@/server/config/env";
 describe("createMailer", () => {
   it("envía con el remitente configurado", async () => {
     const transport = createTransport({ jsonTransport: true });
-    const mailer = createMailer({ host: "h", port: 465, from: "AOC <n@x.test>" }, transport);
+    const mailer = createMailer({ host: "h", port: 465, from: "PageSpeed <n@x.test>" }, transport);
     await expect(mailer.send({ to: "a@x.test", subject: "Asunto", text: "t", html: "<p>t</p>" })).resolves.toBeUndefined();
   });
 
   it("adjunta archivos con su nombre y tipo", async () => {
     const transport = createTransport({ streamTransport: true, buffer: true });
-    const mailer = createMailer({ host: "h", port: 587, from: "AOC <n@x.test>" }, transport);
+    const mailer = createMailer({ host: "h", port: 587, from: "PageSpeed <n@x.test>" }, transport);
     let raw = "";
     const orig = transport.sendMail.bind(transport);
     transport.sendMail = (async (m: never) => { const info = await orig(m); raw = (info as unknown as { message: Buffer }).message.toString("utf8"); return info; }) as never;
     await mailer.send({ to: "a@x.test", subject: "Informe", text: "t", html: "<p>t</p>", attachments: [{ filename: "informe.pdf", content: Buffer.from("%PDF-1.7 x"), contentType: "application/pdf" }] });
     expect(raw).toContain("Content-Type: application/pdf");
     expect(raw).toMatch(/filename=(")?informe\.pdf/);
-    expect(raw).toContain("From: AOC <n@x.test>");
+    expect(raw).toContain("From: PageSpeed <n@x.test>");
   });
 
   it("propaga el error del transporte", async () => {
@@ -41,8 +41,8 @@ describe("entorno del worker y correo", () => {
     expect(env.ALERT_EMAIL).toBeUndefined();
   });
   it("lee SMTP, remitente, URL pública y destinatario; ALERT_EMAIL vacío equivale a no definido", () => {
-    const env = parseWorkerEnv({ ...base, SMTP_HOST: "smtp.x.test", SMTP_PORT: "465", EMAIL_FROM: "AOC <n@x.test>", APP_URL: "https://app.x.test", ALERT_EMAIL: "" });
-    expect(env).toMatchObject({ SMTP_HOST: "smtp.x.test", SMTP_PORT: 465, EMAIL_FROM: "AOC <n@x.test>", APP_URL: "https://app.x.test" });
+    const env = parseWorkerEnv({ ...base, SMTP_HOST: "smtp.x.test", SMTP_PORT: "465", EMAIL_FROM: "PageSpeed <n@x.test>", APP_URL: "https://app.x.test", ALERT_EMAIL: "" });
+    expect(env).toMatchObject({ SMTP_HOST: "smtp.x.test", SMTP_PORT: 465, EMAIL_FROM: "PageSpeed <n@x.test>", APP_URL: "https://app.x.test" });
     expect(env.ALERT_EMAIL).toBeUndefined();
     expect(parseWorkerEnv({ ...base, ALERT_EMAIL: "alertas@x.test" }).ALERT_EMAIL).toBe("alertas@x.test");
     expect(() => parseWorkerEnv({ ...base, ALERT_EMAIL: "no-es-correo" })).toThrow(/ALERT_EMAIL/);

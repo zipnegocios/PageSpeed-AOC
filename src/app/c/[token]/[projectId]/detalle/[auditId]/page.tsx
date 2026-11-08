@@ -16,9 +16,10 @@ import { PortalShell } from "../../../../_components/portal-shell";
 import { SuspendedNotice } from "../../../../_components/suspended-notice";
 import { portalAccess } from "../../../../_lib/access";
 import { portalProjectPath } from "@/lib/urls";
+import { pageTitle } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Detalle técnico · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Detalle técnico"), robots: { index: false, follow: false } };
 
 export default async function PortalAuditDetail({
   params,

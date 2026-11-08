@@ -1,4 +1,4 @@
-import { EMAIL, emailBrandBand, emailButton } from "./email-theme";
+import { EMAIL, EMAIL_TEXT_SIGNATURE, emailBrandBand, emailButton, emailFooter } from "./email-theme";
 import { PERIOD_LABEL, type Period } from "@/server/domain/history";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -15,14 +15,15 @@ export function buildReportEmail(input: {
   const subject = `Informe de ${input.projectName}`;
   const line = `Te enviamos el informe de ${input.projectName} con las auditorías de los últimos ${period}. Lo encuentras adjunto en PDF.`;
   const portal = "También puedes ver siempre el estado actualizado en tu portal:";
-  const text = [greeting, "", line, "", portal, input.portalUrl, "", "AOC PageSpeed"].join("\n");
+  const text = [greeting, "", line, "", portal, input.portalUrl, "", ...EMAIL_TEXT_SIGNATURE].join("\n");
   const html =
     `<div style="font-family:Arial,Helvetica,sans-serif;color:${EMAIL.ink};max-width:560px">` +
-    emailBrandBand() +
+    emailBrandBand(input.portalUrl) +
     `<p style="margin:16px 0 0">${esc(greeting)}</p>` +
     `<p>${esc(line)}</p>` +
     `<p>${esc(portal)}</p>` +
     `<p style="margin:20px 0">${emailButton(esc(input.portalUrl), "Abrir mi portal")}</p>` +
+    emailFooter() +
     `</div>`;
   return { subject, text, html };
 }

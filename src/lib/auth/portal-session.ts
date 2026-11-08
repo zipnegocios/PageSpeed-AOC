@@ -9,7 +9,7 @@ function secret(): string {
 }
 
 /** Una cookie por cliente (varios clientes pueden convivir en un mismo navegador). Vale para todo el portal. */
-const cookieName = (clientId: string) => `aoc_portal_${clientId.replace(/-/g, "").slice(0, 16)}`;
+const cookieName = (clientId: string) => `pagespeed_portal_${clientId.replace(/-/g, "").slice(0, 16)}`;
 
 export async function setPortalSession(client: { id: string; pinVersion: number }): Promise<void> {
   const { token, expiresAt } = await signPortalSession({ sub: client.id, pv: client.pinVersion }, secret());

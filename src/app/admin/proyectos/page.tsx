@@ -6,8 +6,9 @@ import { ProjectCard } from "@/lib/ui/components/project-card";
 import { SegmentedNav } from "@/lib/ui/components/segmented-nav";
 import { getFleet } from "@/server/services/dashboard";
 import { AdminShell } from "../_components/admin-shell";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Proyectos · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Proyectos"), robots: { index: false, follow: false } };
 
 const PHASES = ["todos", "produccion", "desarrollo"] as const;
 type Phase = (typeof PHASES)[number];

@@ -9,8 +9,9 @@ import { ReportFrame } from "@/lib/ui/components/report-frame";
 import { getAudit, getSiblingAudits } from "@/server/services/audits";
 import { ProfileSwitch } from "@/lib/ui/components/profile-switch";
 import { AdminShell } from "../../../_components/admin-shell";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Informe de Lighthouse · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Informe de Lighthouse"), robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AuditReportPage({ params }: { params: Promise<{ id: string }> }) {

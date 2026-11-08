@@ -48,5 +48,5 @@ export function decodeRow<T = Record<string, unknown>>(line: string): T {
   }) as T;
 }
 
-export type BackupHeader = { _: "aoc-backup"; format: number; createdAt: string; tables: string[] };
+export type BackupHeader = { _: "pagespeed-backup"; format: number; createdAt: string; tables: string[] };
 export type BackupFooter = { _: "end"; counts: Record<string, number> };

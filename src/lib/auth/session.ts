@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { readSessionToken, signSessionToken } from "@/server/auth/session-token";
 import { resolveSession, type AdminSummary } from "@/server/services/admin-auth";
 
-export const SESSION_COOKIE = "aoc_session";
+export const SESSION_COOKIE = "pagespeed_session";
 
 function secret(): string {
   const value = process.env.SESSION_SECRET;

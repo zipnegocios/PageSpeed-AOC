@@ -8,11 +8,11 @@ describe("/api/lang", () => {
     const res = call(`set=en&back=${encodeURIComponent("/admin/auditorias/x?vista=seo")}`);
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/admin/auditorias/x?vista=seo");
-    expect(res.headers.get("set-cookie")).toMatch(/^aoc_lang=en; Path=\/; Max-Age=31536000; SameSite=Lax; HttpOnly$/);
+    expect(res.headers.get("set-cookie")).toMatch(/^pagespeed_lang=en; Path=\/; Max-Age=31536000; SameSite=Lax; HttpOnly$/);
   });
   it("un idioma desconocido cae en español", () => {
-    expect(call("set=fr&back=/").headers.get("set-cookie")).toContain("aoc_lang=es");
-    expect(call("back=/").headers.get("set-cookie")).toContain("aoc_lang=es");
+    expect(call("set=fr&back=/").headers.get("set-cookie")).toContain("pagespeed_lang=es");
+    expect(call("back=/").headers.get("set-cookie")).toContain("pagespeed_lang=es");
   });
   it("solo vuelve a rutas internas (nada de redirecciones abiertas ni inyección de cabeceras)", () => {
     for (const back of ["https://evil.test", "//evil.test", "/\\evil.test", "javascript:alert(1)", "/ok\r\nSet-Cookie: x=1"]) {

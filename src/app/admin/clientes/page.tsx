@@ -9,8 +9,9 @@ import { Field, TextareaField } from "@/lib/ui/components/field";
 import { listClients } from "@/server/services/clients";
 import { AdminShell } from "../_components/admin-shell";
 import { createClientAction } from "./actions";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Clientes · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Clientes"), robots: { index: false, follow: false } };
 
 export default async function ClientsPage() {
   const session = await verifySession();

@@ -58,7 +58,7 @@ export const runLighthouse: LighthouseRunner = async (input) => {
       throw new ChromeError(`No se encontró Chromium ejecutable en ${input.chromePath} (ENOENT)`);
     }
   }
-  const userDataDir = await mkdtemp(join(tmpdir(), "aoc-chrome-"));
+  const userDataDir = await mkdtemp(join(tmpdir(), "pagespeed-chrome-"));
   let chrome: LaunchedChrome | undefined;
   let browser: Awaited<ReturnType<typeof puppeteer.connect>> | undefined;
   try {

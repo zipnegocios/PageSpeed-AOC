@@ -19,7 +19,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * Esquema de AOC PageSpeed. Postgres guarda solo el índice liviano de auditorías,
+ * Esquema de PageSpeed. Postgres guarda solo el índice liviano de auditorías,
  * metadatos y configuración; el JSON completo de cada auditoría vive en R2.
  * Convenciones: PK uuid, timestamptz en UTC, soft-delete solo en clients y projects.
  */

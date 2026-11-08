@@ -3,10 +3,10 @@ export const BACKUP_PREFIX = "_backups/postgres/";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** `_backups/postgres/2026/11/aoc-20261103T031700Z.ndjson.gz` */
+/** `_backups/postgres/2026/11/pagespeed-20261103T031700Z.ndjson.gz` */
 export function backupKey(at: Date): string {
   const stamp = `${at.getUTCFullYear()}${pad(at.getUTCMonth() + 1)}${pad(at.getUTCDate())}T${pad(at.getUTCHours())}${pad(at.getUTCMinutes())}${pad(at.getUTCSeconds())}Z`;
-  return `${BACKUP_PREFIX}${at.getUTCFullYear()}/${pad(at.getUTCMonth() + 1)}/aoc-${stamp}.ndjson.gz`;
+  return `${BACKUP_PREFIX}${at.getUTCFullYear()}/${pad(at.getUTCMonth() + 1)}/pagespeed-${stamp}.ndjson.gz`;
 }
 
 export const isBackupKey = (key: string) => key.startsWith(BACKUP_PREFIX) && key.endsWith(".ndjson.gz");

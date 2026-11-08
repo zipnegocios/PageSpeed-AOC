@@ -4,7 +4,7 @@ import { createDb } from "@/server/db/client";
 import { runMigrations } from "@/server/db/migrate";
 import * as s from "@/server/db/schema";
 
-// Requiere un Postgres real: TEST_DATABASE_URL=postgres://aoc:aoc@127.0.0.1:54329/aoc_test
+// Requiere un Postgres real: TEST_DATABASE_URL=postgres://USUARIO:CLAVE@127.0.0.1:54329/BASE_test
 const url = process.env.TEST_DATABASE_URL;
 
 async function pgCode(promise: Promise<unknown>): Promise<string | undefined> {

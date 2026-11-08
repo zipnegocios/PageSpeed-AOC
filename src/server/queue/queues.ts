@@ -33,15 +33,15 @@ export function auditJobOptions(auditId: string, priority: number, attempts = au
   };
 }
 
-const g = globalThis as unknown as { __aocQueues?: Map<string, Queue> };
+const g = globalThis as unknown as { __pagespeedQueues?: Map<string, Queue> };
 
 function queue<T>(name: string, connection: Redis): Queue<T> {
-  g.__aocQueues ??= new Map();
-  let q = g.__aocQueues.get(name);
+  g.__pagespeedQueues ??= new Map();
+  let q = g.__pagespeedQueues.get(name);
   if (!q) {
     q = new Queue(name, { connection, prefix: QUEUE_PREFIX });
     q.on("error", () => undefined);
-    g.__aocQueues.set(name, q);
+    g.__pagespeedQueues.set(name, q);
   }
   return q as Queue<T>;
 }

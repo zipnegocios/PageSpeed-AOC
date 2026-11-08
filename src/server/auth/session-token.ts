@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { jwtVerify, SignJWT } from "jose";
 
-const ISSUER = "aoc-pagespeed";
+const ISSUER = "pagespeed";
 const AUDIENCE = "admin";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 

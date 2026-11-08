@@ -1,5 +1,5 @@
 // Genera src/lib/ui/tokens/tokens.css y tailwind-theme.css a partir de design/tokens.json.
-// design/tokens.json es un espejo del Design System "AOC PageSpeed": NO editar valores a mano.
+// design/tokens.json es un espejo del Design System "PageSpeed": NO editar valores a mano.
 // Flujo: cambiar en el Design System -> copiar tokens.json a design/ -> `pnpm tokens:sync`.
 import { readFileSync, writeFileSync } from "node:fs";
 

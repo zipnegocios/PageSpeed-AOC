@@ -1,4 +1,4 @@
-# Runbook de operación — AOC PageSpeed
+# Runbook de operación — PageSpeed
 
 Para quien opera el sistema en EasyPanel. Cada sección es independiente: ve directo a lo que necesitas.
 
@@ -59,7 +59,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 ## 5. Respaldos y restauración
 
 ### Qué hay
-- Cada día a las 03:17 UTC el worker sube a R2 un archivo `_backups/postgres/AAAA/MM/aoc-<fecha>.ndjson.gz` con **todas** las tablas. Se conservan 30 días y siempre los 5 más recientes. Si falla, el panel lo muestra (Cola → Respaldos) y llega un correo.
+- Cada día a las 03:17 UTC el worker sube a R2 un archivo `_backups/postgres/AAAA/MM/pagespeed-<fecha>.ndjson.gz` con **todas** las tablas. Se conservan 30 días y siempre los 5 más recientes. Si falla, el panel lo muestra (Cola → Respaldos) y llega un correo.
 - *Respaldar ahora*: botón en Cola → Respaldos (lo ejecuta el worker; hay que tenerlo en línea).
 - Las credenciales de páginas privadas van en el respaldo **cifradas**; la clave (`AUTH_ENCRYPTION_KEY`) no. Al restaurar en otro servidor, usa la misma clave o tendrás que volver a introducir los accesos.
 - Los JSON de las auditorías ya viven en R2 y no forman parte del respaldo: allí están a salvo. **Recomendado**: activar el versionado de objetos del bucket en Cloudflare.
@@ -74,7 +74,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
    node restore-cli.cjs latest --dry-run    # valida el último sin tocar nada
    node restore-cli.cjs latest              # restaura
    ```
-   También acepta una clave concreta (`node restore-cli.cjs _backups/postgres/2026/11/aoc-....ndjson.gz`) o un archivo local (`--file`).
+   También acepta una clave concreta (`node restore-cli.cjs _backups/postgres/2026/11/pagespeed-....ndjson.gz`) o un archivo local (`--file`).
 4. La restauración ocurre en una sola transacción: o entra completa o no entra. Se niega si la base ya tiene clientes, proyectos o auditorías.
 5. Reinicia el web y el worker. El worker registra de nuevo los agendadores y encola lo pendiente (reconciliación).
 6. Comprueba: iniciar sesión (la contraseña es la del momento del respaldo), abrir un cliente, un portal y el historial de un proyecto.

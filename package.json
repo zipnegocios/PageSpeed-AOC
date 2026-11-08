@@ -1,5 +1,7 @@
 {
-  "name": "aoc-pagespeed",
+  "name": "pagespeed",
+  "author": "zipnegocios (Gustavo Amarista)",
+  "license": "UNLICENSED",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -8,14 +8,14 @@ describe("claves de API", () => {
     const b = generateApiKey();
     expect(a).not.toBe(b);
     expect(isPlausibleApiKey(a)).toBe(true);
-    expect(a).toMatch(/^aoc_[A-Za-z0-9_-]{43}$/);
+    expect(a).toMatch(/^pagespeed_[A-Za-z0-9_-]{43}$/);
     expect(hashApiKey(a)).toMatch(/^[0-9a-f]{64}$/);
     expect(hashApiKey(a)).toBe(hashApiKey(a));
     expect(hashApiKey(a)).not.toBe(hashApiKey(b));
     expect(hashApiKey(a)).not.toContain(a.slice(4));
   });
   it("descarta lo que no parece una clave", () => {
-    for (const bad of ["", "aoc_", "aoc_corta", `aoc_${"x".repeat(44)}`, `xyz_${"x".repeat(43)}`, `aoc_${"!".repeat(43)}`]) {
+    for (const bad of ["", "pagespeed_", "pagespeed_corta", `pagespeed_${"x".repeat(44)}`, `xyz_${"x".repeat(43)}`, `pagespeed_${"!".repeat(43)}`]) {
       expect(isPlausibleApiKey(bad)).toBe(false);
     }
   });

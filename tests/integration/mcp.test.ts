@@ -106,7 +106,7 @@ describe.skipIf(!ready)("servidor MCP", () => {
       const none = await raw(null);
       expect(none.status).toBe(401);
       expect(none.headers.get("www-authenticate")).toContain("Bearer");
-      expect((await raw(`aoc_${"a".repeat(43)}`)).status).toBe(401);
+      expect((await raw(`pagespeed_${"a".repeat(43)}`)).status).toBe(401);
       expect((await raw("no-es-clave")).status).toBe(401);
       const { key, view } = await createApiKey({ name: "clave-de-prueba", preset: "read" }, db);
       expect((await raw(key)).status).toBe(200);

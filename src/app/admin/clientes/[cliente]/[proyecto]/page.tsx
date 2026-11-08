@@ -47,8 +47,9 @@ import {
 import { PageAuditCard } from "@/app/admin/_components/page-audit-card";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { SitemapImporter } from "./sitemap-importer";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Proyecto · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Proyecto"), robots: { index: false, follow: false } };
 
 const METRIC_LABELS = {
   performance: "Rendimiento",

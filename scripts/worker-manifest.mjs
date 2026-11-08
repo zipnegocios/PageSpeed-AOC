@@ -40,7 +40,7 @@ for (const name of unique) {
 }
 
 const manifest = {
-  name: "aoc-pagespeed-worker",
+  name: "pagespeed-worker",
   version: "0.0.0",
   private: true,
   type: "module",

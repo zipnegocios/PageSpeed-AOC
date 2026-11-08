@@ -3,9 +3,10 @@ import { Suspense } from "react";
 import { verifySession } from "@/lib/auth/session";
 import { AdminShell } from "./_components/admin-shell";
 import { AlertsPanel, FleetSection, OpsSection, RecentAuditsPanel, type PhaseFilter } from "./_components/dashboard-panels";
+import { pageTitle } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Panel · AOC PageSpeed",
+  title: pageTitle("Panel"),
   robots: { index: false, follow: false },
 };
 

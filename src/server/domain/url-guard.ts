@@ -202,7 +202,7 @@ export async function fetchGuarded(rawUrl: string, opts: GuardedFetchOptions): P
         redirect: "manual",
         dispatcher: agentFor(allowPrivate),
         signal: AbortSignal.timeout(timeoutMs),
-        headers: { "user-agent": "AOC-PageSpeed/1.0", accept: opts.accept ?? "*/*" },
+        headers: { "user-agent": "PageSpeed/1.0", accept: opts.accept ?? "*/*" },
       });
     } catch (err) {
       throw translateFetchError(err, host);

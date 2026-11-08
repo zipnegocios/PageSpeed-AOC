@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Rajdhani } from "next/font/google";
+import { BRAND_NAME, COPYRIGHT_OWNER } from "@/lib/brand";
 import { darkToken } from "@/lib/tokens";
 import "./globals.css";
 
@@ -11,7 +12,9 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: "AOC PageSpeed",
+  title: BRAND_NAME,
+  applicationName: BRAND_NAME,
+  authors: [{ name: COPYRIGHT_OWNER }],
   description: "Auditorías Lighthouse para los proyectos de tus clientes.",
 };
 

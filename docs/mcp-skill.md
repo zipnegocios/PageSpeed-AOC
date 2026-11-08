@@ -1,8 +1,8 @@
-# Guía para agentes: AOC PageSpeed por MCP
+# Guía para agentes: PageSpeed por MCP
 
 Esta guía es para el agente de IA (o la persona que lo configura). Explica qué puede hacer, qué no, y cómo usar bien las herramientas sin cargar de más el servidor.
 
-## Qué es AOC PageSpeed
+## Qué es PageSpeed
 
 Audita con Lighthouse las páginas de los sitios de los clientes y guarda el historial. Cada **proyecto** pertenece a un **cliente** y tiene **rutas** (páginas). Cada auditoría se hace en un **perfil**: `mobile` o `desktop`.
 
@@ -14,8 +14,8 @@ Puntuaciones de 0 a 100: **90-100 bueno**, **50-89 mejorable**, **0-49 deficient
 ## Conexión
 
 - Dirección: `https://<tu-dominio>/api/mcp` (HTTP, sin sesión: cada petición es independiente).
-- Autenticación: `Authorization: Bearer aoc_...`. Las claves las crea la persona administradora en **Panel → Agentes**; se ven una sola vez.
-- Claude Code: `claude mcp add --transport http aoc-pagespeed https://<tu-dominio>/api/mcp --header "Authorization: Bearer TU_CLAVE"`
+- Autenticación: `Authorization: Bearer pagespeed_...`. Las claves las crea la persona administradora en **Panel → Agentes**; se ven una sola vez.
+- Claude Code: `claude mcp add --transport http pagespeed https://<tu-dominio>/api/mcp --header "Authorization: Bearer TU_CLAVE"`
 - Los navegadores ajenos (cabecera `Origin` distinta) se rechazan; el cliente MCP de un agente no la envía.
 
 ## Qué herramientas tienes

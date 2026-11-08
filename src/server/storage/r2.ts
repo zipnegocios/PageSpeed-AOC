@@ -101,9 +101,9 @@ export function r2ConfigFromEnv(source: R2EnvSource | NodeJS.ProcessEnv = proces
   };
 }
 
-const g = globalThis as unknown as { __aocR2?: R2Store };
+const g = globalThis as unknown as { __pagespeedR2?: R2Store };
 
 /** Cliente de R2 compartido por el proceso (web o worker). */
 export function getR2(): R2Store {
-  return (g.__aocR2 ??= createR2(r2ConfigFromEnv()));
+  return (g.__pagespeedR2 ??= createR2(r2ConfigFromEnv()));
 }

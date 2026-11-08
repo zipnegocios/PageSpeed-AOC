@@ -12,8 +12,9 @@ import { getQueueStatus } from "@/server/services/queue-status";
 import { AdminShell } from "../_components/admin-shell";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { requestBackupAction } from "./actions";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Cola · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Cola"), robots: { index: false, follow: false } };
 
 const FREQUENCY = { weekly: "Semanal", daily: "Diaria" } as const;
 

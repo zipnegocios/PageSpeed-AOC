@@ -1,7 +1,8 @@
 import path from "node:path";
-import { Circle, Document, Font, Line, Page, Path, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Circle, Document, Font, Line, Page, Path, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { BRAND_NAME, COPYRIGHT, LOGO_BOLT_PATH, LOGO_CORNERS_PATH, LOGO_FRAME_PATH, LOGO_GLYPH_VIEWBOX } from "@/lib/brand";
 import { layoutChart } from "@/lib/chart-layout";
-import { lightToken } from "@/lib/tokens";
+import { darkToken, lightToken } from "@/lib/tokens";
 import { METRIC_META, formatMetric, type Change } from "@/server/domain/history";
 import { scoreBand } from "@/server/domain/score-band";
 import type { ReportChart, ReportData } from "@/server/services/report";
@@ -16,6 +17,10 @@ const C = {
   muted: lightColor("ink-muted"),
   primary: lightColor("primary"),
   deep: lightColor("brand-deep"),
+  // La marca va siempre sobre su baldosa navy, como en la app: sus colores son los del tema oscuro.
+  navy: darkToken("surface-100"),
+  lime: darkToken("primary"),
+  frame: darkToken("brand-frame"),
   ok: lightColor("ok"),
   warning: lightColor("warning"),
   danger: lightColor("danger"),
@@ -122,19 +127,44 @@ function Chart({ chart, data }: { chart: ReportChart; data: ReportData }) {
   );
 }
 
+/** La marca completa (glifo, marco y esquinas sobre navy) para la primera página. */
+function LogoMark({ size }: { size: number }) {
+  return (
+    <Svg viewBox="0 0 256 256" width={size} height={size}>
+      <Rect x={0} y={0} width={256} height={256} fill={C.navy} />
+      <Path d={LOGO_FRAME_PATH} fill={C.frame} />
+      <Path d={LOGO_CORNERS_PATH} stroke={C.lime} strokeWidth={8} fill="none" />
+      <Path d={LOGO_BOLT_PATH} fill={C.lime} />
+    </Svg>
+  );
+}
+
+/** El glifo solo, en el color de acento del tema claro, para el pie. */
+function LogoGlyph({ height }: { height: number }) {
+  const [, , w, h] = LOGO_GLYPH_VIEWBOX.split(" ").map(Number) as [number, number, number, number];
+  return (
+    <Svg viewBox={LOGO_GLYPH_VIEWBOX} width={(height * w) / h} height={height}>
+      <Path d={LOGO_BOLT_PATH} fill={C.primary} />
+    </Svg>
+  );
+}
+
 function ReportDocument({ data }: { data: ReportData }) {
   const periodText = `${shortFmt.format(data.from)} – ${dateFmt.format(data.generatedAt)}`;
   return (
-    <Document title={`Informe ${data.projectName}`} author="AOC PageSpeed" subject={`Informe de ${data.projectName}`} language="es">
+    <Document title={`Informe ${data.projectName}`} author={BRAND_NAME} subject={`Informe de ${data.projectName}`} language="es">
       <Page size="A4" style={s.page} wrap>
-        <View>
-          <Text style={s.eyebrow}>{data.clientName}</Text>
-          <Text style={s.title}>{data.projectName}</Text>
-          <View style={s.rule} />
-          <Text style={s.mono}>{data.baseUrl}</Text>
-          <Text style={s.meta}>
-            Periodo: {periodText} ({data.days === 365 ? "1 año" : `${data.days} días`}) · Generado el {dateTimeFmt.format(data.generatedAt)} UTC
-          </Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <View style={{ flexGrow: 1, flexShrink: 1, paddingRight: 16 }}>
+            <Text style={s.eyebrow}>{data.clientName}</Text>
+            <Text style={s.title}>{data.projectName}</Text>
+            <View style={s.rule} />
+            <Text style={s.mono}>{data.baseUrl}</Text>
+            <Text style={s.meta}>
+              Periodo: {periodText} ({data.days === 365 ? "1 año" : `${data.days} días`}) · Generado el {dateTimeFmt.format(data.generatedAt)} UTC
+            </Text>
+          </View>
+          <LogoMark size={56} />
         </View>
 
         <Text style={s.h2} minPresenceAhead={120}>Estado actual</Text>
@@ -188,7 +218,10 @@ function ReportDocument({ data }: { data: ReportData }) {
         ))}
 
         <View style={s.footer} fixed>
-          <Text>Informe generado por AOC PageSpeed</Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <LogoGlyph height={11} />
+            <Text style={{ marginLeft: 5 }}>Informe generado por {BRAND_NAME} · {COPYRIGHT}</Text>
+          </View>
           <Text render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
         </View>
       </Page>

@@ -11,16 +11,17 @@ import { listApiKeys } from "@/server/services/api-keys";
 import { AdminShell } from "../_components/admin-shell";
 import { revokeApiKeyAction } from "./actions";
 import { CreateKeyForm } from "./_components/create-key-form";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Agentes · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Agentes"), robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
   const session = await verifySession();
   const keys = await listApiKeys();
   const endpoint = `${appUrl()}/api/mcp`;
-  const cli = `claude mcp add --transport http aoc-pagespeed ${endpoint} --header "Authorization: Bearer TU_CLAVE"`;
-  const json = JSON.stringify({ mcpServers: { "aoc-pagespeed": { type: "http", url: endpoint, headers: { Authorization: "Bearer TU_CLAVE" } } } }, null, 2);
+  const cli = `claude mcp add --transport http pagespeed ${endpoint} --header "Authorization: Bearer TU_CLAVE"`;
+  const json = JSON.stringify({ mcpServers: { "pagespeed": { type: "http", url: endpoint, headers: { Authorization: "Bearer TU_CLAVE" } } } }, null, 2);
   const presets = PRESET_IDS.map((id) => ({ id, label: PRESETS[id].label, description: PRESETS[id].description }));
 
   return (

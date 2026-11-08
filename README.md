@@ -1,4 +1,4 @@
-# AOC PageSpeed
+# PageSpeed
 
 Auditorías Lighthouse (velocidad, accesibilidad, SEO, buenas prácticas) para los proyectos de clientes.
 Monolito Next.js + worker BullMQ/Lighthouse independiente. Arquitectura y plan por milestones: ver el plan de implementación aprobado.
@@ -145,7 +145,7 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   herramientas y el mapa de rectángulos externo. En rutas que exigen sesión, al cliente se le quitan capturas,
   fragmentos de HTML y textos de elementos (`redactLhr`).
 - **Idioma**: el JSON se guarda una sola vez (inglés) y se traduce al leer con `swapLocale` de Lighthouse, también
-  para auditorías ya guardadas. Selector Español/English (cookie `aoc_lang`, español por defecto); solo cambia los
+  para auditorías ya guardadas. Selector Español/English (cookie `pagespeed_lang`, español por defecto); solo cambia los
   textos de Lighthouse.
 - **Navegación con agentes** (`agentic-browsing`, Lighthouse 13): se mide y se guarda como superadas/totales
   (`audit_logs.agentic_passed/total`, migración `0001`). No es una nota 0-100, no tiene umbral y no genera alertas.
@@ -199,7 +199,7 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 ## Agentes (MCP)
 
 - Servidor MCP en `POST /api/mcp` (Streamable HTTP, **sin sesión**: cada petición crea su servidor y lo libera).
-  Autenticación con `Authorization: Bearer aoc_...`; las claves se crean y revocan en **Panel → Agentes**, se
+  Autenticación con `Authorization: Bearer pagespeed_...`; las claves se crean y revocan en **Panel → Agentes**, se
   muestran una sola vez y en la base solo queda su sha256. Un `Origin` ajeno se rechaza (anti DNS-rebinding).
 - Tres niveles de permisos (presets): solo lectura, + auditorías, + configuración. La clave guarda los nombres
   de las herramientas permitidas; las demás ni aparecen en `tools/list`. Ninguna herramienta borra, cambia la
@@ -229,12 +229,22 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 
 ## Design System
 
-La fuente de verdad del diseño es el Design System "AOC PageSpeed" (Rajdhani, azules tecnológicos, rojos sutiles).
+La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midnight Navy y Electric Lime).
 `design/tokens.json` es su espejo; no se editan valores en código. Para aplicar un cambio:
 
 1. Cambia el valor en el Design System.
 2. Copia su `tokens.json` a `design/tokens.json`.
 3. `pnpm tokens:sync` regenera `src/lib/ui/tokens/*` (CI verifica que no haya diferencias).
+
+## Marca
+
+El producto se llama **PageSpeed**. El logo (un rayo y un chevron lima separados por una ranura diagonal, dentro de un marco con cuatro marcas de esquina) vive en `design/brand/`: `logo-mark.svg` (marca completa sobre navy), `logo-glyph.svg` (solo el glifo, de 12 a 32 px), `logo-mono.svg` (`currentColor`), `logo-lockup.svg` / `logo-lockup-light.svg` (glifo + PAGESPEED en trazados de Rajdhani) y `logo-favicon.svg`. En código, la geometría y el copyright salen de `src/lib/brand.ts` y se dibujan con `BrandMark`, `BrandGlyph` y `BrandLockup` (`src/lib/ui/components/brand-mark.tsx`); el PDF y los correos usan los mismos datos.
+
+Los PNG (`public/pwa/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `src/app/apple-icon.png`, `public/brand/*.png`) y `src/app/favicon.ico` se generan desde esos SVG: abre cada SVG en Chromium (Playwright) al tamaño pedido y captura la pantalla (el icono de la app, `design/icons/app-icon.svg`, lleva la marca al 74 % para la zona segura de las máscaras).
+
+## Licencia
+
+© 2026 zipnegocios · Gustavo Amarista. Todos los derechos reservados (ver `LICENSE`).
 
 ## Capas
 

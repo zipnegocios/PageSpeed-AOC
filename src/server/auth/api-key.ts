@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 
-export const API_KEY_PREFIX = "aoc_";
+export const API_KEY_PREFIX = "pagespeed_";
 
-/** `aoc_` + 32 bytes aleatorios en base64url (43 caracteres). Solo se muestra una vez al crearla. */
+/** `pagespeed_` + 32 bytes aleatorios en base64url (43 caracteres). Solo se muestra una vez al crearla. */
 export function generateApiKey(): string {
   return API_KEY_PREFIX + randomBytes(32).toString("base64url");
 }
@@ -12,7 +12,7 @@ export function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
-const KEY_RE = /^aoc_[A-Za-z0-9_-]{43}$/;
+const KEY_RE = /^pagespeed_[A-Za-z0-9_-]{43}$/;
 export const isPlausibleApiKey = (key: string) => KEY_RE.test(key);
 
 /** Saca la clave de una cabecera `Authorization: Bearer ...`. null si falta o está mal formada. */

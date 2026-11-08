@@ -2,7 +2,7 @@
 services:
   postgres:
     image: postgres:17-alpine
-    environment: { POSTGRES_USER: aoc, POSTGRES_PASSWORD: aoc, POSTGRES_DB: aoc }
+    environment: { POSTGRES_USER: pagespeed, POSTGRES_PASSWORD: pagespeed, POSTGRES_DB: pagespeed }
     ports: ["5432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
   redis:
@@ -22,7 +22,7 @@ services:
     depends_on: [minio]
     entrypoint: >
       /bin/sh -c "until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
-      mc mb --ignore-existing local/aoc-pagespeed"
+      mc mb --ignore-existing local/pagespeed"
   mailpit:
     image: axllent/mailpit
     ports: ["1025:1025", "8025:8025"]

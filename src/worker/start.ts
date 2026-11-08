@@ -163,7 +163,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
         if (mailer && to) {
           await mailer.send({
             to,
-            subject: "Falló el respaldo de AOC PageSpeed",
+            subject: "Falló el respaldo de PageSpeed",
             text: `El respaldo diario de la base de datos no se pudo completar.\n\nMotivo: ${message.slice(0, 200)}\n\nRevisa el panel (Cola → Respaldos) y los logs del worker.`,
             html: `<p>El respaldo diario de la base de datos no se pudo completar.</p><p><strong>Motivo:</strong> ${message.slice(0, 200).replace(/[<>&]/g, "")}</p><p>Revisa el panel (Cola → Respaldos) y los logs del worker.</p>`,
           });

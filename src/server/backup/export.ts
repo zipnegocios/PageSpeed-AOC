@@ -24,7 +24,7 @@ export async function buildBackup(db: Database, now: Date): Promise<{ body: Buff
     if (rawBytes > MAX_RAW_BYTES) throw new Error("El respaldo supera el tamaño máximo en memoria.");
     lines.push(line);
   };
-  const header: BackupHeader = { _: "aoc-backup", format: BACKUP_FORMAT, createdAt: now.toISOString(), tables: BACKUP_TABLES.map((t) => t.name) };
+  const header: BackupHeader = { _: "pagespeed-backup", format: BACKUP_FORMAT, createdAt: now.toISOString(), tables: BACKUP_TABLES.map((t) => t.name) };
   push(JSON.stringify(header));
 
   const counts: Record<string, number> = {};

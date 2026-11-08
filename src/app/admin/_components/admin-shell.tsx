@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Button } from "@/lib/ui/components/button";
+import { BrandLockup } from "@/lib/ui/components/brand-mark";
+import { CopyrightLine } from "@/lib/ui/components/copyright-line";
 import { PageTitle } from "@/lib/ui/components/page-title";
 import { logoutAction } from "../actions";
 import { AdminNav } from "./admin-nav";
@@ -29,11 +31,7 @@ export function AdminShell({
       <header className="hud z-30 mt-3 md:sticky md:top-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg px-3 py-2">
         <nav aria-label="Principal" className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Link href="/admin" className="press mr-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-[13px] font-bold tracking-[0.08em] text-ink uppercase">
-            <svg viewBox="0 0 24 24" className="size-6 text-primary" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden>
-              <path d="M5.6 18.4a9 9 0 1 1 12.8 0" />
-              <path d="m12 13 4-4" />
-            </svg>
-            AOC PageSpeed
+            <BrandLockup wordClassName="text-[13px] tracking-[0.08em]" />
           </Link>
           <AdminNav />
         </nav>
@@ -75,6 +73,9 @@ export function AdminShell({
       </div>
 
       <main className="flex flex-col gap-6">{children}</main>
+      <footer className="mt-auto border-t border-border pt-4">
+        <CopyrightLine />
+      </footer>
     </div>
   );
 }

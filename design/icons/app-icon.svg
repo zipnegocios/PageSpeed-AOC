@@ -1,7 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Fondo brand-deep a sangre: el sistema aplica su máscara. El dibujo cabe en la zona segura (60 % central). -->
-  <rect width="512" height="512" fill="#111827"/>
-  <path d="M171.15 346.85 A120 120 0 1 1 340.85 346.85" fill="none" stroke="#a3e635" stroke-width="28" stroke-linecap="round"/>
-  <line x1="256" y1="262" x2="328.8" y2="200.9" stroke="#f3f4f6" stroke-width="22" stroke-linecap="round"/>
-  <circle cx="256" cy="262" r="18" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="512" height="512" role="img"><title>PageSpeed</title>
+  <!-- Fondo navy a sangre: el sistema aplica su máscara. La marca completa va reducida al 74 % para que quepa en la zona segura (círculo del 80 %). -->
+  <rect width="256" height="256" fill="#111827"/>
+  <g transform="translate(33.3 33.3) scale(0.74)"><path d="M167 28H28V228H68L78 208H48V48H157ZM195 28H228V228H96L106 208H208V48H185Z" fill="#4B5563"/><path d="M10 46V10H46M210 10H246V46M246 210V246H210M46 246H10V210" fill="none" stroke="#A3E635" stroke-width="8"/><path d="M184 12 56 140h48l-11 54zM160 80l38 38L76 250 147 108z" fill="#A3E635"/></g>
 </svg>

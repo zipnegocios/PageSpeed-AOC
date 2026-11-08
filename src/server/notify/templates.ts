@@ -1,4 +1,4 @@
-import { EMAIL, emailBrandBand, emailButton } from "./email-theme";
+import { EMAIL, EMAIL_TEXT_SIGNATURE, emailBrandBand, emailButton, emailFooter } from "./email-theme";
 import { PROFILE_TEXT, METRIC_TEXT } from "./labels";
 
 export type DigestItem = {
@@ -99,15 +99,16 @@ export function buildDigestEmail(input: DigestInput): DigestEmail {
         "</ul>",
     );
   }
-  textLines.push(`Abrir el proyecto: ${input.projectUrl}`);
+  textLines.push(`Abrir el proyecto: ${input.projectUrl}`, "", ...EMAIL_TEXT_SIGNATURE);
 
   const html =
     `<div style="font-family:Arial,Helvetica,sans-serif;color:${EMAIL.ink};max-width:560px">` +
-    emailBrandBand() +
+    emailBrandBand(input.projectUrl) +
     `<h1 style="font-size:20px;margin:16px 0 0">${esc(input.projectName)}</h1>` +
     `<p style="margin:2px 0 0;color:${EMAIL.muted}">${esc(input.clientName)}</p>` +
     htmlParts.join("") +
     `<p style="margin:24px 0 0">${emailButton(esc(input.projectUrl), "Abrir el proyecto")}</p>` +
+    emailFooter() +
     `</div>`;
 
   return { type, subject, text: textLines.join("\n"), html };

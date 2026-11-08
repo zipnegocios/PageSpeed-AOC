@@ -47,7 +47,7 @@ export async function handleMcpRequest(req: Request, deps: McpDeps): Promise<Res
   if (!auth) {
     deps.limits.badAuthPerIp.recordFailure(deps.ip);
     return rpcError(401, -32001, "Falta una clave de API válida (Authorization: Bearer ...).", {
-      "WWW-Authenticate": 'Bearer realm="aoc-pagespeed"',
+      "WWW-Authenticate": 'Bearer realm="pagespeed"',
     });
   }
 

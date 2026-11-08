@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 // Un único juego de límites por proceso; sobrevive a las recargas de módulos en desarrollo.
-const g = globalThis as unknown as { __aocMcpLimits?: ReturnType<typeof createLimits> };
-const limits = (g.__aocMcpLimits ??= createLimits());
+const g = globalThis as unknown as { __pagespeedMcpLimits?: ReturnType<typeof createLimits> };
+const limits = (g.__pagespeedMcpLimits ??= createLimits());
 
 async function handle(req: Request): Promise<Response> {
   return handleMcpRequest(req, {

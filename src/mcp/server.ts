@@ -12,7 +12,7 @@ const failure = (message: string): ToolResult => ({ content: [{ type: "text", te
  * está en su alcance ni siquiera aparece en `tools/list`, y llamarlo por nombre da "no existe".
  */
 export function createMcpServer(auth: ApiKeyAuth, options: { log?: McpLog; context?: Partial<ToolContext> } = {}): McpServer {
-  const server = new McpServer({ name: "aoc-pagespeed", version: "1.0.0" });
+  const server = new McpServer({ name: "pagespeed", version: "1.0.0" });
   const allowed = new Set<string>(auth.scopes);
   const ctx: ToolContext = { keyName: auth.name, ...options.context };
 

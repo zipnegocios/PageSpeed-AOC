@@ -8,8 +8,9 @@ import { listArchivedClients, listArchivedProjects } from "@/server/services/arc
 import { AdminShell } from "../_components/admin-shell";
 import { DeleteConfirmForm } from "../_components/delete-confirm-form";
 import { deleteClientAction, deleteProjectAction, restoreClientAction, restoreProjectAction } from "./actions";
+import { pageTitle } from "@/lib/brand";
 
-export const metadata: Metadata = { title: "Archivados · AOC PageSpeed", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Archivados"), robots: { index: false, follow: false } };
 
 export default async function ArchivedPage() {
   const session = await verifySession();
