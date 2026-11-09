@@ -15,6 +15,18 @@ export type ProbeTarget = { brands: string[]; domain: string };
 
 const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+/**
+ * Dominio de una fuente citada. Gemini devuelve redirecciones de Google en lugar de la URL real, pero pone el
+ * dominio como título: en ese caso se usa el título.
+ */
+function citationHost(c: Citation): string | null {
+  const host = hostOf(c.url)?.replace(/^www\./, "") ?? null;
+  const redirect = host !== null && /(^|\.)vertexaisearch\.cloud\.google\.com$/.test(host);
+  if (host !== null && !redirect) return host;
+  const title = c.title?.trim().toLowerCase().replace(/^www\./, "");
+  return title && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(title) ? title : null;
+}
+
 export type Mention = {
   /** La respuesta nombra la marca (sin distinguir mayúsculas ni acentos). */
   mentioned: boolean;
@@ -31,7 +43,7 @@ export function detectMention(answer: ProbeAnswer, target: ProbeTarget): Mention
   const citedUrls: string[] = [];
   const others = new Set<string>();
   for (const c of answer.citations) {
-    const host = hostOf(c.url)?.replace(/^www\./, "");
+    const host = citationHost(c);
     if (!host) continue;
     if (host === domain || host.endsWith(`.${domain}`)) citedUrls.push(c.url);
     else others.add(host);
@@ -51,9 +63,6 @@ export const mockProvider: Provider = {
     return { text: `Respuesta simulada (${q.lang}) para: ${q.prompt}`, citations: [] };
   },
 };
-
-/** Proveedores disponibles. Los reales se añaden cuando se decida con cuáles sondear (ver el plan). */
-export const providers: Record<string, Provider> = { mock: mockProvider };
 
 export type ProbeRun = {
   provider: string;

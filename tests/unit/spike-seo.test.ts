@@ -13,6 +13,7 @@ import { Recorder, requestJson, SpikeHttpError, type FetchLike } from "../../scr
 import { coverage, ga4ByPage, gscByPage } from "../../scripts/spike-seo/lib/join";
 import { classifyPath, parseMarkets, summarizeByLang } from "../../scripts/spike-seo/lib/lang";
 import { detectMention, summarizeRuns, type ProbeRun } from "../../scripts/spike-seo/lib/probe";
+import { availableProviders } from "../../scripts/spike-seo/lib/providers";
 import { pagePath } from "../../scripts/spike-seo/lib/urls";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -326,5 +327,29 @@ describe("sondeo de IA", () => {
   it("calcula la tasa de mención y de cita por pregunta", () => {
     const run = (mentioned: boolean, cited: boolean): ProbeRun => ({ provider: "mock", lang: "es", prompt: "p", repeat: 1, at: "", mentioned, cited, citedUrls: [], otherDomains: [], excerpt: "" });
     expect(summarizeRuns([run(true, true), run(true, false), run(false, false), run(false, false)])).toEqual([{ provider: "mock", lang: "es", prompt: "p", runs: 4, mentionRate: 0.5, citedRate: 0.25 }]);
+  });
+});
+
+describe("sondeo de IA: fuentes de Gemini y registro de proveedores", () => {
+  const target = { brands: ["Acme"], domain: "acme.com" };
+
+  it("reconoce el dominio por el título cuando la URL es una redirección de Google", () => {
+    const redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AbC123";
+    const m = detectMention(
+      { text: "Texto.", citations: [{ url: redirect, title: "www.acme.com" }, { url: redirect, title: "rival.com" }, { url: redirect, title: "Una página cualquiera" }] },
+      target,
+    );
+    expect(m.cited).toBe(true);
+    expect(m.citedUrls).toEqual([redirect]);
+    expect(m.otherDomains).toEqual(["rival.com"]);
+  });
+
+  it("solo ofrece los proveedores con clave, más el simulado, y no filtra la clave", () => {
+    expect(Object.keys(availableProviders({}))).toEqual(["mock"]);
+    const env = { SPIKE_OPENAI_API_KEY: "sk-secreta", SPIKE_GEMINI_API_KEY: "g-secreta", SPIKE_PROBE_COUNTRY: "co" };
+    const p = availableProviders(env);
+    expect(Object.keys(p).sort()).toEqual(["gemini", "mock", "openai"]);
+    expect(p.openai?.name).toBe("openai");
+    expect(JSON.stringify(Object.values(p).map((x) => x.name))).not.toContain("secreta");
   });
 });

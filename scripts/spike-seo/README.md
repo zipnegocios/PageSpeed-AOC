@@ -33,15 +33,17 @@ Se ejecutan con `pnpm exec tsx scripts/spike-seo/<script>.ts`. Cada uno deja sus
 | `20-ga4.ts` | Sesiones y usuarios por fecha, página, país, idioma y fuente; sesiones desde asistentes de IA | cuenta de servicio |
 | `30-cloudflare.ts` | Rastreadores de IA por día (`--days 7`), rutas más rastreadas y referidos. El día que falla indica el historial del plan | token de Cloudflare |
 | `40-crawl.ts` | Rastreo mínimo desde el sitemap (`--pages 20 --pause 500`): título, canónica, `hreflang`, `lang`, JSON-LD | ninguna |
-| `50-probe.ts` | Sondeo de IA con preguntas repetidas. Hoy solo con `--provider mock` | claves de proveedores (pendiente) |
+| `50-probe.ts` | Sondeo de IA con preguntas repetidas (`--provider mock\|anthropic\|openai\|gemini\|perplexity\|all`, `--repeats 3`). Cada llamada real cuesta dinero | clave de cada proveedor |
 | `60-compare.ts` | Totales de GSC y GA4 para contrastar a mano con sus interfaces, y cobertura del cruce por página | ninguna (lee la salida) |
 
 Orden sugerido: `00` → `10` → `20` → `60` → `30` → `40` → `50`.
 
 ## Qué no está hecho a propósito
 
-- **Proveedores de IA reales** (`lib/probe.ts`): falta decidir con cuáles se sondea. La interfaz `Provider` y el proveedor
-  `mock` ya permiten probar el flujo; para añadir uno basta implementar `ask()` y registrarlo en `providers`.
+- **Respuestas reales de los proveedores:** los adaptadores de `lib/providers/` se escribieron contra la documentación vigente
+  (anthropic, openai, gemini, perplexity) y se probaron con respuestas simuladas, no con llamadas reales. La primera corrida
+  real puede mostrar diferencias: revisa `probe-failures.json`. Conocidos: Gemini devuelve redirecciones de Google en lugar de
+  la URL real (la cita se reconoce por el título, que trae el dominio) y Perplexity anuncia el fin de su endpoint Sonar actual.
 - Tablas, cola `seo`, panel, API y MCP: son de las fases 1 a 4.
 
 ## Estructura
@@ -51,5 +53,5 @@ Orden sugerido: `00` → `10` → `20` → `60` → `30` → `40` → `50`.
 - `lib/google-auth.ts`: cuenta de servicio → JWT RS256 → token de acceso.
 - `lib/gsc.ts`, `lib/ga4.ts`, `lib/cloudflare.ts`: un cliente por fuente.
 - `lib/lang.ts`, `lib/urls.ts`, `lib/join.ts`: idioma por prefijo de ruta, normalización de URLs y cruce de GSC con GA4.
-- `lib/crawl.ts`, `lib/probe.ts`: extracción SEO mínima y sondeo de IA (menciones y citas).
+- `lib/crawl.ts`, `lib/probe.ts`, `lib/providers/`: extracción SEO mínima y sondeo de IA (menciones y citas; un adaptador por proveedor).
 - Pruebas de las piezas puras y de los clientes (con `fetch` simulado): `tests/unit/spike-seo.test.ts`.
