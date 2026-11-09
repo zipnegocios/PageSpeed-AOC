@@ -8,7 +8,6 @@ import type { WorkerEnv } from "@/server/config/env";
 import { createDb } from "@/server/db/client";
 import { runMigrations } from "@/server/db/migrate";
 import * as s from "@/server/db/schema";
-import { DomainError } from "@/server/domain/errors";
 import { LighthouseRuntimeError } from "@/server/domain/audit-errors";
 import { createRedis } from "@/server/queue/connection";
 import { readHeartbeat, writeHeartbeat } from "@/server/queue/heartbeat";
@@ -116,11 +115,14 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
       expect(await db.select().from(s.auditLogs)).toHaveLength(0);
     });
 
-    it("en desarrollo exige un único perfil y crea la fila en cola con su trabajo", async () => {
+    it("en desarrollo audita uno o ambos perfiles y crea la fila en cola con su trabajo", async () => {
       const { routes: [r] } = await setup();
       await online();
-      await expect(req(r!.id, ["mobile", "desktop"])).rejects.toThrow(/un perfil a la vez/);
-      await expect(req(r!.id)).rejects.toThrow(DomainError);
+      const both = await req(r!.id, ["mobile", "desktop"]);
+      expect(both).toMatchObject({ created: 2, alreadyPending: 0 });
+      expect(both.audits.map((a) => a.profile).sort()).toEqual(["desktop", "mobile"]);
+      await db.delete(s.auditLogs);
+      await queue.obliterate({ force: true });
       const res = await req(r!.id, ["desktop"]);
       expect(res).toMatchObject({ created: 1, alreadyPending: 0 });
       const audit = res.audits[0]!;

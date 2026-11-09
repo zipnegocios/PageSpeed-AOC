@@ -23,7 +23,7 @@ export const MAX_WAITING_JOBS = 50;
 
 export type RequestAuditInput = {
   routeId: string;
-  /** Desarrollo: exactamente uno. Producción: uno o ambos (por defecto ambos). */
+  /** Uno o ambos; sin indicar ninguno, ambos (móvil y escritorio), también en desarrollo. */
   profiles?: Profile[];
   trigger: AuditTrigger;
   requestedBy: string;

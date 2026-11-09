@@ -169,11 +169,12 @@ describe("error-classifier", () => {
 });
 
 describe("audit-rules", () => {
-  it("en desarrollo exige exactamente un perfil", () => {
+  it("en desarrollo permite uno o ambos perfiles, por defecto ambos", () => {
     expect(planProfiles("development", ["mobile"], "manual")).toEqual(["mobile"]);
-    expect(() => planProfiles("development", ["mobile", "desktop"], "manual")).toThrow(DomainError);
-    expect(() => planProfiles("development", [], "manual")).toThrow(/un perfil a la vez/);
-    expect(() => planProfiles("development", undefined, "mcp")).toThrow(DomainError);
+    expect(planProfiles("development", ["mobile", "desktop"], "manual")).toEqual(["mobile", "desktop"]);
+    expect(planProfiles("development", [], "manual")).toEqual(["mobile", "desktop"]);
+    expect(planProfiles("development", undefined, "mcp")).toEqual(["mobile", "desktop"]);
+    expect(() => planProfiles("development", ["tablet" as never], "manual")).toThrow(DomainError);
   });
 
   it("en producción manual permite uno o ambos, por defecto ambos", () => {

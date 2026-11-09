@@ -4,7 +4,10 @@ import { mcpApiKeys } from "@/server/db/schema";
 
 export type ApiKeyRow = typeof mcpApiKeys.$inferSelect;
 
-export async function insertApiKey(db: Database, values: { name: string; keyHash: string; scopes: string[] }): Promise<ApiKeyRow> {
+export async function insertApiKey(
+  db: Database,
+  values: { name: string; keyHash: string; scopes: string[]; allAccess: boolean; clientIds: string[]; projectIds: string[] },
+): Promise<ApiKeyRow> {
   const [row] = await db.insert(mcpApiKeys).values(values).returning();
   if (!row) throw new Error("No se pudo crear la clave");
   return row;

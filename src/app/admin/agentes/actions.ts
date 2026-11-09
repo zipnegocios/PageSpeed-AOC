@@ -8,7 +8,13 @@ import { createApiKey, revokeApiKey } from "@/server/services/api-keys";
 export async function createApiKeyAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {
-    const { key, view } = await createApiKey({ name: field(fd, "name"), preset: field(fd, "preset") });
+    const { key, view } = await createApiKey({
+      name: field(fd, "name"),
+      preset: field(fd, "preset"),
+      access: field(fd, "access"),
+      clientIds: fd.getAll("clientIds").map(String),
+      projectIds: fd.getAll("projectIds").map(String),
+    });
     revalidatePath("/admin/agentes");
     return { ok: `Clave «${view.name}» creada.`, secret: key };
   });

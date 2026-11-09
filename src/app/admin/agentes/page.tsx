@@ -6,8 +6,11 @@ import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { CopyButton } from "@/lib/ui/components/copy-button";
+import { accessSummary } from "@/server/domain/mcp-access";
 import { PRESETS, PRESET_IDS } from "@/server/domain/mcp-scopes";
 import { listApiKeys } from "@/server/services/api-keys";
+import { listClients } from "@/server/services/clients";
+import { listAllProjects } from "@/server/services/projects";
 import { AdminShell } from "../_components/admin-shell";
 import { revokeApiKeyAction } from "./actions";
 import { CreateKeyForm } from "./_components/create-key-form";
@@ -18,7 +21,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentsPage() {
   const session = await verifySession();
-  const keys = await listApiKeys();
+  const [keys, clients, projects] = await Promise.all([listApiKeys(), listClients(), listAllProjects()]);
+  const scopeClients = clients.map((c) => ({ id: c.id, name: c.name, projects: projects.filter((p) => p.clientId === c.id).map((p) => ({ id: p.id, name: p.name })) }));
   const endpoint = `${appUrl()}/api/mcp`;
   const cli = `claude mcp add --transport http pagespeed ${endpoint} --header "Authorization: Bearer TU_CLAVE"`;
   const json = JSON.stringify({ mcpServers: { "pagespeed": { type: "http", url: endpoint, headers: { Authorization: "Bearer TU_CLAVE" } } } }, null, 2);
@@ -51,7 +55,7 @@ export default async function AgentsPage() {
       </Card>
 
       <Card title="Nueva clave" description="Cada agente debería tener la suya: así puedes revocarla sin afectar a los demás. Nunca borra proyectos, cambia fases, rota links ni suspende clientes.">
-        <CreateKeyForm presets={presets} />
+        <CreateKeyForm presets={presets} clients={scopeClients} />
       </Card>
 
       <Card title={`Claves (${keys.length})`} description="La clave en sí no se guarda: solo queda su huella. Si se pierde, se revoca y se crea otra.">
@@ -65,7 +69,13 @@ export default async function AgentsPage() {
                   <span className="font-semibold text-ink">{k.name}</span>
                   <Badge tone={k.active ? "ok" : "danger"}>{k.active ? "Activa" : "Revocada"}</Badge>
                   <Badge>{k.preset === "custom" ? "Permisos personalizados" : PRESETS[k.preset].label}</Badge>
+                  <Badge tone={k.scope.all ? "primary" : "neutral"}>{accessSummary(k.scope.all ? { all: true } : { all: false, clientIds: k.scope.clients.map((c) => c.id), projectIds: k.scope.projects.map((x) => x.id) })}</Badge>
                 </div>
+                {!k.scope.all ? (
+                  <p className="text-[15px] text-ink-muted">
+                    {[...k.scope.clients.map((c) => `${c.name} (todos sus proyectos)`), ...k.scope.projects.map((x) => `${x.clientName} · ${x.name}`)].join(" · ") || "Los clientes y proyectos elegidos ya no existen."}
+                  </p>
+                ) : null}
                 <p className="text-[15px] text-ink-muted">
                   Creada {formatDate(k.createdAt)} · {k.lastUsedAt ? `último uso ${formatDate(k.lastUsedAt)}` : "sin usar todavía"}
                   {k.revokedAt ? ` · revocada ${formatDate(k.revokedAt)}` : ""}

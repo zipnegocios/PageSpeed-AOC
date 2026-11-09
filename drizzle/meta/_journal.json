@@ -43,6 +43,13 @@
       "when": 1793721791335,
       "tag": "0005_pin_visible",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794184310950,
+      "tag": "0006_claves_con_alcance",
+      "breakpoints": true
     }
   ]
 }

@@ -204,6 +204,11 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 - Tres niveles de permisos (presets): solo lectura, + auditorías, + configuración. La clave guarda los nombres
   de las herramientas permitidas; las demás ni aparecen en `tools/list`. Ninguna herramienta borra, cambia la
   fase, rota links ni suspende clientes.
+- **Alcance por datos:** cada clave llega a todos los clientes y proyectos (`all_access`) o solo a una lista de
+  clientes (con todos sus proyectos, también los futuros) y proyectos sueltos (`client_ids`, `project_ids`). Cada
+  herramienta lo comprueba antes de leer o cambiar (`src/mcp/access.ts`, reglas en `server/domain/mcp-access.ts`);
+  lo que queda fuera responde «no encontrado», como si no existiera. Al crear la clave hay que elegir una de las dos
+  cosas.
 - Límites en memoria: 60 llamadas por minuto por clave y 20 claves inválidas cada 10 minutos por IP.
 - `run_audit` reutiliza `requestAudit` (idempotente, exige worker en línea, respeta la fase) con `trigger = mcp` y
   `requested_by = mcp:<nombre de la clave>`. Con una URL crea una ruta puntual (`source = adhoc`, sin monitoreo),

@@ -152,8 +152,8 @@ export async function archiveProjectAction(id: string, clientId: string, _prev: 
 }
 
 /**
- * Solicita auditar una ruta. En desarrollo el formulario trae el perfil elegido; en producción
- * no trae ninguno y se auditan ambos (móvil y escritorio).
+ * Solicita auditar una ruta. El formulario trae el perfil elegido («mobile» o «desktop»); sin perfil
+ * (o con «both») se auditan los dos, móvil y escritorio, en cualquier fase.
  */
 export async function requestAuditAction(
   projectId: string,

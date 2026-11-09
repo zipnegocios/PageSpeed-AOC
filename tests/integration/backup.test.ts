@@ -65,7 +65,7 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
       .returning();
     await alerts.evaluateAudit(a!.id, { db });
     await alerts.sweepNotifications({ db, mailer: { send: async () => undefined }, recipient: "a@x.test", appUrl: "https://app.test", now: () => new Date("2026-10-30T10:05:00Z") });
-    await createApiKey({ name: "agente", preset: "read" }, db);
+    await createApiKey({ name: "agente", preset: "read", access: "all" }, db);
     await db.insert(s.adminUsers).values({ email: "admin@x.test", passwordHash: "scrypt$hash" });
     await db.insert(s.settings).values({ key: "default_thresholds", value: { performance: 80, seo: 90 } });
     return { client, project, home };

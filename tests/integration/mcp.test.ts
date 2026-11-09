@@ -64,8 +64,9 @@ describe.skipIf(!ready)("servidor MCP", () => {
     return handleMcpRequest(new Request(url, { ...init, headers }), d());
   }) as typeof fetch;
 
-  async function connect(preset: "read" | "audit" | "configure") {
-    const { key } = await createApiKey({ name: `agente-${preset}`, preset }, db);
+  async function connect(preset: "read" | "audit" | "configure", scope: { clientIds?: string[]; projectIds?: string[] } = {}) {
+    const selected = (scope.clientIds?.length ?? 0) + (scope.projectIds?.length ?? 0) > 0;
+    const { key } = await createApiKey({ name: `agente-${preset}`, preset, access: selected ? "selected" : "all", ...scope }, db);
     const client = new Client({ name: "prueba", version: "1.0.0" });
     await client.connect(new StreamableHTTPClientTransport(new URL(URL_MCP), { fetch: fetchVia(key, () => deps) }));
     opened.push(client);
@@ -108,14 +109,14 @@ describe.skipIf(!ready)("servidor MCP", () => {
       expect(none.headers.get("www-authenticate")).toContain("Bearer");
       expect((await raw(`pagespeed_${"a".repeat(43)}`)).status).toBe(401);
       expect((await raw("no-es-clave")).status).toBe(401);
-      const { key, view } = await createApiKey({ name: "clave-de-prueba", preset: "read" }, db);
+      const { key, view } = await createApiKey({ name: "clave-de-prueba", preset: "read", access: "all" }, db);
       expect((await raw(key)).status).toBe(200);
       await revokeApiKey(view.id, db);
       expect((await raw(key)).status).toBe(401);
     });
 
     it("en la base solo queda el hash de la clave, y se anota su último uso", async () => {
-      const { key, view } = await createApiKey({ name: "clave-de-prueba", preset: "read" }, db);
+      const { key, view } = await createApiKey({ name: "clave-de-prueba", preset: "read", access: "all" }, db);
       const [row] = await db.select().from(s.mcpApiKeys);
       expect(JSON.stringify(row)).not.toContain(key.slice(4));
       expect(row!.keyHash).toMatch(/^[0-9a-f]{64}$/);
@@ -126,7 +127,7 @@ describe.skipIf(!ready)("servidor MCP", () => {
     });
 
     it("rechaza un Origin ajeno, acepta el propio y solo admite POST", async () => {
-      const { key } = await createApiKey({ name: "clave-de-prueba", preset: "read" }, db);
+      const { key } = await createApiKey({ name: "clave-de-prueba", preset: "read", access: "all" }, db);
       expect((await raw(key, { headers: { Origin: "https://evil.test" } })).status).toBe(403);
       expect((await raw(key, { headers: { Origin: "https://app.test" } })).status).toBe(200);
       const get = await fetchVia(key, () => deps)(URL_MCP, { method: "GET", headers: { Accept: "text/event-stream" } });
@@ -140,7 +141,7 @@ describe.skipIf(!ready)("servidor MCP", () => {
       expect(blocked.status).toBe(429);
       expect(blocked.headers.get("retry-after")).toMatch(/^\d+$/);
       deps.ip = "8.8.8.8";
-      const { key } = await createApiKey({ name: "clave-de-prueba", preset: "read" }, db);
+      const { key } = await createApiKey({ name: "clave-de-prueba", preset: "read", access: "all" }, db);
       for (let i = 0; i < 3; i++) expect((await raw(key)).status).toBe(200);
       expect((await raw(key)).status).toBe(429);
     });
@@ -260,12 +261,13 @@ describe.skipIf(!ready)("servidor MCP", () => {
       void project;
     });
 
-    it("en desarrollo exige elegir perfil", async () => {
+    it("en desarrollo, sin perfil audita móvil y escritorio, y con perfil solo ese", async () => {
       const { home } = await seed("development");
       const { client: agent } = await connect("audit");
-      const r = await call(agent, "run_audit", { route_id: home.id });
-      expect(r.isError).toBe(true);
-      expect(r.text).toContain("un perfil a la vez");
+      const both = await call(agent, "run_audit", { route_id: home.id });
+      expect(both.isError).toBeFalsy();
+      expect(both.json.created).toBe(2);
+      await db.delete(s.auditLogs);
       expect((await call(agent, "run_audit", { route_id: home.id, profile: "desktop" })).json.created).toBe(1);
     });
 
@@ -358,6 +360,92 @@ describe.skipIf(!ready)("servidor MCP", () => {
       expect(r.text).toContain("rutas puntuales");
       // Una ruta que ya existe sí se puede auditar.
       expect((await call(agent, "run_audit", { project_id: project.id, url: "/p3", profile: "mobile" })).isError).toBe(false);
+    });
+  });
+
+  describe("alcance por clientes y proyectos", () => {
+    /** Dos clientes con un proyecto cada uno, y un segundo proyecto del primero. */
+    async function seedTwo() {
+      const a = await seed("production");
+      const clientB = await clients.createClient({ name: "Beta" }, db);
+      const projectB = await projects.createProject(clientB.id, { name: "Blog", baseUrl: "https://beta.test" }, db);
+      const routeB = await routes.addRoute(projectB.id, { path: "/" }, db);
+      const projectA2 = await projects.createProject(a.client.id, { name: "Intranet", baseUrl: "https://acme.test" }, db);
+      const routeA2 = await routes.addRoute(projectA2.id, { path: "/" }, db);
+      const auditB = await db.insert(s.auditLogs).values({
+        projectId: projectB.id, routeId: routeB.id, profile: "mobile", trigger: "scheduled", phaseAtRun: "production", status: "succeeded",
+        scorePerformance: 70, scoreSeo: 90, scoreAccessibility: 100, scoreBestPractices: 100, r2Key: "k", queuedAt: new Date(), finishedAt: new Date(),
+      }).returning().then((r) => r[0]!);
+      return { ...a, clientB, projectB, routeB, projectA2, routeA2, auditB };
+    }
+
+    it("una clave de un cliente ve todos sus proyectos (también los nuevos) y ninguno de los demás", async () => {
+      const t = await seedTwo();
+      const { client: agent } = await connect("configure", { clientIds: [t.client.id] });
+      const listed = (await call(agent, "list_projects")).json.projects.map((p: { project_id: string }) => p.project_id).sort();
+      expect(listed).toEqual([t.project.id, t.projectA2.id].sort());
+      // Un proyecto creado después de la clave, del mismo cliente, entra solo.
+      const later = await projects.createProject(t.client.id, { name: "Nuevo", baseUrl: "https://acme.test" }, db);
+      expect((await call(agent, "list_projects")).json.projects.map((p: { project_id: string }) => p.project_id)).toContain(later.id);
+      expect((await call(agent, "get_project", { project_id: t.projectA2.id })).isError).toBe(false);
+    });
+
+    it("una clave de un proyecto solo ve ese proyecto, no los demás del mismo cliente", async () => {
+      const t = await seedTwo();
+      const { client: agent } = await connect("read", { projectIds: [t.project.id] });
+      expect((await call(agent, "list_projects")).json.projects.map((p: { project_id: string }) => p.project_id)).toEqual([t.project.id]);
+      expect((await call(agent, "get_project", { project_id: t.project.id })).isError).toBe(false);
+      expect((await call(agent, "get_project", { project_id: t.projectA2.id })).isError).toBe(true);
+    });
+
+    it("lo que queda fuera se responde como si no existiera, en todas las herramientas", async () => {
+      const t = await seedTwo();
+      const { client: agent } = await connect("configure", { clientIds: [t.client.id] });
+      const denied = async (name: string, args: Record<string, unknown>, what: string) => {
+        const r = await call(agent, name, args);
+        expect([name, r.isError, r.text]).toEqual([name, true, expect.stringContaining(`${what} no encontrad`)]);
+      };
+      await denied("get_project", { project_id: t.projectB.id }, "Proyecto");
+      await denied("list_routes", { project_id: t.projectB.id }, "Proyecto");
+      await denied("get_thresholds", { project_id: t.projectB.id }, "Proyecto");
+      await denied("discover_routes", { project_id: t.projectB.id }, "Proyecto");
+      await denied("set_thresholds", { project_id: t.projectB.id, thresholds: [{ metric: "seo", min_score: 33 }] }, "Proyecto");
+      await denied("add_route", { project_id: t.projectB.id, path: "/nueva" }, "Proyecto");
+      await denied("get_audit_history", { route_id: t.routeB.id }, "Ruta");
+      await denied("set_route_monitored", { route_id: t.routeB.id, monitored: false }, "Ruta");
+      await denied("run_audit", { route_id: t.routeB.id, profile: "mobile" }, "Ruta");
+      await denied("run_audit", { project_id: t.projectB.id, url: "/x", profile: "mobile" }, "Proyecto");
+      await denied("get_audit", { audit_id: t.auditB.id }, "Auditoría");
+      // Nada se cambió ni se encoló en el proyecto ajeno.
+      expect(await db.select().from(s.auditLogs).where(eq(s.auditLogs.projectId, t.projectB.id))).toHaveLength(1);
+      expect((await db.select().from(s.alertThresholds).where(eq(s.alertThresholds.projectId, t.projectB.id))).some((x) => x.minScore === 33)).toBe(false);
+      expect((await db.select().from(s.routes).where(eq(s.routes.projectId, t.projectB.id))).map((r) => r.path)).toEqual(["/"]);
+      const status = (await call(agent, "get_audit_status", { audit_ids: [t.auditB.id] })).json.audits;
+      expect(status).toEqual([{ audit_id: t.auditB.id, status: "not_found" }]);
+    });
+
+    it("dentro del alcance todo funciona igual y una clave de acceso total no cambia", async () => {
+      const t = await seedTwo();
+      const scoped = (await connect("audit", { clientIds: [t.clientB.id] })).client;
+      expect((await call(scoped, "run_audit", { route_id: t.routeB.id, profile: "mobile" })).json.created).toBe(1);
+      expect((await call(scoped, "get_audit", { audit_id: t.auditB.id })).json.audit_id).toBe(t.auditB.id);
+      const all = (await connect("read")).client;
+      expect((await call(all, "list_projects")).json.projects).toHaveLength(3);
+      expect((await call(all, "get_project", { project_id: t.projectB.id })).isError).toBe(false);
+    });
+
+    it("al crear la clave se valida el alcance", async () => {
+      const t = await seedTwo();
+      await expect(createApiKey({ name: "sin alcance", preset: "read", access: "selected" }, db)).rejects.toThrow(/al menos un cliente o un proyecto/);
+      await expect(createApiKey({ name: "sin alcance", preset: "read" }, db)).rejects.toThrow();
+      await expect(createApiKey({ name: "id falso", preset: "read", access: "selected", clientIds: ["00000000-0000-4000-8000-000000000000"] }, db)).rejects.toThrow(/ya no existe/);
+      // Un proyecto de un cliente ya elegido es redundante: solo se guarda el cliente.
+      const { view } = await createApiKey({ name: "mixta", preset: "read", access: "selected", clientIds: [t.client.id], projectIds: [t.project.id, t.projectB.id] }, db);
+      expect(view.scope.all).toBe(false);
+      expect(view.scope.clients.map((c) => c.name)).toEqual(["Acme"]);
+      expect(view.scope.projects.map((p) => p.name)).toEqual(["Blog"]);
+      const full = await createApiKey({ name: "total", preset: "read", access: "all", clientIds: [t.client.id] }, db);
+      expect(full.view.scope).toEqual({ all: true, clients: [], projects: [] });
     });
   });
 });

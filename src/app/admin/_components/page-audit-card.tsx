@@ -84,15 +84,26 @@ function DevicePanel({ block, page, projectId, now }: { block: ProfileBlock; pag
         </div>
       ) : null}
 
-      <ActionForm
-        action={requestAuditAction.bind(null, projectId, page.route.id)}
-        submitLabel="Auditar este dispositivo"
-        pendingLabel="Encolando…"
-        variant="secondary"
-        className="flex-row flex-wrap items-center gap-2"
-      >
-        <input type="hidden" name="profile" value={profile} />
-      </ActionForm>
+      <div className="flex flex-wrap items-center gap-3">
+        <ActionForm
+          action={requestAuditAction.bind(null, projectId, page.route.id)}
+          submitLabel="Auditar este dispositivo"
+          pendingLabel="Encolando…"
+          variant="secondary"
+          className="flex-row flex-wrap items-center gap-2"
+        >
+          <input type="hidden" name="profile" value={profile} />
+        </ActionForm>
+        <ActionForm
+          action={requestAuditAction.bind(null, projectId, page.route.id)}
+          submitLabel="Auditar móvil y escritorio"
+          pendingLabel="Encolando…"
+          variant="secondary"
+          className="flex-row flex-wrap items-center gap-2"
+        >
+          <input type="hidden" name="profile" value="both" />
+        </ActionForm>
+      </div>
     </div>
   );
 }

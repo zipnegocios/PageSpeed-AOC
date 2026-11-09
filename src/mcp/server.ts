@@ -14,7 +14,7 @@ const failure = (message: string): ToolResult => ({ content: [{ type: "text", te
 export function createMcpServer(auth: ApiKeyAuth, options: { log?: McpLog; context?: Partial<ToolContext> } = {}): McpServer {
   const server = new McpServer({ name: "pagespeed", version: "1.0.0" });
   const allowed = new Set<string>(auth.scopes);
-  const ctx: ToolContext = { keyName: auth.name, ...options.context };
+  const ctx: ToolContext = { keyName: auth.name, access: auth.access, ...options.context };
 
   for (const tool of TOOLS) {
     if (!allowed.has(tool.name)) continue;

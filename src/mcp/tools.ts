@@ -1,18 +1,22 @@
 import { z } from "zod";
 import { isDomainError } from "@/server/domain/errors";
 import type { Profile } from "@/server/domain/audit-rules";
+import { canAccessProject, type KeyAccess } from "@/server/domain/mcp-access";
 import { type ToolName } from "@/server/domain/mcp-scopes";
 import { listOpenAlerts } from "@/server/services/alerts";
 import { getAudit, getAuditInsights, requestAudit } from "@/server/services/audits";
 import { getLatestScores, getRouteHistory } from "@/server/services/history";
 import { getProject, listAllProjects } from "@/server/services/projects";
-import { addRoute, findOrCreateAdhocRoute, getRoute, listRoutes, setRouteMonitored } from "@/server/services/routes";
+import { addRoute, findOrCreateAdhocRoute, listRoutes, setRouteMonitored } from "@/server/services/routes";
 import { discoverRoutes } from "@/server/services/sitemap-discovery";
+import { requireAudit, requireProject, requireRoute } from "./access";
 import { getThresholds, setThresholds } from "@/server/services/thresholds";
 
 export type ToolContext = {
   /** Quién llama: se anota en las auditorías que lance. */
   keyName: string;
+  /** A qué clientes y proyectos llega la clave que llama. Cada herramienta lo comprueba antes de leer o cambiar nada. */
+  access: KeyAccess;
   /** Pausa entre sondeos de `run_audit` con espera; sustituible en pruebas. */
   sleep?: (ms: number) => Promise<void>;
 };
@@ -72,14 +76,15 @@ export const TOOLS = [
   defineTool({
     name: "list_projects",
     title: "Listar proyectos",
-    description: "Lista los proyectos vigentes con su cliente, fase (development/production) y frecuencia. Úsala primero para obtener los project_id.",
+    description: "Lista los proyectos vigentes a los que tu clave tiene acceso, con su cliente, fase (development/production) y frecuencia. Úsala primero para obtener los project_id.",
     input: { client: z.string().trim().max(100).optional().describe("Filtra por nombre de cliente (contiene, sin distinguir mayúsculas).") },
     readOnly: true,
-    run: async ({ client }) => {
+    run: async ({ client }, ctx) => {
       const all = await listAllProjects();
       const q = client?.toLowerCase();
       return {
         projects: all
+          .filter((p) => canAccessProject(ctx.access, p))
           .filter((p) => !q || p.clientName.toLowerCase().includes(q))
           .map((p) => ({ project_id: p.id, name: p.name, client: p.clientName, phase: p.phase, base_url: p.baseUrl, audit_frequency: p.auditFrequency })),
       };
@@ -92,7 +97,8 @@ export const TOOLS = [
     description: "Detalle de un proyecto: fase, hosts permitidos, rutas, umbrales, alertas abiertas y la última puntuación de cada ruta y perfil con su variación frente a la auditoría anterior.",
     input: { project_id: uuid("project_id") },
     readOnly: true,
-    run: async ({ project_id }) => {
+    run: async ({ project_id }, ctx) => {
+      await requireProject(ctx.access, project_id);
       const [project, routes, thresholds, alerts, latest] = await Promise.all([
         getProject(project_id),
         listRoutes(project_id),
@@ -132,7 +138,8 @@ export const TOOLS = [
     description: "Rutas (páginas) de un proyecto. `monitored` indica si entran a las auditorías programadas de producción.",
     input: { project_id: uuid("project_id"), only_monitored: z.boolean().optional().describe("Solo las monitoreadas.") },
     readOnly: true,
-    run: async ({ project_id, only_monitored }) => {
+    run: async ({ project_id, only_monitored }, ctx) => {
+      await requireProject(ctx.access, project_id);
       const routes = await listRoutes(project_id);
       return {
         routes: routes
@@ -153,8 +160,8 @@ export const TOOLS = [
       limit: z.number().int().min(1).max(200).optional().describe("Máximo de auditorías por perfil (1-200). Por defecto 30."),
     },
     readOnly: true,
-    run: async ({ route_id, profile: p, days, limit }) => {
-      const route = await getRoute(route_id);
+    run: async ({ route_id, profile: p, days, limit }, ctx) => {
+      const route = await requireRoute(ctx.access, route_id);
       const profiles: Profile[] = p ? [p] : ["mobile", "desktop"];
       const out: Record<string, unknown> = {};
       for (const prof of profiles) {
@@ -171,8 +178,9 @@ export const TOOLS = [
     description: "Resultado de una auditoría. Con `include_details` suma las mejoras principales de Lighthouse y las comprobaciones que fallan por categoría (las explicaciones de por qué sube o baja cada puntuación).",
     input: { audit_id: uuid("audit_id"), include_details: z.boolean().optional().describe("Incluir mejoras y comprobaciones fallidas (lee el informe completo).") },
     readOnly: true,
-    run: async ({ audit_id, include_details }) => {
+    run: async ({ audit_id, include_details }, ctx) => {
       const audit = await getAudit(audit_id);
+      await requireAudit(ctx.access, audit);
       const base = auditSummary(audit);
       if (!include_details) return base;
       const insights = await getAuditInsights(audit);
@@ -200,11 +208,13 @@ export const TOOLS = [
     description: "Estado de hasta 10 auditorías (queued, running, succeeded, failed) para consultar el avance de las que lanzó run_audit.",
     input: { audit_ids: z.array(uuid("audit_id")).min(1).max(10).describe("Identificadores de auditoría.") },
     readOnly: true,
-    run: async ({ audit_ids }) => ({
+    run: async ({ audit_ids }, ctx) => ({
       audits: await Promise.all(
         audit_ids.map(async (id) => {
           try {
-            return auditSummary(await getAudit(id));
+            const audit = await getAudit(id);
+            await requireAudit(ctx.access, audit);
+            return auditSummary(audit);
           } catch (err) {
             if (isDomainError(err) && err.code === "NOT_FOUND") return { audit_id: id, status: "not_found" };
             throw err;
@@ -220,9 +230,10 @@ export const TOOLS = [
     description: "Puntuación mínima aceptable por métrica en un proyecto. Bajo ese valor, en producción, se abre una alerta.",
     input: { project_id: uuid("project_id") },
     readOnly: true,
-    run: async ({ project_id }) => ({
-      thresholds: (await getThresholds(project_id)).map((t) => ({ metric: t.metric, min_score: t.minScore, enabled: t.enabled })),
-    }),
+    run: async ({ project_id }, ctx) => {
+      await requireProject(ctx.access, project_id);
+      return { thresholds: (await getThresholds(project_id)).map((t) => ({ metric: t.metric, min_score: t.minScore, enabled: t.enabled })) };
+    },
   }),
 
   defineTool({
@@ -230,7 +241,7 @@ export const TOOLS = [
     title: "Lanzar una auditoría",
     description:
       "Encola una auditoría de Lighthouse. Indica `route_id`, o `project_id` + `url` (ruta o URL completa de un host permitido; se crea como ruta puntual sin monitoreo). " +
-      "En producción sin `profile` se auditan móvil y escritorio; en desarrollo `profile` es obligatorio. Si ya hay una pendiente para esa ruta y perfil, la devuelve. " +
+      "Sin `profile` se auditan móvil y escritorio (también en desarrollo). Si ya hay una pendiente para esa ruta y perfil, la devuelve. " +
       "Las auditorías corren de una en una en un servidor compartido: pueden tardar. Con `wait_seconds` espera el resultado hasta ese tiempo; si no termina, consulta después con get_audit_status.",
     input: {
       route_id: uuid("route_id").optional(),
@@ -242,10 +253,13 @@ export const TOOLS = [
     readOnly: false,
     run: async ({ route_id, project_id, url, profile: p, wait_seconds }, ctx) => {
       let routeId = route_id;
-      if (!routeId) {
+      if (routeId) {
+        await requireRoute(ctx.access, routeId);
+      } else {
         if (!project_id || !url) {
           return { error: "Indica route_id, o project_id junto con url." };
         }
+        await requireProject(ctx.access, project_id);
         routeId = (await findOrCreateAdhocRoute(project_id, url)).id;
       }
       const result = await requestAudit({ routeId, profiles: p ? [p] : undefined, trigger: "mcp", requestedBy: `mcp:${ctx.keyName}` });
@@ -276,7 +290,8 @@ export const TOOLS = [
     description: "Lee el sitemap del proyecto y propone rutas que aún no están agregadas. No agrega nada: usa add_route para las que quieras.",
     input: { project_id: uuid("project_id") },
     readOnly: true,
-    run: async ({ project_id }) => {
+    run: async ({ project_id }, ctx) => {
+      await requireProject(ctx.access, project_id);
       const r = await discoverRoutes(project_id);
       return {
         sitemap_url: r.sitemapUrl,
@@ -307,7 +322,8 @@ export const TOOLS = [
         .max(4),
     },
     readOnly: false,
-    run: async ({ project_id, thresholds }) => {
+    run: async ({ project_id, thresholds }, ctx) => {
+      await requireProject(ctx.access, project_id);
       const saved = await setThresholds(
         project_id,
         thresholds.map((t) => ({ metric: t.metric, minScore: t.min_score, enabled: t.enabled ?? true })),
@@ -322,7 +338,8 @@ export const TOOLS = [
     description: "Agrega una ruta al proyecto y la deja monitoreada (entra a las auditorías programadas de producción). Acepta /ruta o una URL de un host permitido.",
     input: { project_id: uuid("project_id"), path: z.string().trim().min(1).max(500), label: z.string().trim().max(120).optional() },
     readOnly: false,
-    run: async ({ project_id, path, label }) => {
+    run: async ({ project_id, path, label }, ctx) => {
+      await requireProject(ctx.access, project_id);
       const r = await addRoute(project_id, { path, label });
       return { route: { route_id: r.id, path: r.path, url: r.url, monitored: r.monitored } };
     },
@@ -334,7 +351,8 @@ export const TOOLS = [
     description: "Activa o desactiva el monitoreo programado de una ruta. Conserva su historial; no la borra.",
     input: { route_id: uuid("route_id"), monitored: z.boolean() },
     readOnly: false,
-    run: async ({ route_id, monitored }) => {
+    run: async ({ route_id, monitored }, ctx) => {
+      await requireRoute(ctx.access, route_id);
       const r = await setRouteMonitored(route_id, monitored);
       return { route: { route_id: r.id, path: r.path, monitored: r.monitored } };
     },

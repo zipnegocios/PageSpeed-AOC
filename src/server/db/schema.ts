@@ -350,6 +350,12 @@ export const mcpApiKeys = pgTable("mcp_api_keys", {
     .array()
     .notNull()
     .default(sql`'{}'::text[]`),
+  // Alcance por datos: con `all_access` la clave ve todos los clientes y proyectos; si no, solo los de `client_ids`
+  // (con todos sus proyectos, también los futuros) y los de `project_ids`. Sin claves foráneas: un id de un cliente o
+  // proyecto que ya no existe simplemente no da acceso a nada.
+  allAccess: boolean("all_access").notNull().default(true),
+  clientIds: uuid("client_ids").array().notNull().default(sql`'{}'::uuid[]`),
+  projectIds: uuid("project_ids").array().notNull().default(sql`'{}'::uuid[]`),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

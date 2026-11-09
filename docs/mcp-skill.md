@@ -6,7 +6,7 @@ Esta guía es para el agente de IA (o la persona que lo configura). Explica qué
 
 Audita con Lighthouse las páginas de los sitios de los clientes y guarda el historial. Cada **proyecto** pertenece a un **cliente** y tiene **rutas** (páginas). Cada auditoría se hace en un **perfil**: `mobile` o `desktop`.
 
-- **Fase `development`**: se audita una página a la vez, bajo demanda y **con un solo perfil**. No hay alertas.
+- **Fase `development`**: se audita bajo demanda, una página a la vez, con uno o ambos perfiles. No hay auditorías programadas ni alertas.
 - **Fase `production`**: las rutas *monitoreadas* se auditan solas (semanal o diaria, móvil y escritorio). Si una puntuación baja de su umbral se abre una alerta y se avisa al administrador por correo.
 
 Puntuaciones de 0 a 100: **90-100 bueno**, **50-89 mejorable**, **0-49 deficiente**. LCP y TBT en milisegundos; CLS sin unidad. Lighthouse en laboratorio no mide INP: usa TBT.
@@ -22,6 +22,8 @@ Puntuaciones de 0 a 100: **90-100 bueno**, **50-89 mejorable**, **0-49 deficient
 
 Tu clave solo ve las herramientas de su nivel. Si una no aparece en `tools/list`, no tienes permiso: no la intentes por otro camino.
 
+**Tu clave también tiene un alcance de datos**: puede llegar a todos los clientes y proyectos, o solo a los clientes (con todos sus proyectos, también los futuros) y proyectos que la persona administradora eligió al crearla. `list_projects` solo devuelve los tuyos; cualquier otro proyecto, ruta o auditoría responde «no encontrado», igual que si no existiera. No intentes adivinar identificadores ajenos: no los vas a ver, y no es un error tuyo.
+
 | Nivel | Herramientas |
 |---|---|
 | **Solo lectura** | `list_projects`, `get_project`, `list_routes`, `get_audit_history`, `get_audit`, `get_audit_status`, `get_thresholds` |
@@ -36,7 +38,7 @@ Tu clave solo ve las herramientas de su nivel. Si una no aparece en `tools/list`
 2. **Para explicar una puntuación, usa `get_audit` con `include_details: true`**: devuelve las comprobaciones de Lighthouse que fallan por categoría (con su porqué y enlace) y las mejoras con más ahorro. Es más barato que adivinar.
 3. **Para tendencias, `get_audit_history`** (más reciente primero). Pide solo el periodo y el límite que necesites; no traigas un año entero si basta un mes.
 4. **Lanzar una auditoría es costoso**: corre en un servidor compartido con los sitios de los clientes, de una en una y con pausa entre cada una. Hazlo solo cuando la persona lo pida o cuando falte un dato imprescindible.
-   - Usa `profile` para auditar un solo perfil cuando no necesites los dos. En desarrollo es obligatorio.
+   - Usa `profile` para auditar un solo perfil cuando no necesites los dos; sin él se auditan móvil y escritorio, también en desarrollo.
    - Si ya hay una auditoría pendiente de esa ruta y perfil, `run_audit` te devuelve esa: no se duplica.
    - Con `wait_seconds` (máx. 45) esperas el resultado; si no llega, la respuesta lo dice. **No repitas `run_audit`**: consulta con `get_audit_status` pasados unos segundos.
    - Con `project_id` + `url` se crea una ruta puntual (sin monitoreo) solo si el host está permitido para ese proyecto. Hay un tope de 50 rutas puntuales por proyecto.

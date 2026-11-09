@@ -195,13 +195,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2">
-                  <ActionForm action={requestAuditAction.bind(null, id, r.id)} submitLabel={production ? "Auditar (móvil y escritorio)" : "Auditar"} variant="secondary" pendingLabel="Encolando…" className="flex-row flex-wrap items-center gap-2">
-                    {production ? null : (
-                      <select name="profile" aria-label="Perfil a auditar" defaultValue="mobile" className="min-h-11 rounded-sm border border-border-strong bg-surface-100 px-2 text-[17px] text-ink">
-                        <option value="mobile">Móvil</option>
-                        <option value="desktop">Escritorio</option>
-                      </select>
-                    )}
+                  <ActionForm action={requestAuditAction.bind(null, id, r.id)} submitLabel="Auditar" variant="secondary" pendingLabel="Encolando…" className="flex-row flex-wrap items-center gap-2">
+                    <select name="profile" aria-label="Perfil a auditar" defaultValue="both" className="min-h-11 rounded-sm border border-border-strong bg-surface-100 px-2 text-[17px] text-ink">
+                      <option value="both">Móvil y escritorio</option>
+                      <option value="mobile">Solo móvil</option>
+                      <option value="desktop">Solo escritorio</option>
+                    </select>
                   </ActionForm>
                   <Badge tone={r.monitored ? "ok" : "neutral"}>{r.monitored ? "Monitoreada" : "Inactiva"}</Badge>
                   <ActionForm action={toggleRouteAuthAction.bind(null, id, r.id, !r.requiresAuth)} submitLabel={r.requiresAuth ? "Sin sesión" : "Pedir sesión"} variant="ghost" pendingLabel="…" />
