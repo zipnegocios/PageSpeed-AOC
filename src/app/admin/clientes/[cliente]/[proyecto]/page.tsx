@@ -9,7 +9,7 @@ import { Alert } from "@/lib/ui/components/alert";
 import { Card } from "@/lib/ui/components/card";
 import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getWhatsappLinkForProject, listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
-import { listAudits } from "@/server/services/audits";
+import { getFirstScanSummary, listAudits } from "@/server/services/audits";
 import { authKeyStatus, getProjectAuthSummary } from "@/server/services/project-auth";
 import { getPageAudits } from "@/server/services/pages";
 import { getNextScheduledRun, getProjectByRef } from "@/server/services/projects";
@@ -46,6 +46,7 @@ import {
 } from "@/app/admin/proyectos/actions";
 import { PageAuditCard } from "@/app/admin/_components/page-audit-card";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
+import { FirstScanBlock } from "./first-scan-block";
 import { SitemapImporter } from "./sitemap-importer";
 import { pageTitle } from "@/lib/brand";
 
@@ -70,7 +71,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const id = project.id;
   const base = projectPath(project.clientSlug, project.slug);
   const now = new Date();
-  const [routes, thresholds, audits, pages, alerts, notifications, whatsappLink, authSummary] = await Promise.all([
+  const [routes, thresholds, audits, pages, alerts, notifications, whatsappLink, authSummary, firstScan] = await Promise.all([
     listRoutes(id),
     getThresholds(id),
     listAudits(id, 20),
@@ -79,6 +80,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     listRecentNotifications(5, id),
     getWhatsappLinkForProject(id),
     getProjectAuthSummary(id),
+    getFirstScanSummary(id),
   ]);
   const authKey = authKeyStatus();
   const client = await getClient(project.clientId);
@@ -168,7 +170,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         description={
           production
             ? `Producción: se audita en móvil y escritorio con la frecuencia elegida y las alertas están activas. ${nextRun ? `Próxima auditoría programada: ${formatDate(nextRun)}.` : "Aún no tiene una próxima auditoría agendada; se corrige sola en unos minutos."}`
-            : "Desarrollo: se audita una página a la vez bajo demanda y no se envían alertas."
+            : "Desarrollo: se audita bajo demanda (una ruta o todas a la vez, en móvil y escritorio) y no se envían alertas."
         }
       >
         <ActionForm action={setPhaseAction.bind(null, id)} submitLabel="Cambiar fase" variant="secondary" className="max-w-md">
@@ -231,6 +233,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <SitemapImporter discover={discoverRoutesAction.bind(null, id)} importRoutes={importRoutesAction.bind(null, id)} />
           </div>
         </details>
+
+        {routes.length > 0 ? <FirstScanBlock projectId={id} summary={firstScan} hasMonitored={routes.some((r) => r.monitored)} /> : null}
       </Card>
 
       <Card

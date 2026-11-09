@@ -2,7 +2,7 @@ import { gunzipSync } from "node:zlib";
 import type { Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import { getDb, type Database } from "@/server/db/client";
-import { assertRouteAuditable, planProfiles, type AuditTrigger, type Profile } from "@/server/domain/audit-rules";
+import { assertRouteAuditable, planFirstScan, planProfiles, type AuditTrigger, type Profile } from "@/server/domain/audit-rules";
 import { DomainError } from "@/server/domain/errors";
 import { readHeartbeat } from "@/server/queue/heartbeat";
 import { failedChecks, type CategoryChecks } from "@/server/domain/failed-checks";
@@ -10,8 +10,8 @@ import { topOpportunities, type LhrLike, type Opportunity } from "@/server/domai
 import { getRedis } from "@/server/queue/connection";
 import { auditJobOptions, lighthouseQueue, PRIORITY, type AuditJobData } from "@/server/queue/queues";
 import * as repo from "@/server/repositories/audits";
-import { findProject } from "@/server/repositories/projects";
-import { findRoute } from "@/server/repositories/routes";
+import { findProject, type Project } from "@/server/repositories/projects";
+import { findRoute, listRoutes, type Route } from "@/server/repositories/routes";
 import { localizeLhr, type UiLocale } from "@/server/report/lighthouse-report";
 import { getR2, type R2Store } from "@/server/storage/r2";
 import { assertUuid, isUniqueViolation } from "./shared";
@@ -78,6 +78,23 @@ export async function requestAudit(input: RequestAuditInput, deps: RequestAuditD
         : PRIORITY.scheduled
       : PRIORITY.manual;
 
+  return enqueueRouteAudits({ db, queue }, route, project, profiles, input.trigger, priority, input.requestedBy);
+}
+
+/**
+ * Inserta la fila de audit_logs de cada perfil y encola su trabajo. Idempotente: si ya hay una pendiente de esa
+ * ruta y perfil, devuelve esa. Si no se puede encolar, la fila se marca fallida para no bloquear la ruta.
+ */
+async function enqueueRouteAudits(
+  ctx: { db: Database; queue: Queue<AuditJobData> },
+  route: Route,
+  project: Pick<Project, "id" | "phase">,
+  profiles: Profile[],
+  trigger: AuditTrigger,
+  priority: number,
+  requestedBy: string,
+): Promise<RequestAuditResult> {
+  const { db, queue } = ctx;
   const audits: repo.AuditLog[] = [];
   let created = 0;
   let alreadyPending = 0;
@@ -89,8 +106,8 @@ export async function requestAudit(input: RequestAuditInput, deps: RequestAuditD
         projectId: project.id,
         routeId: route.id,
         profile,
-        trigger: input.trigger,
-        requestedBy: input.requestedBy,
+        trigger,
+        requestedBy,
         phaseAtRun: project.phase,
       });
     } catch (err) {
@@ -113,6 +130,113 @@ export async function requestAudit(input: RequestAuditInput, deps: RequestAuditD
     created++;
   }
   return { audits, created, alreadyPending };
+}
+
+/** Lo que el primer escaneo haría hoy en un proyecto, para mostrarlo en la ficha (no toca Redis). */
+export type FirstScanSummary = {
+  /** Rutas con algo por escanear. */
+  routesToScan: number;
+  /** Auditorías que se crearían (móvil y escritorio). */
+  auditsToQueue: number;
+  /** Dispositivos que ya están en cola o en curso. */
+  alreadyPending: number;
+  /** Rutas que piden sesión y el proyecto no tiene el acceso configurado. */
+  skippedAuth: number;
+  /** Rutas cuyo host ya no está en los hosts permitidos del proyecto. */
+  skippedHost: number;
+};
+
+function authIsConfigured(project: Pick<Project, "authStrategy" | "authConfigEnc">): boolean {
+  return project.authStrategy !== "none" && project.authConfigEnc !== null;
+}
+
+/** Rutas auditables del proyecto (host permitido) y cuántas se dejaron fuera por ese motivo. */
+function splitAuditable(routes: Route[], allowedHosts: string[]): { auditable: Route[]; skippedHost: number } {
+  const auditable: Route[] = [];
+  let skippedHost = 0;
+  for (const r of routes) {
+    if (!r.monitored) {
+      auditable.push(r);
+      continue;
+    }
+    try {
+      assertRouteAuditable(r.url, allowedHosts);
+      auditable.push(r);
+    } catch {
+      skippedHost++;
+    }
+  }
+  return { auditable, skippedHost };
+}
+
+async function loadFirstScan(projectId: string, db: Database, budget: number) {
+  assertUuid(projectId, "Proyecto");
+  const project = await findProject(db, projectId);
+  if (!project) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+  const [allRoutes, covered] = await Promise.all([listRoutes(db, projectId), repo.listCoveredProfiles(db, projectId)]);
+  const { auditable, skippedHost } = splitAuditable(allRoutes, project.allowedHosts);
+  const plan = planFirstScan({ routes: auditable, covered, authConfigured: authIsConfigured(project), budget });
+  return { project, routes: auditable, plan, skippedHost };
+}
+
+export async function getFirstScanSummary(projectId: string, db: Database = getDb()): Promise<FirstScanSummary> {
+  const { plan, skippedHost } = await loadFirstScan(projectId, db, Number.POSITIVE_INFINITY);
+  return {
+    routesToScan: plan.targets.length,
+    auditsToQueue: plan.toQueue,
+    alreadyPending: plan.alreadyPending,
+    skippedAuth: plan.skippedAuth,
+    skippedHost,
+  };
+}
+
+export type FirstScanResult = {
+  /** Auditorías nuevas en cola. */
+  created: number;
+  /** Rutas a las que se les encoló algo. */
+  routes: number;
+  /** Dispositivos que ya estaban pendientes antes de pulsar. */
+  alreadyPending: number;
+  skippedAuth: number;
+  skippedHost: number;
+  /** Rutas que quedaron sin encolar por falta de cupo en la cola. */
+  routesWithoutRoom: number;
+};
+
+/**
+ * Primer escaneo de todas las rutas monitoreadas de un proyecto, móvil y escritorio. Encola solo lo que aún no tiene
+ * una auditoría correcta ni pendiente, hasta llenar el cupo de la cola; lo que no cabe se informa y se puede repetir.
+ */
+export async function requestFirstScan(
+  projectId: string,
+  requestedBy: string,
+  deps: RequestAuditDeps = {},
+): Promise<FirstScanResult> {
+  const db = deps.db ?? getDb();
+  assertUuid(projectId, "Proyecto");
+  const redis = deps.redis ?? getRedis();
+  const queue = deps.queue ?? lighthouseQueue(redis);
+
+  if (!(await readHeartbeat(redis))) {
+    throw new DomainError("UPSTREAM", "El worker de auditorías no está en línea. Inicia el servicio worker e inténtalo de nuevo.");
+  }
+  const counts = await queue.getJobCounts("waiting", "prioritized", "delayed");
+  const budget = Math.max(0, MAX_WAITING_JOBS - ((counts.waiting ?? 0) + (counts.prioritized ?? 0) + (counts.delayed ?? 0)));
+
+  const { project, routes, plan, skippedHost } = await loadFirstScan(projectId, db, budget);
+  const byId = new Map(routes.map((r) => [r.id, r]));
+  let created = 0;
+  let queuedRoutes = 0;
+  let alreadyPending = plan.alreadyPending;
+  for (const target of plan.targets) {
+    const route = byId.get(target.routeId);
+    if (!route) continue;
+    const res = await enqueueRouteAudits({ db, queue }, route, project, target.profiles, "manual", PRIORITY.bulk, requestedBy);
+    created += res.created;
+    alreadyPending += res.alreadyPending;
+    if (res.created > 0) queuedRoutes++;
+  }
+  return { created, routes: queuedRoutes, alreadyPending, skippedAuth: plan.skippedAuth, skippedHost, routesWithoutRoom: plan.routesWithoutRoom };
 }
 
 export async function listAudits(projectId: string, limit = 20, db: Database = getDb()) {

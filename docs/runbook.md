@@ -134,7 +134,7 @@ Una semana en producción sin degradar los sitios alojados.
 
 1. Antes: anota CPU y memoria en reposo (`docker stats`) y el tiempo de respuesta de 2-3 sitios vecinos (por ejemplo con `curl -w "%{time_total}"` cada 5 minutos).
 2. Pasa 3 proyectos reales a **producción** con 3-5 rutas monitoreadas cada uno.
-3. Lanza *Auditar (móvil y escritorio)* en todas las rutas a la vez: son ~30 auditorías. Verifica en **Cola** que corren de una en una (nunca dos *En curso*) y que la pausa entre ellas se respeta.
+3. Pulsa *Primer escaneo de todas las rutas* en cada proyecto (tarjeta *Rutas*; son ~30 auditorías en total; si la cola no admite más de 50 a la vez, repite el botón cuando avance). Verifica en **Cola** que corren de una en una (nunca dos *En curso*) y que la pausa entre ellas se respeta.
 4. Durante la ráfaga mide: pico de memoria del worker (< 2 GB), CPU total del VPS y tiempos de los sitios vecinos. Criterio: ningún vecino supera 2× su tiempo habitual de forma sostenida.
 5. Deja la semana corriendo. Revisa al final: fallos por código, respaldos diarios presentes en R2, alertas coherentes, correos recibidos.
 6. Prueba una restauración del último respaldo en una base de pruebas (sección 5).

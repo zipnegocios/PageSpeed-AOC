@@ -55,7 +55,7 @@ function CandidateList({ candidates, importRoutes }: { candidates: SitemapCandid
     });
 
   // Tras importar, la lista se reemplaza por la confirmación (si se desmontara, el mensaje se perdería).
-  if (doneMessage) return <Alert tone="info">{doneMessage}</Alert>;
+  if (doneMessage) return <Alert tone="info">{`${doneMessage} Usa «Primer escaneo» (abajo) para auditarlas en móvil y escritorio.`}</Alert>;
 
   return (
     <ActionForm

@@ -30,6 +30,12 @@ necesita `SMTP_*`, `EMAIL_FROM` y `APP_URL` (y opcionalmente `ALERT_EMAIL`); sin
 evalúa las alertas y lo avisa en los logs.
 
 - Si no hay worker en línea, el botón **Auditar** se niega con un aviso (no deja filas bloqueadas).
+- **Primer escaneo de todas las rutas:** en la tarjeta *Rutas* de la ficha del proyecto, junto a «Descubrir desde el sitemap»,
+  el bloque «Primer escaneo» audita en móvil y escritorio las rutas **monitoreadas** que aún no tienen una auditoría correcta
+  ni pendiente (lo que falló antes se reintenta; las rutas que piden sesión se omiten mientras el proyecto no tenga el acceso
+  configurado). Encola con prioridad de lote (por detrás de un «Auditar» individual) y respeta el límite de 50 trabajos
+  esperando: rutas completas hasta llenar el cupo; si faltan, el mensaje lo dice y se repite el botón cuando avance la cola.
+  Lógica en `planFirstScan` (`server/domain/audit-rules.ts`) y `requestFirstScan` (`server/services/audits.ts`).
 - En local, para auditar sitios en `localhost` (el worker de producción los rechaza a propósito):
   `pnpm exec tsx scripts/dev-worker.ts`. Ese script no se incluye en la imagen.
 - Prueba con Chromium y Lighthouse reales (opcional):
