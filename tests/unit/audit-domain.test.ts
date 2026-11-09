@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fixture from "../fixtures/lhr-minimal.json";
 import { AuditTimeoutError, ChromeError, LighthouseRuntimeError } from "@/server/domain/audit-errors";
-import { assertRouteAuditable, planProfiles } from "@/server/domain/audit-rules";
+import { assertRouteAuditable, planFirstScan, planProfiles, type CoveredProfile, type FirstScanRoute } from "@/server/domain/audit-rules";
 import { classifyError } from "@/server/domain/error-classifier";
 import { DomainError } from "@/server/domain/errors";
 import { buildAuditKey, routeSlug } from "@/server/domain/r2-key";
@@ -196,5 +196,83 @@ describe("audit-rules", () => {
     expect(() => assertRouteAuditable("https://acme.test/x", ["acme.test"])).not.toThrow();
     expect(() => assertRouteAuditable("https://otro.test/x", ["acme.test"])).toThrowError(expect.objectContaining({ code: "FORBIDDEN_HOST" }));
     expect(() => assertRouteAuditable("no-es-url", ["acme.test"])).toThrow(DomainError);
+  });
+});
+
+describe("planFirstScan", () => {
+  const route = (id: string, path: string, extra: Partial<FirstScanRoute> = {}): FirstScanRoute => ({ id, path, monitored: true, requiresAuth: false, ...extra });
+  const plan = (routes: FirstScanRoute[], covered: CoveredProfile[] = [], authConfigured = false, budget = 50) =>
+    planFirstScan({ routes, covered, authConfigured, budget });
+
+  it("encola móvil y escritorio de cada ruta monitoreada, en orden de ruta", () => {
+    const p = plan([route("b", "/b"), route("a", "/a")]);
+    expect(p.targets).toEqual([
+      { routeId: "a", profiles: ["mobile", "desktop"] },
+      { routeId: "b", profiles: ["mobile", "desktop"] },
+    ]);
+    expect(p).toMatchObject({ toQueue: 4, alreadyPending: 0, skippedAuth: 0, routesWithoutRoom: 0 });
+  });
+
+  it("ignora las rutas no monitoreadas", () => {
+    const p = plan([route("a", "/a", { monitored: false }), route("b", "/b")]);
+    expect(p.targets.map((t) => t.routeId)).toEqual(["b"]);
+  });
+
+  it("solo pide lo que falta: lo correcto y lo pendiente cuentan como cubierto, lo fallido se reintenta", () => {
+    const p = plan(
+      [route("a", "/a"), route("b", "/b"), route("c", "/c")],
+      [
+        { routeId: "a", profile: "mobile", state: "succeeded" },
+        { routeId: "a", profile: "desktop", state: "succeeded" },
+        { routeId: "b", profile: "mobile", state: "pending" },
+      ],
+    );
+    // «c» no tiene nada (o solo una auditoría fallida, que no aparece como cubierta).
+    expect(p.targets).toEqual([
+      { routeId: "b", profiles: ["desktop"] },
+      { routeId: "c", profiles: ["mobile", "desktop"] },
+    ]);
+    expect(p).toMatchObject({ toQueue: 3, alreadyPending: 1 });
+  });
+
+  it("si una auditoría correcta y una pendiente coinciden, prevalece la correcta", () => {
+    const p = plan(
+      [route("a", "/a")],
+      [
+        { routeId: "a", profile: "mobile", state: "pending" },
+        { routeId: "a", profile: "mobile", state: "succeeded" },
+        { routeId: "a", profile: "desktop", state: "succeeded" },
+      ],
+    );
+    expect(p).toMatchObject({ targets: [], toQueue: 0, alreadyPending: 0 });
+  });
+
+  it("omite las rutas con sesión si el proyecto no tiene acceso, y las incluye si lo tiene", () => {
+    const routes = [route("a", "/a"), route("p", "/privada", { requiresAuth: true })];
+    const sin = plan(routes, [], false);
+    expect(sin.targets.map((t) => t.routeId)).toEqual(["a"]);
+    expect(sin.skippedAuth).toBe(1);
+    const con = plan(routes, [], true);
+    expect(con.targets.map((t) => t.routeId)).toEqual(["a", "p"]);
+    expect(con.skippedAuth).toBe(0);
+  });
+
+  it("llena el cupo ruta a ruta con los dos dispositivos juntos y cuenta lo que no cabe", () => {
+    const routes = [route("a", "/a"), route("b", "/b"), route("c", "/c")];
+    const p = plan(routes, [], false, 5);
+    expect(p.targets.map((t) => t.routeId)).toEqual(["a", "b"]);
+    expect(p).toMatchObject({ toQueue: 4, routesWithoutRoom: 1 });
+    expect(plan(routes, [], false, 0)).toMatchObject({ targets: [], routesWithoutRoom: 3 });
+  });
+
+  it("una ruta a la que solo le falta un dispositivo cabe en un cupo de 1", () => {
+    const p = plan([route("a", "/a"), route("b", "/b")], [{ routeId: "a", profile: "mobile", state: "succeeded" }], false, 1);
+    expect(p.targets).toEqual([{ routeId: "a", profiles: ["desktop"] }]);
+    expect(p.routesWithoutRoom).toBe(1);
+  });
+
+  it("con todo cubierto no hay nada que hacer", () => {
+    const covered: CoveredProfile[] = (["mobile", "desktop"] as const).map((profile) => ({ routeId: "a", profile, state: "succeeded" }));
+    expect(plan([route("a", "/a")], covered)).toMatchObject({ targets: [], toQueue: 0, skippedAuth: 0, routesWithoutRoom: 0 });
   });
 });

@@ -11,8 +11,8 @@ import * as s from "@/server/db/schema";
 import { LighthouseRuntimeError } from "@/server/domain/audit-errors";
 import { createRedis } from "@/server/queue/connection";
 import { readHeartbeat, writeHeartbeat } from "@/server/queue/heartbeat";
-import { lighthouseQueue } from "@/server/queue/queues";
-import { requestAudit } from "@/server/services/audits";
+import { lighthouseQueue, PRIORITY } from "@/server/queue/queues";
+import { getFirstScanSummary, requestAudit, requestFirstScan } from "@/server/services/audits";
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
@@ -179,6 +179,122 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
       await online();
       const full = { add: async () => undefined, getJobCounts: async () => ({ waiting: 50 }) } as never;
       await expect(requestAudit({ routeId: r!.id, profiles: ["mobile"], trigger: "manual", requestedBy: "t" }, { db, queue: full, redis })).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+  });
+
+  // --------------------------------------------------------------- primer escaneo
+  describe("primer escaneo de todas las rutas", () => {
+    const scan = (projectId: string, q: unknown = queue) => requestFirstScan(projectId, "test", { db, queue: q as never, redis });
+    const auditsOf = () => db.select().from(s.auditLogs);
+
+    it("sin worker en línea no encola nada", async () => {
+      const { project } = await setup({ paths: ["/", "/a"] });
+      await expect(scan(project.id)).rejects.toMatchObject({ code: "UPSTREAM", message: expect.stringContaining("worker") });
+      expect(await auditsOf()).toHaveLength(0);
+    });
+
+    it("encola móvil y escritorio de todas las rutas con prioridad de lote, y repetirlo no duplica", async () => {
+      const { project } = await setup({ paths: ["/", "/a", "/b"] });
+      await online();
+      const first = await scan(project.id);
+      expect(first).toMatchObject({ created: 6, routes: 3, alreadyPending: 0, skippedAuth: 0, routesWithoutRoom: 0 });
+      const rows = await auditsOf();
+      expect(rows).toHaveLength(6);
+      expect(rows.every((a) => a.status === "queued" && a.trigger === "manual" && a.requestedBy === "test")).toBe(true);
+      for (const a of rows) {
+        const job = await queue.getJob(a.id);
+        expect(job?.data).toEqual({ auditId: a.id });
+        expect(job?.opts.priority).toBe(PRIORITY.bulk);
+      }
+      // Un «Auditar» individual va por delante del lote.
+      expect(PRIORITY.manual).toBeLessThan(PRIORITY.bulk);
+
+      const again = await scan(project.id);
+      expect(again).toMatchObject({ created: 0, routes: 0, alreadyPending: 6 });
+      expect(await auditsOf()).toHaveLength(6);
+    });
+
+    it("no repite lo que ya tiene una auditoría correcta y completa lo que falta", async () => {
+      const { project, routes: [a, b] } = await setup({ paths: ["/a", "/b"] });
+      await online();
+      await scan(project.id);
+      await db.update(s.auditLogs).set({ status: "succeeded", finishedAt: new Date() }).where(eq(s.auditLogs.routeId, a!.id));
+      await db.delete(s.auditLogs).where(eq(s.auditLogs.routeId, b!.id));
+      await queue.obliterate({ force: true });
+
+      expect(await getFirstScanSummary(project.id, db)).toMatchObject({ routesToScan: 1, auditsToQueue: 2, alreadyPending: 0 });
+      const res = await scan(project.id);
+      expect(res).toMatchObject({ created: 2, routes: 1 });
+      expect((await auditsOf()).filter((x) => x.routeId === a!.id)).toHaveLength(2);
+      expect(await getFirstScanSummary(project.id, db)).toMatchObject({ routesToScan: 0, auditsToQueue: 0, alreadyPending: 2 });
+    });
+
+    it("reintenta lo que falló antes", async () => {
+      const { project, routes: [a] } = await setup({ paths: ["/a"] });
+      await online();
+      await scan(project.id);
+      await db.update(s.auditLogs).set({ status: "failed", finishedAt: new Date(), errorCode: "TIMEOUT" }).where(eq(s.auditLogs.routeId, a!.id));
+      await queue.obliterate({ force: true });
+      expect(await scan(project.id)).toMatchObject({ created: 2, routes: 1 });
+    });
+
+    it("ignora las rutas inactivas", async () => {
+      const { project, routes: [a] } = await setup({ paths: ["/a", "/b"] });
+      await routes.setRouteMonitored(a!.id, false, db);
+      await online();
+      expect(await scan(project.id)).toMatchObject({ created: 2, routes: 1 });
+      expect((await auditsOf()).every((x) => x.routeId !== a!.id)).toBe(true);
+    });
+
+    it("omite las rutas que piden sesión mientras el proyecto no tenga acceso configurado", async () => {
+      const { project, routes: [pub, priv] } = await setup({ paths: ["/a", "/privada"] });
+      await routes.updateRouteDetails(priv!.id, { requiresAuth: true }, db);
+      await online();
+      expect(await getFirstScanSummary(project.id, db)).toMatchObject({ routesToScan: 1, skippedAuth: 1 });
+      const sin = await scan(project.id);
+      expect(sin).toMatchObject({ created: 2, routes: 1, skippedAuth: 1 });
+      expect((await auditsOf()).every((x) => x.routeId === pub!.id)).toBe(true);
+
+      await db.update(s.projects).set({ authStrategy: "cookie", authConfigEnc: Buffer.from("cifrado") }).where(eq(s.projects.id, project.id));
+      const con = await scan(project.id);
+      expect(con).toMatchObject({ created: 2, routes: 1, skippedAuth: 0 });
+    });
+
+    it("omite las rutas cuyo host ya no está permitido", async () => {
+      const { project } = await setup({ paths: ["/a"] });
+      await db.update(s.projects).set({ allowedHosts: ["otro.test"] }).where(eq(s.projects.id, project.id));
+      await online();
+      expect(await scan(project.id)).toMatchObject({ created: 0, skippedHost: 1 });
+      expect(await auditsOf()).toHaveLength(0);
+    });
+
+    it("con la cola casi llena encola hasta el cupo, rutas completas, e informa las que faltan", async () => {
+      const { project } = await setup({ paths: ["/a", "/b", "/c"] });
+      await online();
+      // Esperan 47 de 50: caben 3 trabajos, o sea una ruta completa (2) y no la siguiente (otros 2).
+      const nearlyFull = { add: queue.add.bind(queue), getJobCounts: async () => ({ waiting: 47 }) };
+      const res = await scan(project.id, nearlyFull);
+      expect(res).toMatchObject({ created: 2, routes: 1, routesWithoutRoom: 2 });
+      expect(await auditsOf()).toHaveLength(2);
+
+      // Con la cola llena del todo no se encola nada, pero no es un error.
+      const full = { add: queue.add.bind(queue), getJobCounts: async () => ({ waiting: 50 }) };
+      expect(await scan(project.id, full)).toMatchObject({ created: 0, routesWithoutRoom: 2 });
+    });
+
+    it("si Redis falla al encolar, la fila no queda bloqueando la ruta", async () => {
+      const { project } = await setup({ paths: ["/a"] });
+      await online();
+      const broken = { add: async () => { throw new Error("redis caído"); }, getJobCounts: async () => ({}) };
+      await expect(scan(project.id, broken)).rejects.toMatchObject({ code: "UPSTREAM" });
+      expect((await auditsOf()).every((x) => x.status === "failed" && x.errorCode === "QUEUE_UNAVAILABLE")).toBe(true);
+      expect(await scan(project.id)).toMatchObject({ created: 2 });
+    });
+
+    it("rechaza un proyecto que no existe", async () => {
+      await online();
+      await expect(scan("no-es-uuid")).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(scan("00000000-0000-4000-8000-000000000000")).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
 

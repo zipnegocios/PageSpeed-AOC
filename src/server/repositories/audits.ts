@@ -69,12 +69,16 @@ export async function findPending(db: Database, routeId: string, profile: "mobil
   return row;
 }
 
-/** Rutas y perfiles del proyecto que ya tienen una auditoría en cola, en curso o terminada con éxito. */
-export async function listCovered(db: Database, projectId: string): Promise<Array<{ routeId: string; profile: "mobile" | "desktop" }>> {
-  return db
-    .selectDistinct({ routeId: auditLogs.routeId, profile: auditLogs.profile })
+/** Qué ruta y dispositivo de un proyecto ya tienen una auditoría correcta o pendiente (para el primer escaneo). */
+export async function listCoveredProfiles(
+  db: Database,
+  projectId: string,
+): Promise<{ routeId: string; profile: "mobile" | "desktop"; state: "succeeded" | "pending" }[]> {
+  const rows = await db
+    .selectDistinct({ routeId: auditLogs.routeId, profile: auditLogs.profile, status: auditLogs.status })
     .from(auditLogs)
-    .where(and(eq(auditLogs.projectId, projectId), inArray(auditLogs.status, ["queued", "running", "succeeded"])));
+    .where(and(eq(auditLogs.projectId, projectId), inArray(auditLogs.status, ["succeeded", "queued", "running"])));
+  return rows.map((r) => ({ routeId: r.routeId, profile: r.profile, state: r.status === "succeeded" ? ("succeeded" as const) : ("pending" as const) }));
 }
 
 export async function insertAudit(db: Database, values: typeof auditLogs.$inferInsert): Promise<AuditLog> {

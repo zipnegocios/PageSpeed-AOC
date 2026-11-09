@@ -6,7 +6,7 @@ Esta guía es para el agente de IA (o la persona que lo configura). Explica qué
 
 Audita con Lighthouse las páginas de los sitios de los clientes y guarda el historial. Cada **proyecto** pertenece a un **cliente** y tiene **rutas** (páginas). Cada auditoría se hace en un **perfil**: `mobile` o `desktop`.
 
-- **Fase `development`**: se audita bajo demanda, una página a la vez, con uno o ambos perfiles. No hay auditorías programadas ni alertas.
+- **Fase `development`**: se audita bajo demanda, con uno o ambos perfiles por página. No hay auditorías programadas ni alertas.
 - **Fase `production`**: las rutas *monitoreadas* se auditan solas (semanal o diaria, móvil y escritorio). Si una puntuación baja de su umbral se abre una alerta y se avisa al administrador por correo.
 
 Puntuaciones de 0 a 100: **90-100 bueno**, **50-89 mejorable**, **0-49 deficiente**. LCP y TBT en milisegundos; CLS sin unidad. Lighthouse en laboratorio no mide INP: usa TBT.

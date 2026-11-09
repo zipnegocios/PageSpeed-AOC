@@ -8,7 +8,8 @@ export const MAINTENANCE_QUEUE = "maintenance";
 /** Lo único que viaja en el trabajo: la fila de audit_logs es la fuente de verdad. */
 export type AuditJobData = { auditId: string };
 
-export const PRIORITY = { manual: 1, scheduledDaily: 5, scheduled: 10 } as const;
+/** `bulk` (primer escaneo de todo un proyecto) cede el paso a un «Auditar» individual, pero va antes que las programadas. */
+export const PRIORITY = { manual: 1, bulk: 2, scheduledDaily: 5, scheduled: 10 } as const;
 
 export function auditAttempts(): number {
   const n = Number(process.env.AUDIT_ATTEMPTS);

@@ -30,6 +30,12 @@ necesita `SMTP_*`, `EMAIL_FROM` y `APP_URL` (y opcionalmente `ALERT_EMAIL`); sin
 evalúa las alertas y lo avisa en los logs.
 
 - Si no hay worker en línea, el botón **Auditar** se niega con un aviso (no deja filas bloqueadas).
+- **Primer escaneo de todas las rutas:** en la tarjeta *Rutas* de la ficha del proyecto, junto a «Descubrir desde el sitemap»,
+  el bloque «Primer escaneo» audita en móvil y escritorio las rutas **monitoreadas** que aún no tienen una auditoría correcta
+  ni pendiente (lo que falló antes se reintenta; las rutas que piden sesión se omiten mientras el proyecto no tenga el acceso
+  configurado). Encola con prioridad de lote (por detrás de un «Auditar» individual) y respeta el límite de 50 trabajos
+  esperando: rutas completas hasta llenar el cupo; si faltan, el mensaje lo dice y se repite el botón cuando avance la cola.
+  Lógica en `planFirstScan` (`server/domain/audit-rules.ts`) y `requestFirstScan` (`server/services/audits.ts`).
 - En local, para auditar sitios en `localhost` (el worker de producción los rechaza a propósito):
   `pnpm exec tsx scripts/dev-worker.ts`. Ese script no se incluye en la imagen.
 - Prueba con Chromium y Lighthouse reales (opcional):
@@ -39,13 +45,6 @@ evalúa las alertas y lo avisa en los logs.
   id). Al dispararse, el worker pide móvil y escritorio de cada ruta monitoreada. Pasar a desarrollo, cambiar
   la frecuencia o archivar actualiza el agendador; si Redis no responde en ese momento, el cambio se guarda
   igual y la reconciliación lo corrige.
-- **Primer escaneo:** en la tarjeta *Rutas* de la ficha del proyecto, el botón «Escanear N rutas (móvil y escritorio)» lanza ambos
-  dispositivos en todas las rutas que todavía no tienen auditoría (en cola, en curso o terminada con éxito; una fallida se reintenta).
-  Sirve en desarrollo y en producción, y también para rutas inactivas. Deja para después las rutas que piden sesión si el proyecto no
-  tiene «Acceso a páginas privadas» configurado, y las de un host ya no permitido. Respeta el límite de la cola (50 esperando): si se
-  llena a la mitad, conserva lo encolado, dice cuántas quedaron fuera y basta volver a pulsar cuando avance. Sin worker en línea
-  falla con el mismo aviso que «Auditar». Pulsarlo dos veces no duplica nada. Código: `domain/first-scan.ts` y `requestFirstScan`
-  en `services/audits.ts`.
 - **Panel de inicio (`/admin`):** el primer pantallazo tras el login, organizado en paneles sólidos con esquinas HUD sobre una
   retícula técnica: resumen de la flota (rendimiento medio, SEO/Accesibilidad/Buenas prácticas, alertas, en curso), una
   tarjeta por proyecto (anillos de puntuación, agentes, miniatura de 30 días, última auditoría), auditorías recientes de

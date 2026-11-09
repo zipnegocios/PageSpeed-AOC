@@ -6,8 +6,7 @@ import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clientPath, projectPath } from "@/lib/urls";
 import { parsePeriod } from "@/server/domain/history";
-import { describeFirstScan } from "@/server/domain/first-scan";
-import { requestAudit, requestFirstScan } from "@/server/services/audits";
+import { MAX_WAITING_JOBS, requestAudit, requestFirstScan } from "@/server/services/audits";
 import { sendProjectReport } from "@/server/services/report-email";
 import { requestFieldDataRefresh } from "@/server/services/crux";
 import { clearProjectAuth, setProjectAuth } from "@/server/services/project-auth";
@@ -129,7 +128,7 @@ export async function importRoutesAction(id: string, _prev: ActionState, fd: For
       fd.getAll("path").map((p) => String(p)),
     );
     refresh(id);
-    return { ok: `${result.added} rutas activadas para monitoreo${result.skipped ? ` (${result.skipped} ya existían)` : ""}. Ya puedes lanzar el primer escaneo desde el botón «Escanear» de la tarjeta Rutas.` };
+    return { ok: `${result.added} rutas activadas para monitoreo${result.skipped ? ` (${result.skipped} ya existían)` : ""}.` };
   });
 }
 
@@ -177,13 +176,33 @@ export async function requestAuditAction(
   });
 }
 
-/** Primer escaneo: móvil y escritorio en todas las rutas que todavía no tienen auditoría. */
-export async function requestFirstScanAction(projectId: string, _prev: ActionState): Promise<ActionState> {
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Primer escaneo de todas las rutas monitoreadas del proyecto, en móvil y escritorio. Solo encola lo que aún no tiene
+ * una auditoría correcta ni pendiente, así que se puede pulsar otra vez cuando la cola avance.
+ */
+export async function firstScanAction(projectId: string, _prev: ActionState): Promise<ActionState> {
   const session = await verifySession();
   return guarded(async () => {
-    const result = await requestFirstScan(projectId, { requestedBy: session.email });
+    const r = await requestFirstScan(projectId, session.email);
     refresh(projectId);
-    return { ok: describeFirstScan(result) };
+    const head =
+      r.created > 0
+        ? `${plural(r.created, "auditoría en cola", "auditorías en cola")} de ${plural(r.routes, "ruta", "rutas")} (móvil y escritorio).`
+        : r.routesWithoutRoom > 0
+          ? "No se encoló nada: la cola está llena."
+          : r.alreadyPending > 0
+            ? "No hay nada nuevo que encolar."
+            : "Todas las rutas ya tienen su primer escaneo.";
+    const notes = [
+      r.created > 0 && r.alreadyPending > 0 ? `${plural(r.alreadyPending, "dispositivo ya estaba", "dispositivos ya estaban")} en cola o en curso.` : "",
+      r.created === 0 && r.alreadyPending > 0 ? `Ya hay ${plural(r.alreadyPending, "auditoría", "auditorías")} en cola o en curso.` : "",
+      r.skippedAuth > 0 ? `${plural(r.skippedAuth, "ruta con sesión se omitió", "rutas con sesión se omitieron")}: configura el acceso a páginas privadas.` : "",
+      r.skippedHost > 0 ? `${plural(r.skippedHost, "ruta se omitió", "rutas se omitieron")} porque su host ya no está permitido.` : "",
+      r.routesWithoutRoom > 0 ? `Faltan ${plural(r.routesWithoutRoom, "ruta", "rutas")}: la cola admite ${MAX_WAITING_JOBS} trabajos; vuelve a pulsar cuando avance.` : "",
+    ].filter(Boolean);
+    return { ok: [head, ...notes].join(" ") };
   });
 }
 
