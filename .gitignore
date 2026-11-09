@@ -16,3 +16,4 @@ AGENTS.md
 
 # Copias de trabajo aisladas de los agentes de Claude
 .claude/worktrees/
+dump.rdb
