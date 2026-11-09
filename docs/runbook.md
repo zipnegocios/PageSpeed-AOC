@@ -97,6 +97,41 @@ Lo que se pierde: cambios hechos entre el último respaldo y la caída (hasta 24
 | `AUTH_ENCRYPTION_KEY` | No se puede rotar sin más: las credenciales guardadas quedan ilegibles. Cambia la clave en web **y** worker, redespliega ambos y vuelve a introducir el acceso de cada proyecto (tarjeta *Acceso a páginas privadas*) | Mientras tanto esas rutas fallan con `AUTH_CONFIG` |
 | Token de R2 / SMTP | Rotar en el proveedor y actualizar la variable en **web y worker**; redesplegar ambos | — |
 
+### Rotar las contraseñas de Postgres y Redis
+
+Úsalo si se filtraron (por ejemplo, un registro de despliegue pegado en un chat: EasyPanel pasa las variables como argumentos de construcción y las imprime en claro cuando un despliegue falla). Hazlo en **una sola ventana de mantenimiento** de 15 a 20 minutos, para redesplegar web y worker una vez. El panel se corta unos segundos y la cola se reconstruye sola (Postgres es la fuente de verdad).
+
+**Antes**
+1. Panel → *Cola* → *Respaldar ahora* y espera «Al día»: es tu red de seguridad.
+2. Comprueba si el Redis lo usa **alguna otra aplicación** además de PageSpeed (su nombre en EasyPanel no es `page_speed_…`). Si es compartido, cambiar su contraseña corta también a las otras: o las actualizas todas en la misma ventana, o creas un Redis propio para PageSpeed y mueves solo `REDIS_URL`.
+3. Comprueba que ni Postgres ni Redis tienen **puerto externo expuesto** (en su servicio, ajustes avanzados). Si lo tienen y no es necesario, quítalo.
+4. Genera cada contraseña nueva **sin mostrarla** (solo letras y números, para que no rompan la URL) y guárdala en el gestor de contraseñas. En PowerShell queda en el portapapeles:
+   `$b = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ([Convert]::ToBase64String($b) -replace '[^A-Za-z0-9]','') | Set-Clipboard`
+   Conserva las contraseñas **viejas** hasta el final: son tu marcha atrás.
+
+**Postgres**
+1. En la consola del servicio Postgres: `psql -U <usuario> -d <base>` y, dentro, `\password <usuario>` (pide la nueva dos veces, sin mostrarla). Cambiar solo la variable del servicio **no** cambia la contraseña de un rol que ya existe; hay que hacerlo con `\password` o `ALTER USER`.
+2. Si el servicio de EasyPanel guarda la contraseña en sus credenciales, ponla también ahí para que no queden desalineadas.
+3. Las conexiones ya abiertas siguen valiendo; las nuevas piden la contraseña nueva. Por eso el paso siguiente va justo después.
+
+**Redis**
+1. En el servicio Redis, cambia la contraseña en sus credenciales (el nombre del campo puede variar según la versión de EasyPanel) y **despliega Redis**. Se reinicia; la cola se reconstruye desde Postgres al arrancar el worker y cada 15 minutos.
+
+**Después, en web y worker** (las dos variables, en los dos servicios)
+1. `DATABASE_URL` = `postgres://<usuario>:<contraseña nueva>@<host interno>:5432/<base>?sslmode=disable`
+2. `REDIS_URL` = `redis://default:<contraseña nueva>@<host interno>:6379`
+3. Despliega el **worker** (manual) y el **web**.
+
+**Verificación**
+- Panel → *Estado del sistema*: Postgres y Redis en verde; *Cola*: worker en línea.
+- Abre un portal de cliente y una auditoría; pulsa *Actualizar ahora* en una pestaña SEO.
+- Logs del worker: sin «error de Redis» ni errores de autenticación de Postgres.
+- Cualquier otra cosa que se conectara con la contraseña vieja (un cliente de base de datos en tu equipo, un `.env` local, otra aplicación) deja de funcionar: actualízala.
+
+**Marcha atrás:** si algo falla, devuelve la contraseña vieja (`\password` en Postgres; credenciales de Redis + despliegue) y las dos variables a su valor anterior. Cuando todo esté en verde durante un rato, borra las viejas del gestor.
+
+**Recuerda:** las contraseñas viejas siguen apareciendo en los registros de despliegues anteriores de EasyPanel; al estar rotadas ya no sirven. No pegues registros completos en chats o tickets: solo el tramo con el error.
+
 ## 7. Incidentes
 
 **El panel dice "Worker fuera de línea"**
