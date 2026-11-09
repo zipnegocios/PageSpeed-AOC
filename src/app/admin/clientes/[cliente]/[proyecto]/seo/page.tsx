@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
 import { ConnectionCard } from "@/app/admin/seo/_components/connection-card";
+import { SeoDataSection } from "@/app/admin/seo/_components/seo-data-section";
 import { verifySession } from "@/lib/auth/session";
 import { pageTitle } from "@/lib/brand";
 import { orNotFound } from "@/lib/not-found";
@@ -15,9 +16,10 @@ import { getConnections, getGoogleAccount } from "@/server/services/seo-connecti
 export const metadata: Metadata = { title: pageTitle("SEO del proyecto"), robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default async function ProjectSeoPage({ params }: { params: Promise<{ cliente: string; proyecto: string }> }) {
+export default async function ProjectSeoPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<{ dias?: string | string[] }> }) {
   await verifySession();
   const { cliente, proyecto } = await params;
+  const { dias } = await searchParams;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (cliente !== project.clientSlug || proyecto !== project.slug) redirect(`${projectPath(project.clientSlug, project.slug)}/seo`);
@@ -50,6 +52,9 @@ export default async function ProjectSeoPage({ params }: { params: Promise<{ cli
           </Link>
           .
         </Alert>
+      ) : null}
+      {connections.gsc || connections.ga4 ? (
+        <SeoDataSection projectId={project.id} basePath={`${projectPath(project.clientSlug, project.slug)}/seo`} dias={dias} />
       ) : null}
       {SEO_KINDS.map((kind) => (
         <ConnectionCard key={kind} projectId={project.id} kind={kind} connection={connections[kind]} googleEmail={googleEmail} />
