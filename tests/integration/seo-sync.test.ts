@@ -199,6 +199,21 @@ describe.skipIf(!(dbUrl && redisUrl))("descarga de datos de Search Console y GA4
       expect((await searchRows(project.id)).some((x) => x.page === "/vieja")).toBe(false);
     });
 
+    it("ignora las filas que Google devuelva fuera de la ventana pedida", async () => {
+      const { project } = await setup({ connect: ["gsc"] });
+      const rare: typeof fetchImpl = async (url, init) => {
+        const res = await fetchImpl(url, init);
+        if (!url.includes("searchAnalytics/query")) return res;
+        const body = (await res.json()) as { rows: Array<{ keys: string[] }> };
+        // Una fila de una fecha ajena a cualquier ventana, repetida en todas.
+        body.rows.push({ keys: ["2026-01-01", "https://acme.test/fuera", "col", "MOBILE"], clicks: 1, impressions: 1, ctr: 1, position: 1 } as never);
+        return json(body);
+      };
+      const r = await syncProjectSeoData(project.id, db, { ...deps(), fetchImpl: rare });
+      expect(r.results[0]?.ok).toBe(true);
+      expect(await count(s.seoSearchDaily, project.id)).toBe(180);
+    });
+
     it("sincronizar un proyecto no toca los datos de otro", async () => {
       const a = await setup({ name: "Acme", connect: ["gsc"] });
       const client = await clients.createClient({ name: "Beta" }, db);
