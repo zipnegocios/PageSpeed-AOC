@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/brand";
 import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
+import { Alert } from "@/lib/ui/components/alert";
 import { avatarUrl } from "@/lib/ui/components/avatar";
 import { Card } from "@/lib/ui/components/card";
 import { Field } from "@/lib/ui/components/field";
@@ -17,6 +18,7 @@ export default async function ProfilePage() {
   const session = await verifySession();
   return (
     <AdminShell title="Mi perfil" subtitle={session.email} crumbs={[{ label: "Panel", href: "/admin" }]}>
+      {session.provisionalPassword ? <Alert tone="info">Estás usando una contraseña provisional. Cámbiala por una tuya.</Alert> : null}
       <Card title="Foto" description="Se ve en el menú de la barra superior. Solo la ve el equipo.">
         <AvatarUploader initials={initials(session)} src={avatarUrl(session.id, session.avatarKey)} />
       </Card>

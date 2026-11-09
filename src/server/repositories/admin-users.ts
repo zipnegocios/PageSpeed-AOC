@@ -27,7 +27,16 @@ export async function countOwners(db: Database): Promise<number> {
 
 export async function insertAdmin(
   db: Database,
-  values: { email: string; passwordHash: string; role?: "owner" | "admin" },
+  values: {
+    id?: string;
+    email: string;
+    passwordHash: string;
+    role?: "owner" | "admin";
+    firstName?: string | null;
+    lastName?: string | null;
+    avatarKey?: string | null;
+    provisionalPassword?: boolean;
+  },
 ): Promise<AdminUser> {
   const [row] = await db.insert(adminUsers).values(values).returning();
   if (!row) throw new Error("No se pudo crear el administrador");
@@ -50,9 +59,9 @@ export async function deleteAdmin(db: Database, id: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-/** Cambia la contraseña (y con ella la versión de las sesiones: las anteriores dejan de valer). */
+/** Cambia la contraseña (y con ella la versión de las sesiones: las anteriores dejan de valer); deja de ser provisional. */
 export async function setAdminPassword(db: Database, id: string, passwordHash: string): Promise<boolean> {
-  const rows = await db.update(adminUsers).set({ passwordHash }).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
+  const rows = await db.update(adminUsers).set({ passwordHash, provisionalPassword: false }).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
   return rows.length > 0;
 }
 

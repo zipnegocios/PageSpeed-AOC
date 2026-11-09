@@ -20,6 +20,8 @@ export type AdminSummary = {
   lastName: string | null;
   /** Clave de la foto en R2 (null si no hay); solo sirve para saber si hay foto y para cambiar la URL al cambiarla. */
   avatarKey: string | null;
+  /** La contraseña la puso el propietario al crear la cuenta y la persona aún no la cambió. */
+  provisionalPassword: boolean;
 };
 
 export function normalizeEmail(email: string): string {
@@ -35,6 +37,7 @@ export function summarize(admin: AdminUser): AdminSummary {
     firstName: admin.firstName,
     lastName: admin.lastName,
     avatarKey: admin.avatarKey,
+    provisionalPassword: admin.provisionalPassword,
   };
 }
 

@@ -5,25 +5,10 @@ import type { ActionState } from "@/lib/actions";
 import { Alert } from "@/lib/ui/components/alert";
 import { Avatar } from "@/lib/ui/components/avatar";
 import { Button } from "@/lib/ui/components/button";
+import { isAvatarType, squareBlob } from "@/lib/image/square-blob";
 import { removeAvatarAction, uploadAvatarAction } from "../actions";
 
-const SIDE = 256;
 const NO_STATE: ActionState = {};
-
-/** Recorta al centro un cuadrado y lo reduce a 256×256: la foto sube ligera y el servidor no necesita librerías de imagen. */
-async function squareBlob(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const canvas = document.createElement("canvas");
-  canvas.width = SIDE;
-  canvas.height = SIDE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("canvas");
-  ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, SIDE, SIDE);
-  bitmap.close();
-  const toBlob = (type: string, q: number) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, q));
-  return (await toBlob("image/webp", 0.9)) ?? (await toBlob("image/jpeg", 0.9)) ?? Promise.reject(new Error("blob"));
-}
 
 export function AvatarUploader({ initials, src }: { initials: string; src: string | null }) {
   const [upload, uploadDispatch, uploading] = useActionState<ActionState, FormData>(uploadAvatarAction, NO_STATE);
@@ -39,7 +24,7 @@ export function AvatarUploader({ initials, src }: { initials: string; src: strin
     setError(null);
     if (!file) return;
     setFileName(file.name);
-    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+    if (!isAvatarType(file.type)) {
       setError("La foto debe ser PNG, JPEG o WebP.");
       return;
     }

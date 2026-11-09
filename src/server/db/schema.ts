@@ -410,6 +410,8 @@ export const adminUsers = pgTable("admin_users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   avatarKey: text("avatar_key"),
+  // La cuenta la creó el propietario con una contraseña provisional y la persona aún no la cambió.
+  provisionalPassword: boolean("provisional_password").notNull().default(false),
   ...timestamps,
 });
 
@@ -424,6 +426,12 @@ export const adminInvites = pgTable(
     kind: text("kind").notNull().default("invite"),
     tokenHash: text("token_hash").notNull().unique(),
     invitedBy: uuid("invited_by"),
+    // Perfil que el propietario dejó preparado: al aceptar la invitación la cuenta nace con estos datos. `user_id` es el
+    // id que tendrá la cuenta (la foto ya está en R2 bajo `_avatars/<user_id>/`).
+    userId: uuid("user_id"),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    avatarKey: text("avatar_key"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),

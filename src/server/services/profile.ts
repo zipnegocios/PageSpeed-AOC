@@ -16,13 +16,13 @@ export type ProfileDeps = { r2?: Pick<R2Store, "putObject" | "getObject" | "dele
 const g = globalThis as unknown as { __pagespeedPasswordLimiter?: AttemptLimiter };
 const passwordLimiter = (g.__pagespeedPasswordLimiter ??= new AttemptLimiter({ max: 5, windowMs: 15 * 60_000 }));
 
-const name = z
+export const profileName = z
   .string()
   .max(NAME_MAX, `Hasta ${NAME_MAX} caracteres.`)
   .refine((v) => !/[\r\n]/.test(v), "Sin saltos de línea.")
   .transform((v) => v.trim());
 
-const profileInput = z.object({ firstName: name, lastName: name });
+const profileInput = z.object({ firstName: profileName, lastName: profileName });
 
 /** Guarda nombre y apellido (ambos opcionales). */
 export async function updateProfile(admin: AdminSummary, raw: unknown, db: Database = getDb()): Promise<AdminSummary> {
@@ -57,18 +57,29 @@ export async function changePassword(admin: AdminSummary, raw: unknown, db: Data
   passwordLimiter.reset(admin.id);
   const passwordHash = await hashPassword(input.password);
   await admins.setAdminPassword(db, admin.id, passwordHash);
-  return summarize({ ...row, passwordHash });
+  return summarize({ ...row, passwordHash, provisionalPassword: false });
+}
+
+/** Valida la foto y la guarda en R2 bajo `_avatars/<userId>/`. Devuelve la clave del objeto. No toca la base. */
+export async function putAvatarObject(userId: string, bytes: Uint8Array, deps: ProfileDeps = {}): Promise<string> {
+  const kind = assertAvatar(bytes);
+  const key = `${AVATAR_PREFIX}${userId}/${randomBytes(12).toString("hex")}.${kind.ext}`;
+  await (deps.r2 ?? getR2()).putObject(key, Buffer.from(bytes), kind.mime);
+  return key;
+}
+
+/** Borra objetos de fotos en R2 (sin fallar: una foto huérfana no debe romper lo demás). */
+export async function deleteAvatarObjects(keys: string[], deps: ProfileDeps = {}): Promise<void> {
+  const list = keys.filter(Boolean);
+  if (list.length > 0) await (deps.r2 ?? getR2()).deleteObjects(list).catch(() => undefined);
 }
 
 /** Guarda la foto (ya validada por firma y tamaño) en R2 y borra la anterior. */
 export async function setAvatar(admin: AdminSummary, bytes: Uint8Array, db: Database = getDb(), deps: ProfileDeps = {}): Promise<string> {
-  const kind = assertAvatar(bytes);
-  const r2 = deps.r2 ?? getR2();
-  const key = `${AVATAR_PREFIX}${admin.id}/${randomBytes(12).toString("hex")}.${kind.ext}`;
-  await r2.putObject(key, Buffer.from(bytes), kind.mime);
+  const key = await putAvatarObject(admin.id, bytes, deps);
   const previous = (await admins.findAdminById(db, admin.id))?.avatarKey;
   await admins.setAvatarKey(db, admin.id, key);
-  if (previous && previous !== key) await r2.deleteObjects([previous]).catch(() => undefined);
+  if (previous && previous !== key) await deleteAvatarObjects([previous], deps);
   return key;
 }
 

@@ -259,6 +259,11 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 
 - La cuenta **propietaria** se crea al primer arranque con `ADMIN_EMAIL` / `ADMIN_PASSWORD` (solo se leen cuando no existe ninguna; cambiarlas después no agrega ni cambia a nadie).
 - Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Todas administran clientes, proyectos, agentes y cola; solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Si el correo no sale, el enlace se copia desde la pantalla.
+- Al invitar se prepara **el perfil completo** de la persona: nombre, apellido y foto (todo opcional) y cómo entra: **enlace por
+  correo** (la cuenta nace con esos datos al aceptarlo) o **contraseña provisional** (la cuenta se crea en el acto, sin correo; la
+  contraseña se muestra una sola vez y la persona puede cambiarla en su perfil, con un aviso mientras siga siendo provisional).
+  La foto de una invitación se guarda en R2 bajo `_avatars/<id de la futura cuenta>/` y se borra si la invitación se revoca o se
+  reemplaza, y al quitar a la persona. Migración 0011.
 - Las invitaciones guardan solo el sha256 del token (`admin_invites`); el enlace `/invitacion/<token>` lleva `no-referrer`, `noindex` y `no-store`, y cada IP tiene un límite de intentos. Quitar a alguien o cambiar su contraseña cierra sus sesiones.
 
 ## Perfil y barra superior

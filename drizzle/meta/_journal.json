@@ -78,6 +78,13 @@
       "when": 1794193575985,
       "tag": "0010_perfil",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794194935496,
+      "tag": "0011_invitar_con_perfil",
+      "breakpoints": true
     }
   ]
 }
