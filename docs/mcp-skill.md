@@ -13,6 +13,8 @@ Puntuaciones de 0 a 100: **90-100 bueno**, **50-89 mejorable**, **0-49 deficient
 
 ## Conexión
 
+- **Desde claude.ai (web):** Personalización → Conectores → *Añadir conector personalizado* → nombre «PageSpeed» y la dirección del MCP → Continuar. Se abre la pantalla de PageSpeed (inicia sesión si hace falta): la persona administradora elige permisos y alcance y pulsa *Autorizar*. No hay clave que copiar.
+
 - Dirección: `https://<tu-dominio>/api/mcp` (HTTP, sin sesión: cada petición es independiente).
 - Autenticación: `Authorization: Bearer pagespeed_...`. Las claves las crea la persona administradora en **Panel → Agentes**; se ven una sola vez.
 - Claude Code: `claude mcp add --transport http pagespeed https://<tu-dominio>/api/mcp --header "Authorization: Bearer TU_CLAVE"`

@@ -23,6 +23,10 @@ export type KeyRowData = {
   created: string;
   lastUsed: string | null;
   rotated: string | null;
+  /** Conexión hecha desde otra aplicación (claude.ai): se renueva sola. */
+  oauth: boolean;
+  /** Cuándo vence su token de acceso actual. */
+  expires: string | null;
   revoked: string | null;
   values: KeyFieldValues;
 };
@@ -74,11 +78,13 @@ export function KeyRow({ k, presets, clients }: { k: KeyRowData; presets: Preset
         <Badge tone={k.active ? "ok" : "danger"}>{k.active ? "Activa" : "Revocada"}</Badge>
         <Badge>{k.presetLabel}</Badge>
         <Badge tone={k.scopeAll ? "primary" : "neutral"}>{k.scopeBadge}</Badge>
+        {k.oauth ? <Badge>Conexión de claude.ai</Badge> : null}
       </div>
       {k.scopeText ? <p className="text-[15px] text-ink-muted">{k.scopeText}</p> : null}
       <p className="text-[15px] text-ink-muted">
         Creada {k.created} · {k.lastUsed ? `último uso ${k.lastUsed}` : "sin usar todavía"}
-        {k.rotated ? ` · rotada ${k.rotated}` : ""}
+        {k.rotated ? ` · ${k.oauth ? "renovada" : "rotada"} ${k.rotated}` : ""}
+        {k.oauth && k.active && k.expires ? ` · acceso caduca ${k.expires}` : ""}
         {k.revoked ? ` · revocada ${k.revoked}` : ""}
       </p>
 
@@ -87,13 +93,15 @@ export function KeyRow({ k, presets, clients }: { k: KeyRowData; presets: Preset
           <Button type="button" variant="ghost" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>
             {editing ? "Cerrar edición" : "Editar"}
           </Button>
-          <ConfirmAction
-            label="Rotar clave"
-            confirmLabel="Sí, rotar"
-            pendingLabel="Rotando…"
-            consequence="La clave actual dejará de funcionar al instante. El agente no podrá conectarse hasta que le pongas la nueva."
-            action={rotateApiKeyAction.bind(null, k.id)}
-          />
+          {k.oauth ? null : (
+            <ConfirmAction
+              label="Rotar clave"
+              confirmLabel="Sí, rotar"
+              pendingLabel="Rotando…"
+              consequence="La clave actual dejará de funcionar al instante. El agente no podrá conectarse hasta que le pongas la nueva."
+              action={rotateApiKeyAction.bind(null, k.id)}
+            />
+          )}
           <ConfirmAction
             label="Revocar"
             confirmLabel="Sí, revocar"

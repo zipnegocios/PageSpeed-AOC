@@ -141,6 +141,7 @@ Una semana en producción sin degradar los sitios alojados.
 ## 9. Lista de puesta en marcha
 
 - [ ] Variables de la sección 1 en web y worker; `APP_URL` con `https://`.
+- [ ] Para conectar claude.ai: `APP_URL` igual a la URL pública exacta (p. ej. `https://pagespeed.zipnegocios.com`) y el proxy debe dejar pasar `/.well-known/*` y `/oauth/*` sin pedir otra autenticación. Prueba: `curl https://<dominio>/.well-known/oauth-protected-resource` devuelve JSON con `resource`.
 - [ ] Redis con `noeviction` y AOF.
 - [ ] Token de R2 acotado al bucket; versionado del bucket activado.
 - [ ] Panel → *Estado del sistema* todo en verde.

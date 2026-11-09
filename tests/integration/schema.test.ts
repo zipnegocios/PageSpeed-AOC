@@ -60,6 +60,8 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "field_data",
       "mcp_api_keys",
       "notifications",
+      "oauth_clients",
+      "oauth_codes",
       "projects",
       "routes",
       "settings",

@@ -32,6 +32,8 @@ function rowOf(k: ApiKeyView): KeyRowData {
     created: formatDate(k.createdAt),
     lastUsed: k.lastUsedAt ? formatDate(k.lastUsedAt) : null,
     rotated: k.rotatedAt ? formatDate(k.rotatedAt) : null,
+    oauth: k.oauth,
+    expires: k.expiresAt ? formatDate(k.expiresAt) : null,
     revoked: k.revokedAt ? formatDate(k.revokedAt) : null,
     values: {
       name: k.name,

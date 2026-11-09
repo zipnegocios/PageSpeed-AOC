@@ -360,7 +360,42 @@ export const mcpApiKeys = pgTable("mcp_api_keys", {
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   // Cuándo se cambió por última vez el secreto de la clave (null si nunca se rotó).
   rotatedAt: timestamp("rotated_at", { withTimezone: true }),
+  // Conexiones OAuth (claude.ai web): la fila es la conexión; el token de acceso caduca y se renueva con el de refresco.
+  oauthClientId: uuid("oauth_client_id"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  refreshHash: text("refresh_hash").unique(),
+  prevRefreshHash: text("prev_refresh_hash"),
+  refreshExpiresAt: timestamp("refresh_expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ------------------------------------------------------- oauth_clients
+// Aplicaciones registradas por registro dinámico (RFC 7591): clientes públicos, sin secreto. Su id es el `client_id`.
+export const oauthClients = pgTable("oauth_clients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  redirectUris: text("redirect_uris").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+});
+
+// --------------------------------------------------------- oauth_codes
+// Códigos de autorización: de un solo uso y de vida corta. Solo se guarda el sha256 del código. Los permisos y el alcance
+// elegidos al autorizar viajan aquí hasta que el código se canjea por la conexión.
+export const oauthCodes = pgTable("oauth_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: uuid("client_id").notNull(),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  keyName: text("key_name").notNull(),
+  scopes: text("scopes").array().notNull(),
+  allAccess: boolean("all_access").notNull(),
+  clientIds: uuid("client_ids").array().notNull().default(sql`'{}'::uuid[]`),
+  projectIds: uuid("project_ids").array().notNull().default(sql`'{}'::uuid[]`),
+  adminId: uuid("admin_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
 });
 
 // --------------------------------------------------------- admin_users

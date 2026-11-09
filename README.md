@@ -209,6 +209,15 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   herramienta lo comprueba antes de leer o cambiar (`src/mcp/access.ts`, reglas en `server/domain/mcp-access.ts`);
   lo que queda fuera responde «no encontrado», como si no existiera. Al crear la clave hay que elegir una de las dos
   cosas.
+- **Conector de claude.ai (OAuth):** los conectores personalizados de claude.ai web no permiten poner una cabecera
+  `Authorization`, solo hablan OAuth. La app es su propio servidor de autorización mínimo: descubrimiento
+  (`/.well-known/oauth-protected-resource` y `/.well-known/oauth-authorization-server`), registro dinámico
+  (`/oauth/register`), pantalla de autorización con sesión de administrador (`/oauth/authorize`, donde se eligen permisos y
+  alcance como en «Nueva clave»), `/oauth/token` (código + PKCE S256, y refresco rotativo) y `/oauth/revoke`. Cada
+  conexión es una fila de `mcp_api_keys` (insignia «Conexión de claude.ai»): accesos de 1 hora, refrescos de 90 días,
+  reutilizar un refresco gastado la revoca, y se edita, revoca y elimina desde Panel → Agentes como cualquier clave.
+  Solo se aceptan direcciones de retorno de `claude.ai`/`claude.com` y de bucle local. Requiere `APP_URL` con la URL
+  pública https exacta. Las claves por cabecera (`Authorization: Bearer pagespeed_…`) siguen valiendo para Claude Code.
 - **Gestión de claves** (Panel → Agentes): cada clave se puede **editar** (nombre, permisos y alcance; vale desde la
   siguiente llamada del agente y la clave no cambia), **rotar** (genera un secreto nuevo, se muestra una sola vez, y el
   anterior deja de servir al instante), **revocar** (deja de servir al instante; sigue en la lista) y, ya revocada,

@@ -38,6 +38,10 @@ export type ApiKeyView = {
   revokedAt: Date | null;
   /** Cuándo se cambió por última vez el secreto (null si nunca se rotó). */
   rotatedAt: Date | null;
+  /** Conexión hecha desde otra aplicación (claude.ai web) por OAuth: se renueva sola y no se rota a mano. */
+  oauth: boolean;
+  /** Cuándo vence el token de acceso actual (solo conexiones OAuth). */
+  expiresAt: Date | null;
   /** A qué datos llega la clave, con los nombres ya resueltos (los que ya no existen no se listan). */
   scope: ApiKeyScopeView;
 };
@@ -61,6 +65,8 @@ const toView = (r: repo.ApiKeyRow, names: Names): ApiKeyView => ({
   createdAt: r.createdAt,
   revokedAt: r.revokedAt,
   rotatedAt: r.rotatedAt,
+  oauth: r.oauthClientId !== null,
+  expiresAt: r.expiresAt,
   scope: {
     all: r.allAccess,
     clients: r.allAccess ? [] : r.clientIds.flatMap((id) => (names.clients.has(id) ? [{ id, name: names.clients.get(id)! }] : [])),
@@ -69,7 +75,7 @@ const toView = (r: repo.ApiKeyRow, names: Names): ApiKeyView => ({
 });
 
 /** Valida los campos de una clave y deja el alcance listo para guardar (ids que existen, sin proyectos redundantes). */
-async function resolveFields(raw: unknown, db: Database) {
+export async function resolveKeyFields(raw: unknown, db: Database) {
   const input = parseInput(keyFieldsInput, raw);
   const names = await loadNames(db);
 
@@ -92,7 +98,7 @@ async function resolveFields(raw: unknown, db: Database) {
 
 /** Crea una clave. La clave en claro solo existe en este resultado: en la base se guarda su hash. */
 export async function createApiKey(raw: unknown, db: Database = getDb()): Promise<{ key: string; view: ApiKeyView }> {
-  const { names, fields } = await resolveFields(raw, db);
+  const { names, fields } = await resolveKeyFields(raw, db);
   const key = generateApiKey();
   const row = await repo.insertApiKey(db, { ...fields, keyHash: hashApiKey(key) });
   return { key, view: toView(row, names) };
@@ -104,7 +110,7 @@ export async function createApiKey(raw: unknown, db: Database = getDb()): Promis
  */
 export async function updateApiKey(id: string, raw: unknown, db: Database = getDb()): Promise<ApiKeyView> {
   assertUuid(id, "Clave");
-  const { names, fields } = await resolveFields(raw, db);
+  const { names, fields } = await resolveKeyFields(raw, db);
   const row = await repo.updateKey(db, id, fields);
   if (!row) throw new DomainError("NOT_FOUND", "La clave no existe o ya está revocada: no se puede editar.");
   return toView(row, names);
@@ -113,6 +119,8 @@ export async function updateApiKey(id: string, raw: unknown, db: Database = getD
 /** Cambia el secreto de una clave activa. La anterior deja de valer al instante; la nueva solo existe en este resultado. */
 export async function rotateApiKey(id: string, db: Database = getDb(), now: Date = new Date()): Promise<{ key: string; view: ApiKeyView }> {
   assertUuid(id, "Clave");
+  const current = await repo.findKey(db, id);
+  if (current?.oauthClientId) throw new DomainError("INVALID", "Esta conexión se renueva sola: no hace falta rotarla. Si quieres cortarla, revócala.");
   const key = generateApiKey();
   const row = await repo.rotateKeyHash(db, id, hashApiKey(key), now);
   if (!row) throw new DomainError("NOT_FOUND", "La clave no existe o ya está revocada: no se puede rotar.");
@@ -145,6 +153,8 @@ export async function authenticateApiKey(key: string, db: Database = getDb(), no
   if (!isPlausibleApiKey(key)) return null;
   const row = await repo.findActiveByHash(db, hashApiKey(key));
   if (!row) return null;
+  // Las conexiones OAuth tienen token de acceso con vigencia: vencido, se pide uno nuevo con el de refresco.
+  if (row.expiresAt && row.expiresAt.getTime() <= now.getTime()) return null;
   await repo.touchKey(db, row.id, now, 60_000).catch(() => undefined);
   return { id: row.id, name: row.name, scopes: row.scopes as ToolName[], access: accessFromRow(row) };
 }
