@@ -14,12 +14,14 @@ const ITEMS = [
   { href: "/admin/cola", label: "Cola" },
 ] as const;
 
+const TEAM_ITEM = { href: "/admin/equipo", label: "Equipo" } as const;
+
 /** Navegación principal con la sección actual marcada (aria-current). */
-export function AdminNav() {
+export function AdminNav({ showTeam = false }: { showTeam?: boolean }) {
   const pathname = usePathname();
   return (
     <ul className="flex flex-wrap items-center gap-1">
-      {ITEMS.map((item) => {
+      {(showTeam ? [...ITEMS, TEAM_ITEM] : [...ITEMS]).map((item) => {
         // /admin/clientes/<cliente>/<proyecto> es una ficha de proyecto: cuenta como "Proyectos", no como "Clientes".
         const isProjectPage = /^\/admin\/clientes\/[^/]+\/[^/]+/.test(pathname);
         const active =

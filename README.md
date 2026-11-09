@@ -241,6 +241,12 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 2. Copia su `tokens.json` a `design/tokens.json`.
 3. `pnpm tokens:sync` regenera `src/lib/ui/tokens/*` (CI verifica que no haya diferencias).
 
+## Equipo y acceso al panel
+
+- La cuenta **propietaria** se crea al primer arranque con `ADMIN_EMAIL` / `ADMIN_PASSWORD` (solo se leen cuando no existe ninguna; cambiarlas después no agrega ni cambia a nadie).
+- Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Todas administran clientes, proyectos, agentes y cola; solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Si el correo no sale, el enlace se copia desde la pantalla.
+- Las invitaciones guardan solo el sha256 del token (`admin_invites`); el enlace `/invitacion/<token>` lleva `no-referrer`, `noindex` y `no-store`, y cada IP tiene un límite de intentos. Quitar a alguien o cambiar su contraseña cierra sus sesiones.
+
 ## Marca
 
 El producto se llama **PageSpeed**. El logo (un rayo y un chevron lima separados por una ranura diagonal, dentro de un marco con cuatro marcas de esquina) vive en `design/brand/`: `logo-mark.svg` (marca completa sobre navy), `logo-glyph.svg` (solo el glifo, de 12 a 32 px), `logo-mono.svg` (`currentColor`), `logo-lockup.svg` / `logo-lockup-light.svg` (glifo + PAGESPEED en trazados de Rajdhani) y `logo-favicon.svg`. En código, la geometría y el copyright salen de `src/lib/brand.ts` y se dibujan con `BrandMark`, `BrandGlyph` y `BrandLockup` (`src/lib/ui/components/brand-mark.tsx`); el PDF y los correos usan los mismos datos.

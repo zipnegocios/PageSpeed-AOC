@@ -368,7 +368,8 @@ describe.skipIf(!ready)("agendado, plan-project-audit y reconciliación", () => 
       worker = await startWorker({ env: env(), runner: okRunner, allowPrivate: true, logger: log });
       await maintenance.add(BACKUP_JOB, {}, { jobId: "backup-manual", removeOnComplete: true });
       await waitFor(async () => [...s3.objects.keys()].some((k) => k.startsWith("_backups/postgres/")) || undefined);
-      const [row] = await db.select().from(s.settings).where(eq(s.settings.key, "last_backup"));
+      // El objeto se sube antes de anotar `last_backup`: se espera a la anotación en vez de leerla de inmediato.
+      const row = await waitFor(async () => (await db.select().from(s.settings).where(eq(s.settings.key, "last_backup")))[0]);
       expect((row!.value as { key: string }).key).toMatch(/^_backups\/postgres\//);
     });
 

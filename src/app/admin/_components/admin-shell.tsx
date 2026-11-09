@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getSession } from "@/lib/auth/session";
 import { Button } from "@/lib/ui/components/button";
 import { BrandLockup } from "@/lib/ui/components/brand-mark";
 import { CopyrightLine } from "@/lib/ui/components/copyright-line";
@@ -11,7 +12,7 @@ import { ProjectSwitcherLoader } from "./project-switcher-loader";
 export type Crumb = { label: string; href?: string };
 
 /** Marco común de las pantallas de administración: navegación, sesión y título. */
-export function AdminShell({
+export async function AdminShell({
   email,
   title,
   subtitle,
@@ -26,6 +27,8 @@ export function AdminShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  // El propietario ve «Equipo» en la navegación (la sesión ya se leyó en la página: aquí sale de la caché de la petición).
+  const session = await getSession();
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-6 px-4 pb-10 md:px-8">
       <header className="hud z-30 mt-3 md:sticky md:top-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg px-3 py-2">
@@ -33,7 +36,7 @@ export function AdminShell({
           <Link href="/admin" className="press mr-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-[13px] font-bold tracking-[0.08em] text-ink uppercase">
             <BrandLockup wordClassName="text-[13px] tracking-[0.08em]" />
           </Link>
-          <AdminNav />
+          <AdminNav showTeam={session?.role === "owner"} />
         </nav>
         <div className="flex flex-wrap items-center gap-3">
           <ProjectSwitcherLoader />

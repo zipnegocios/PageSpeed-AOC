@@ -367,8 +367,29 @@ export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  // `owner`: la cuenta que administra el equipo (una sola); `admin`: administra todo lo demás.
+  role: text("role").notNull().default("admin"),
   ...timestamps,
 });
+
+// ---------------------------------------------------------- admin_invites
+// Invitaciones para entrar al panel y enlaces de contraseña nueva. El token viaja solo en el enlace: aquí queda su sha256.
+export const adminInvites = pgTable(
+  "admin_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    // `invite`: crea la cuenta; `reset`: cambia la contraseña de una cuenta que ya existe.
+    kind: text("kind").notNull().default("invite"),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: uuid("invited_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("admin_invites_email_idx").on(t.email)],
+);
 
 // ------------------------------------------------------------- settings
 export const settings = pgTable("settings", {

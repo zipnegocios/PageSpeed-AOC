@@ -3,6 +3,7 @@ import { getDummyHash, hashPassword, verifyPassword } from "@/server/auth/passwo
 import { passwordVersion, type SessionClaims } from "@/server/auth/session-token";
 import {
   countAdmins,
+  countOwners,
   findAdminByEmail,
   findAdminById,
   insertAdmin,
@@ -11,32 +12,35 @@ import {
 
 export const MIN_PASSWORD_LENGTH = 12;
 
-export type AdminSummary = { id: string; email: string; pv: string };
+export type AdminSummary = { id: string; email: string; pv: string; role: "owner" | "admin" };
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function summarize(admin: AdminUser): AdminSummary {
-  return { id: admin.id, email: admin.email, pv: passwordVersion(admin.passwordHash) };
+export function summarize(admin: AdminUser): AdminSummary {
+  return { id: admin.id, email: admin.email, pv: passwordVersion(admin.passwordHash), role: admin.role === "owner" ? "owner" : "admin" };
 }
 
 export type SeedResult = "created" | "exists" | "missing-env" | "invalid";
 
 /**
- * Crea el administrador único a partir de ADMIN_EMAIL / ADMIN_PASSWORD la primera vez.
+ * Crea al propietario a partir de ADMIN_EMAIL / ADMIN_PASSWORD cuando no hay ninguno (la primera vez, o tras borrar su fila).
+ * Las demás personas se invitan desde Panel → Equipo; estas variables no sirven para agregarlas.
  * Si ya existe uno, no toca nada (cambiar las variables después no cambia la contraseña).
  */
 export async function seedAdminFromEnv(
   source: { ADMIN_EMAIL?: string; ADMIN_PASSWORD?: string },
   db: Database = getDb(),
 ): Promise<SeedResult> {
-  if ((await countAdmins(db)) > 0) return "exists";
+  // Basta con que exista un propietario: así, si se borra su fila para recuperar la contraseña, las demás cuentas no estorban.
+  if ((await countOwners(db)) > 0) return "exists";
   const email = source.ADMIN_EMAIL ? normalizeEmail(source.ADMIN_EMAIL) : "";
   const password = source.ADMIN_PASSWORD ?? "";
   if (!email || !password) return "missing-env";
   if (!email.includes("@") || password.length < MIN_PASSWORD_LENGTH) return "invalid";
-  await insertAdmin(db, { email, passwordHash: await hashPassword(password) });
+  // El primero que se crea es el propietario: administra el equipo.
+  await insertAdmin(db, { email, passwordHash: await hashPassword(password), role: "owner" });
   return "created";
 }
 

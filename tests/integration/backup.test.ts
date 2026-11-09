@@ -43,7 +43,7 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     await pool.end();
   });
   beforeEach(async () => {
-    await db.execute(sql`truncate clients, settings, admin_users, mcp_api_keys restart identity cascade`);
+    await db.execute(sql`truncate clients, settings, admin_users, admin_invites, mcp_api_keys restart identity cascade`);
     s3.objects.clear();
     s3.mtimes.clear();
     s3.failWith(null);
@@ -66,7 +66,8 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     await alerts.evaluateAudit(a!.id, { db });
     await alerts.sweepNotifications({ db, mailer: { send: async () => undefined }, recipient: "a@x.test", appUrl: "https://app.test", now: () => new Date("2026-10-30T10:05:00Z") });
     await createApiKey({ name: "agente", preset: "read", access: "all" }, db);
-    await db.insert(s.adminUsers).values({ email: "admin@x.test", passwordHash: "scrypt$hash" });
+    await db.insert(s.adminUsers).values({ email: "admin@x.test", passwordHash: "scrypt$hash", role: "owner" });
+    await db.insert(s.adminInvites).values({ email: "luis@x.test", kind: "invite", tokenHash: "h".repeat(64), expiresAt: new Date("2026-11-10T00:00:00.789Z") });
     await db.insert(s.settings).values({ key: "default_thresholds", value: { performance: 80, seo: 90 } });
     return { client, project, home };
   }
@@ -81,7 +82,7 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     return out;
   }
 
-  const wipe = () => db.execute(sql`truncate clients, settings, admin_users, mcp_api_keys restart identity cascade`);
+  const wipe = () => db.execute(sql`truncate clients, settings, admin_users, admin_invites, mcp_api_keys restart identity cascade`);
 
   describe("exportación", () => {
     it("sube un archivo comprimido a R2 bajo su propio prefijo y lo registra", async () => {

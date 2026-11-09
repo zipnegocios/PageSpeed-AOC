@@ -25,7 +25,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 | `ALERT_EMAIL` | opc. | opc. | Destinatario de alertas. Vacío: el correo del administrador |
 | `AUTH_ENCRYPTION_KEY` | ✔ | ✔ | `openssl rand -base64 32`. **Idéntica en ambos.** Cifra las credenciales de páginas privadas. Guárdala fuera del sistema (gestor de contraseñas) |
 | `SESSION_SECRET` | ✔ | — | ≥ 32 caracteres. Cambiarla cierra todas las sesiones |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | ✔ | — | Solo se leen si no existe ningún administrador |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | ✔ | — | Solo se leen si no existe la cuenta propietaria. No sirven para agregar personas: eso se hace en Panel → Equipo |
 | `AUDIT_COOLDOWN_MS`, `AUDIT_TIMEOUT_MS`, `AUDIT_ATTEMPTS` | — | opc. | 12000 / 90000 / 3 por defecto |
 | `LOG_LEVEL` | opc. | opc. | `info` por defecto |
 | `NODE_OPTIONS` | opc. | opc. | Las imágenes ya fijan `--max-old-space-size` (web 512, worker 512) |
@@ -85,7 +85,10 @@ Lo que se pierde: cambios hechos entre el último respaldo y la caída (hasta 24
 
 | Qué | Cómo se cambia | Efecto |
 |---|---|---|
-| Contraseña del administrador | En la consola de Postgres: `delete from admin_users;` y reinicia el web con `ADMIN_EMAIL` y `ADMIN_PASSWORD` nuevos | Se crea el administrador al arrancar. Quita la contraseña de las variables después |
+| Contraseña del propietario | En la consola de Postgres: `delete from admin_users where role = 'owner';` y reinicia el web con `ADMIN_EMAIL` y `ADMIN_PASSWORD` nuevos | Se crea la cuenta propietaria al arrancar; las demás personas siguen. Quita la contraseña de las variables después |
+| Agregar a una persona del equipo | Panel → Equipo → *Invitar a una persona* (solo el propietario) | Le llega un enlace de un solo uso (7 días) para crear su contraseña. Si el correo no sale, copia el enlace de la pantalla |
+| Contraseña olvidada de otra persona del equipo | Panel → Equipo → *Enviar enlace de contraseña nueva* | Crea una contraseña nueva y cierra sus sesiones anteriores |
+| Quitar a una persona del equipo | Panel → Equipo → *Quitar* | Deja de poder entrar y su sesión se cierra en su siguiente petición |
 | `SESSION_SECRET` | Cambiar la variable y reiniciar el web | Cierra todas las sesiones |
 | Link de un cliente filtrado | Ficha del cliente → *Generar link nuevo* | El anterior deja de funcionar al instante. También sirve *Suspender* |
 | Clave de agente (MCP) filtrada | Panel → Agentes → *Revocar* | Deja de funcionar al instante |

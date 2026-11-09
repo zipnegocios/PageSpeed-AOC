@@ -50,6 +50,13 @@
       "when": 1794184310950,
       "tag": "0006_claves_con_alcance",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794186056419,
+      "tag": "0007_equipo",
+      "breakpoints": true
     }
   ]
 }

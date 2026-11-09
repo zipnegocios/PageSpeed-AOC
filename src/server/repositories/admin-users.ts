@@ -19,9 +19,15 @@ export async function countAdmins(db: Database): Promise<number> {
   return row?.n ?? 0;
 }
 
+/** Cuántas cuentas propietarias hay (debe ser una). */
+export async function countOwners(db: Database): Promise<number> {
+  const [row] = await db.select({ n: count() }).from(adminUsers).where(eq(adminUsers.role, "owner"));
+  return row?.n ?? 0;
+}
+
 export async function insertAdmin(
   db: Database,
-  values: { email: string; passwordHash: string },
+  values: { email: string; passwordHash: string; role?: "owner" | "admin" },
 ): Promise<AdminUser> {
   const [row] = await db.insert(adminUsers).values(values).returning();
   if (!row) throw new Error("No se pudo crear el administrador");
@@ -32,4 +38,20 @@ export async function insertAdmin(
 export async function findFirstAdmin(db: Database): Promise<AdminUser | undefined> {
   const [row] = await db.select().from(adminUsers).orderBy(asc(adminUsers.createdAt)).limit(1);
   return row;
+}
+
+/** Todo el equipo, de la cuenta más antigua a la más reciente. */
+export function listAdmins(db: Database): Promise<AdminUser[]> {
+  return db.select().from(adminUsers).orderBy(asc(adminUsers.createdAt));
+}
+
+export async function deleteAdmin(db: Database, id: string): Promise<boolean> {
+  const rows = await db.delete(adminUsers).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
+  return rows.length > 0;
+}
+
+/** Cambia la contraseña (y con ella la versión de las sesiones: las anteriores dejan de valer). */
+export async function setAdminPassword(db: Database, id: string, passwordHash: string): Promise<boolean> {
+  const rows = await db.update(adminUsers).set({ passwordHash }).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
+  return rows.length > 0;
 }

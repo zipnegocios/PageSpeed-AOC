@@ -51,6 +51,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       sql`select table_name from information_schema.tables where table_schema = 'public' order by 1`,
     );
     expect(r.rows.map((x) => x.table_name)).toEqual([
+      "admin_invites",
       "admin_users",
       "alert_states",
       "alert_thresholds",
