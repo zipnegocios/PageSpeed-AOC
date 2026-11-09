@@ -3,7 +3,8 @@ import type { Redis } from "ioredis";
 import { getDb, type Database } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
 import { toPageRows } from "@/server/domain/seo-crawl-rows";
-import { evaluate, summarize, type SeverityCounts } from "@/server/domain/seo-crawl-rules";
+import { byLanguage, diffIssues, evaluate, ISSUE_CATALOG, ISSUE_CODES, summarize, type IssueCode, type Severity, type SeverityCounts } from "@/server/domain/seo-crawl-rules";
+import { parseLangParam } from "@/server/domain/seo-markets";
 import { getRedis } from "@/server/queue/connection";
 import { readHeartbeat } from "@/server/queue/heartbeat";
 import { seoQueue } from "@/server/queue/queues";
@@ -13,6 +14,7 @@ import { listRoutes } from "@/server/repositories/routes";
 import * as repo from "@/server/repositories/seo-crawl";
 import { listMarkets } from "@/server/repositories/seo-markets";
 import { crawl, DEFAULT_LIMITS, type CrawlOptions, type CrawlOutcome } from "@/server/seo/crawler";
+import { getMarkets, type SeoMarket } from "./seo-markets";
 import { assertUuid, isUniqueViolation } from "./shared";
 
 const ENQUEUE_TIMEOUT_MS = 8_000;
@@ -187,4 +189,104 @@ export async function reconcileCrawlRuns(deps: { db?: Database; queue: Queue; no
     if (await repo.failRun(db, run.id, "El rastreo se perdió (el worker se detuvo o Redis perdió el trabajo). Vuelve a pedirlo.", "stale")) failed += 1;
   }
   return { failed };
+}
+
+// ------------------------------------------------------------------ lectura
+
+export type CrawlRunView = Pick<
+  repo.RunRow,
+  "id" | "status" | "trigger" | "queuedAt" | "startedAt" | "finishedAt" | "outcome" | "detail" | "pagesCrawled" | "pagesDiscovered" | "truncatedBy" | "errors" | "warnings" | "infos"
+>;
+
+export type CrawlGroup = { code: IssueCode; severity: Severity; group: (typeof ISSUE_CATALOG)[IssueCode]["group"]; title: string; advice: string; pages: number; added: number };
+
+export type CrawlDetail = {
+  code: IssueCode;
+  severity: Severity;
+  title: string;
+  advice: string;
+  rows: Array<{ page: string; lang: string | null; evidence: Record<string, string | number | boolean | string[]>; isNew: boolean }>;
+  /** Filas que no caben en pantalla. */
+  more: number;
+};
+
+export type CrawlReport = {
+  /** Rastreo en cola o en curso. */
+  active: CrawlRunView | null;
+  /** El último pedido, de cualquier estado: dice si el más reciente falló. */
+  latest: CrawlRunView | null;
+  /** El último terminado con datos: de él salen los números. */
+  current: CrawlRunView | null;
+  previous: CrawlRunView | null;
+  markets: SeoMarket[];
+  /** Idioma aplicado (`?idioma=`) o null si se ven todos. */
+  lang: string | null;
+  counts: SeverityCounts | null;
+  previousCounts: SeverityCounts | null;
+  /** Hallazgos nuevos y resueltos frente al rastreo anterior; null si no hay anterior. */
+  changes: { added: number; resolved: number } | null;
+  groups: CrawlGroup[];
+  detail: CrawlDetail | null;
+  /** Conteos de los últimos rastreos terminados, del más antiguo al más reciente. */
+  history: Array<{ at: Date; errors: number; warnings: number; infos: number }>;
+};
+
+const MAX_DETAIL_ROWS = 200;
+
+const view = (r: repo.RunRow): CrawlRunView => ({
+  id: r.id, status: r.status, trigger: r.trigger, queuedAt: r.queuedAt, startedAt: r.startedAt, finishedAt: r.finishedAt, outcome: r.outcome, detail: r.detail,
+  pagesCrawled: r.pagesCrawled, pagesDiscovered: r.pagesDiscovered, truncatedBy: r.truncatedBy, errors: r.errors, warnings: r.warnings, infos: r.infos,
+});
+
+/**
+ * Lo que muestra la pantalla «Auditoría técnica»: el estado del último rastreo, los números del último terminado con su
+ * variación frente al anterior, los hallazgos agrupados por tipo y, si se pide uno (`code`), sus páginas con la evidencia.
+ */
+export async function getCrawlReport(projectId: string, opts: { lang?: string; code?: string } = {}, db: Database = getDb()): Promise<CrawlReport> {
+  assertUuid(projectId, "Proyecto");
+  const [recent, finished, markets] = await Promise.all([repo.listRuns(db, projectId, 1), repo.listFinishedRuns(db, projectId, 12), getMarkets(projectId, db)]);
+  const active = await repo.findActiveRun(db, projectId);
+  const [current, previous] = finished;
+  const lang = parseLangParam(opts.lang, markets) ?? null;
+  const history = [...finished].reverse().map((r) => ({ at: r.queuedAt, errors: r.errors, warnings: r.warnings, infos: r.infos }));
+  const base = { active: active ? view(active) : null, latest: recent[0] ? view(recent[0]) : null, current: current ? view(current) : null, previous: previous ? view(previous) : null, markets, lang, history };
+  if (!current) return { ...base, counts: null, previousCounts: null, changes: null, groups: [], detail: null };
+
+  const now = byLanguage(await repo.listIssues(db, current.id), lang);
+  const before = previous ? byLanguage(await repo.listIssues(db, previous.id), lang) : null;
+  const diff = before ? diffIssues(before, now) : null;
+  const added = new Set(diff?.added.map((i) => `${i.code}|${i.page}`) ?? []);
+
+  const groups = new Map<IssueCode, CrawlGroup>();
+  for (const i of now) {
+    const code = i.code as IssueCode;
+    const g = groups.get(code) ?? { code, severity: ISSUE_CATALOG[code].severity, group: ISSUE_CATALOG[code].group, title: ISSUE_CATALOG[code].title, advice: ISSUE_CATALOG[code].advice, pages: 0, added: 0 };
+    g.pages += 1;
+    if (added.has(`${i.code}|${i.page}`)) g.added += 1;
+    groups.set(code, g);
+  }
+  const order: Record<Severity, number> = { error: 0, warning: 1, info: 2 };
+  const sorted = [...groups.values()].sort((a, b) => order[a.severity] - order[b.severity] || b.pages - a.pages || a.code.localeCompare(b.code));
+
+  let detail: CrawlDetail | null = null;
+  const code = ISSUE_CODES.find((c) => c === opts.code);
+  if (code && groups.has(code)) {
+    const rows = now.filter((i) => i.code === code);
+    detail = {
+      code,
+      severity: ISSUE_CATALOG[code].severity,
+      title: ISSUE_CATALOG[code].title,
+      advice: ISSUE_CATALOG[code].advice,
+      rows: rows.slice(0, MAX_DETAIL_ROWS).map((i) => ({ page: i.page, lang: i.lang, evidence: i.evidence, isNew: added.has(`${i.code}|${i.page}`) })),
+      more: Math.max(0, rows.length - MAX_DETAIL_ROWS),
+    };
+  }
+  return {
+    ...base,
+    counts: summarize(now),
+    previousCounts: before ? summarize(before) : null,
+    changes: diff ? { added: diff.added.length, resolved: diff.resolved.length } : null,
+    groups: sorted,
+    detail,
+  };
 }

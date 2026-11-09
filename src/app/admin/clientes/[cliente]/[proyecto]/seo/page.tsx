@@ -5,6 +5,7 @@ import { AdminShell } from "@/app/admin/_components/admin-shell";
 import { SeoDataSection } from "@/app/_components/seo/seo-data-section";
 import { requestSeoSyncAction } from "@/app/admin/seo/actions";
 import { ClientVisibilityCard } from "@/app/admin/seo/_components/client-visibility-card";
+import { CrawlSection } from "@/app/admin/seo/_components/crawl-section";
 import { ConnectionCard } from "@/app/admin/seo/_components/connection-card";
 import { MarketsCard } from "@/app/admin/seo/_components/markets-card";
 import { verifySession } from "@/lib/auth/session";
@@ -17,6 +18,7 @@ import { SEO_KINDS } from "@/server/domain/seo-connections";
 import { parseSeoPeriod } from "@/server/domain/seo-data";
 import { getProjectByRef } from "@/server/services/projects";
 import { getConnections, getGoogleAccount } from "@/server/services/seo-connections";
+import { getCrawlReport } from "@/server/services/seo-crawl";
 import { getSeoDashboard } from "@/server/services/seo-data";
 import { getMarkets, getMarketSuggestions } from "@/server/services/seo-markets";
 import { getSeoSharing } from "@/server/services/seo-portal";
@@ -24,12 +26,13 @@ import { getSeoSharing } from "@/server/services/seo-portal";
 export const metadata: Metadata = { title: pageTitle("SEO del proyecto"), robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default async function ProjectSeoPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<{ periodo?: string | string[]; idioma?: string | string[] }> }) {
+export default async function ProjectSeoPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<{ periodo?: string | string[]; idioma?: string | string[]; hallazgo?: string | string[] }> }) {
   await verifySession();
   const { cliente, proyecto } = await params;
   const query = await searchParams;
   const periodo = Array.isArray(query.periodo) ? query.periodo[0] : query.periodo;
   const idioma = Array.isArray(query.idioma) ? query.idioma[0] : query.idioma;
+  const hallazgo = Array.isArray(query.hallazgo) ? query.hallazgo[0] : query.hallazgo;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (cliente !== project.clientSlug || proyecto !== project.slug) redirect(`${projectPath(project.clientSlug, project.slug)}/seo`);
@@ -37,6 +40,8 @@ export default async function ProjectSeoPage({ params, searchParams }: { params:
   const googleEmail = google.configured && !google.unreadable ? google.email : null;
   const hasData = Boolean(connections.gsc || connections.ga4);
   const days = parseSeoPeriod(periodo);
+  const crawl = await getCrawlReport(project.id, { lang: idioma, code: hallazgo });
+  const basePath = `${projectPath(project.clientSlug, project.slug)}/seo`;
   const [markets, suggestions, sharing, dashboard] = hasData
     ? await Promise.all([getMarkets(project.id), getMarketSuggestions(project.id), getSeoSharing(project.id), getSeoDashboard(project.id, { days, lang: idioma })])
     : [[], [], null, null];
@@ -72,11 +77,12 @@ export default async function ProjectSeoPage({ params, searchParams }: { params:
         <SeoDataSection
           dashboard={dashboard}
           days={days}
-          basePath={`${projectPath(project.clientSlug, project.slug)}/seo`}
-          search={{ periodo, idioma }}
+          basePath={basePath}
+          search={{ periodo, idioma, hallazgo }}
           syncForm={<ActionForm action={requestSeoSyncAction.bind(null, project.id)} submitLabel="Actualizar ahora" pendingLabel="Pidiendo…" variant="secondary" className="max-w-xl" />}
         />
       ) : null}
+      <CrawlSection projectId={project.id} report={crawl} basePath={basePath} search={{ periodo, idioma, hallazgo }} />
       {sharing ? <ClientVisibilityCard projectId={project.id} sharing={sharing} /> : null}
       {hasData ? <MarketsCard projectId={project.id} markets={markets} suggestions={suggestions} /> : null}
       {SEO_KINDS.map((kind) => (

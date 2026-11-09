@@ -287,6 +287,29 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
   archivado, no fue activado o no tiene conexión a Search Console ni GA4; se comprueba en el servicio, no en la pantalla. El componente
   es el mismo para el administrador y el cliente (`app/_components/seo/`, con `audience`). Sus parámetros (`?periodo=`, `?idioma=`) son
   distintos de los de la evolución (`?dias=`), así que cada panel conserva lo que eligió en el otro.
+- **Auditoría técnica (fase 2):** un rastreador propio del worker audita el sitio de un proyecto como lo haría un buscador y muestra
+  una lista priorizada de problemas en la sección «Auditoría técnica» de la pestaña SEO (solo administradores; el portal del cliente
+  no la muestra todavía). Se pide con «Rastrear ahora» (sirve también en proyectos en desarrollo, como lista de comprobación antes de
+  entregar) y corre sola cada semana (domingos 04:23 UTC) en los proyectos en producción con Search Console o GA4 conectados.
+  - **Qué hace:** lee `robots.txt` y los sitemaps, y recorre la portada, el sitemap y los enlaces internos hasta 3 niveles, **sin
+    ejecutar JavaScript**. Solo hosts del proyecto, con las mismas protecciones anti-SSRF que Lighthouse. No usa credenciales: un
+    sitio que pide sesión se informa como tal. Se identifica como `PageSpeedAOC-SEO/1.0` (es lo que un cliente permitiría en su
+    cortafuegos), respeta `robots.txt` y `Crawl-delay`, y limita su ritmo (2 peticiones a la vez con pausa de 400 ms).
+  - **Límites:** 300 páginas, 1 MB de HTML por página, 10 s por página, 20 minutos en total; pasado el tope termina como **parcial** y
+    lo dice (y omite lo que necesita verlo todo: páginas huérfanas, idiomas sin páginas). Si un cortafuegos responde 403 o 429 de
+    forma masiva, se corta y se explica; no se entregan páginas dudosas como errores.
+  - **Hallazgos:** 40 tipos con gravedad (error, aviso, información), evidencia y «qué hacer»: acceso (errores, bucles y cadenas de
+    redirecciones, enlaces rotos, huérfanas), indexación (`noindex`, `robots.txt` y sitemap), canónicas, contenido (`title`,
+    `meta description`, `h1`), idiomas (`lang`, `hreflang` recíproco, `x-default`) y datos estructurados (JSON-LD). No hay puntuación
+    global: se muestran conteos por gravedad y la variación frente al rastreo anterior (nuevos y resueltos). `?hallazgo=` abre el
+    detalle de un tipo; `?idioma=` filtra por idioma, igual que «Tráfico y búsqueda».
+  - **Datos:** `seo_crawl_runs`, `seo_crawl_pages` y `seo_crawl_issues` (migración `0016`, entran en los respaldos). Un solo rastreo
+    activo por proyecto (índice único). Nunca se guarda el HTML ni el texto de las páginas, solo hechos técnicos. Se conservan las
+    páginas y hallazgos de los últimos 12 rastreos; de los anteriores queda su fila con los conteos. La reconciliación del worker
+    cierra los rastreos perdidos (sin trabajo en Redis) para no bloquear al proyecto.
+  - **Código:** `domain/seo-crawl-parse.ts`, `seo-robots.ts`, `seo-crawl-rules.ts` y `seo-crawl-rows.ts` (puros), `seo/crawler.ts`,
+    `repositories/seo-crawl.ts`, `services/seo-crawl.ts`, trabajo `seo-crawl` en `worker/start.ts` y
+    `app/admin/seo/_components/crawl-section.tsx`. Dependencias nuevas: `htmlparser2` y `robots-parser`.
 - **Despliegue:** el cambio toca `src/server` y la lista de respaldos del worker: despliega **primero el web** (aplica la migración)
   y **después el worker**.
 

@@ -301,9 +301,10 @@ function hreflangRules(p: CrawledPage & { facts: PageFacts }, byPath: Map<string
   const valid = entries.filter((e) => HREFLANG.test(e.lang));
   if (!valid.some((e) => pagePath(e.href) === p.path)) add("hreflang_no_self", p.path);
 
-  const bad: string[] = [];
-  const nonReciprocal: string[] = [];
-  const wrongLang: string[] = [];
+  // Varios códigos (es, x-default) pueden apuntar a la misma página: cada una se informa una sola vez.
+  const bad = new Set<string>();
+  const nonReciprocal = new Set<string>();
+  const wrongLang = new Set<string>();
   for (const e of valid) {
     const path = pagePath(e.href);
     if (path === p.path) continue;
@@ -312,18 +313,18 @@ function hreflangRules(p: CrawledPage & { facts: PageFacts }, byPath: Map<string
     const facts = target.facts;
     const canonicalElsewhere = facts?.canonical ? pagePath(facts.canonical) !== path : false;
     if (failing(target) || target.finalPath || (facts && (hasNoindex([...facts.robots, ...target.xRobots]) || canonicalElsewhere))) {
-      bad.push(path);
+      bad.add(path);
       continue;
     }
-    if (facts && !facts.hreflang.some((h) => pagePath(h.href) === p.path)) nonReciprocal.push(path);
+    if (facts && !facts.hreflang.some((h) => pagePath(h.href) === p.path)) nonReciprocal.add(path);
     if (markets.length > 0 && e.lang.toLowerCase() !== "x-default") {
       const expected = classifyPath(path, markets);
-      if (expected && primary(e.lang) !== expected) wrongLang.push(path);
+      if (expected && primary(e.lang) !== expected) wrongLang.add(path);
     }
   }
-  if (bad.length > 0) add("hreflang_target_bad", p.path, { targets: sample(bad) });
-  if (nonReciprocal.length > 0) add("hreflang_not_reciprocal", p.path, { targets: sample(nonReciprocal) });
-  if (wrongLang.length > 0) add("hreflang_wrong_language", p.path, { targets: sample(wrongLang) });
+  if (bad.size > 0) add("hreflang_target_bad", p.path, { targets: sample([...bad]) });
+  if (nonReciprocal.size > 0) add("hreflang_not_reciprocal", p.path, { targets: sample([...nonReciprocal]) });
+  if (wrongLang.size > 0) add("hreflang_wrong_language", p.path, { targets: sample([...wrongLang]) });
 }
 
 function jsonLdRules(p: CrawledPage & { facts: PageFacts }, add: Add): void {
@@ -380,6 +381,16 @@ export function groupByCode(issues: Issue[]): Array<{ code: IssueCode; severity:
   return [...counts]
     .map(([code, pages]) => ({ code, severity: ISSUE_CATALOG[code].severity, pages }))
     .sort((a, b) => ORDER[a.severity] - ORDER[b.severity] || b.pages - a.pages || a.code.localeCompare(b.code));
+}
+
+/**
+ * Deja los hallazgos de un idioma. `null` = todos. «none» = páginas sin idioma (las del sitio entero no tienen idioma y
+ * solo salen cuando no se filtra).
+ */
+export function byLanguage<T extends { page: string; lang: string | null }>(issues: T[], lang: string | null): T[] {
+  if (lang === null) return issues;
+  if (lang === "none") return issues.filter((i) => i.lang === null && i.page !== SITE);
+  return issues.filter((i) => i.lang === lang);
 }
 
 export type IssueKey = { page: string; code: string };

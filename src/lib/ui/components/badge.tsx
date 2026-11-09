@@ -6,6 +6,8 @@ const tones = {
   primary: "bg-primary text-on-primary",
   ok: "bg-ok-subtle text-on-ok-subtle",
   danger: "bg-danger-subtle text-on-danger-subtle",
+  // Sin color de relleno propio (el contraste ya está validado en `neutral`): el aro ámbar refuerza el texto.
+  warning: "bg-surface-300 text-ink ring-1 ring-inset ring-warning",
 } as const;
 
 /** Etiqueta de estado. Siempre lleva texto: el color solo refuerza. */

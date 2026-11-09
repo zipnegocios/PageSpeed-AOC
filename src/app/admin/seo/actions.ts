@@ -6,6 +6,7 @@ import { verifySession } from "@/lib/auth/session";
 import { clearGoogleAccount, removeConnection, saveConnection, saveGoogleAccount, testConnection } from "@/server/services/seo-connections";
 import { addMarket, removeMarket } from "@/server/services/seo-markets";
 import { setSeoClientVisible } from "@/server/services/seo-portal";
+import { requestCrawl } from "@/server/services/seo-crawl";
 import { requestSeoSync } from "@/server/services/seo-sync";
 
 /** Las direcciones llevan slugs de cliente y proyecto: se revalida todo el panel en lugar de adivinar cada ruta. */
@@ -93,5 +94,15 @@ export async function setSeoClientVisibleAction(projectId: string, visible: bool
     await setSeoClientVisible(projectId, visible);
     refresh();
     return { ok: visible ? "Listo: el cliente ya ve «Tráfico y búsqueda» en su portal." : "Listo: el cliente ya no ve «Tráfico y búsqueda» en su portal." };
+  });
+}
+
+/** «Rastrear ahora»: pide al worker auditar el sitio del proyecto. Sirve también para proyectos en desarrollo. */
+export async function requestCrawlAction(projectId: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const { queued } = await requestCrawl(projectId);
+    refresh();
+    return { ok: queued ? "Rastreo pedido. El worker recorre el sitio en unos minutos; recarga la página para ver el resultado." : "Ya hay un rastreo en cola o en curso para este proyecto." };
   });
 }

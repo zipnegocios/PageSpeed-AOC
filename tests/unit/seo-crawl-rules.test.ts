@@ -360,6 +360,12 @@ describe("idiomas", () => {
     expect(issues.find((i) => i.code === "hreflang_not_reciprocal")?.evidence).toEqual({ targets: ["/en"] });
   });
 
+  it("varios códigos que apuntan a la misma página se informan una sola vez", () => {
+    // es y x-default apuntan a «/»; /en no la devuelve.
+    const issues = run(bilingual([alt("es", "/"), alt("en", "/en"), alt("x-default", "/en"), alt("en-GB", "/en")], [alt("en", "/en")]), { markets: [ES, EN] });
+    expect(issues.find((i) => i.code === "hreflang_not_reciprocal")?.evidence).toEqual({ targets: ["/en"] });
+  });
+
   it("la alternativa no se puede verificar si no se rastreó: no se acusa", () => {
     const pages = [page("/", { facts: { hreflang: good, jsonLd: { invalid: 0, items: [org] } } })];
     expect(codes(run(pages, { markets: [ES, EN] }))).not.toContain("hreflang_not_reciprocal");
