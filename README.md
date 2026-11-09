@@ -264,6 +264,14 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
   de cada fuente queda en `seo_integrations` (`synced_through`, `last_sync_at`, `sync_status`, `sync_detail`). Todo entra en los
   respaldos. Código: `domain/seo-sync.ts` (ventanas y agregación, puro), `services/seo-sync.ts` y `repositories/seo-sync.ts`.
   **El worker necesita `GOOGLE_SERVICE_ACCOUNT_JSON` (o `AUTH_ENCRYPTION_KEY` si la cuenta se guardó en el panel).**
+- **Pantalla «Tráfico y búsqueda»** (arriba de las conexiones, en la pestaña SEO del proyecto, si hay conexión a Search Console o GA4):
+  periodo de 7, 28 o 90 días (`?dias=`), estado de la última descarga de cada fuente y botón «Actualizar ahora»; indicadores con su
+  variación frente al periodo anterior (clics, impresiones, CTR, posición media —bajar es mejor—, sesiones y visitas desde IA); gráficos
+  diarios; y rankings de páginas, países, dispositivos y canales, y de visitas desde ChatGPT, Perplexity, Gemini y otros. **Cada fuente
+  termina en su último día con datos** (Search Console cierra ~3 días tarde y GA4 ~1), y la pantalla muestra el periodo de cada una, para
+  que ni caiga a cero al final ni se compare contra menos días. No se muestran «usuarios»: GA4 los entrega por día, página, país y canal, y
+  sumarlos cuenta varias veces a la misma persona. Código: `domain/seo-data.ts` (puro), `services/seo-data.ts`
+  (`getSeoDashboard`, solo agregaciones SQL) y `app/admin/seo/_components/`.
 - **Despliegue:** el cambio toca `src/server` y la lista de respaldos del worker: despliega **primero el web** (aplica la migración)
   y **después el worker**.
 

@@ -56,16 +56,23 @@ function SourceStatus({ name, sync }: { name: string; sync: SeoSyncInfo }) {
   );
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+function Group({ title, period, children }: { title: string; period?: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="text-[19px] leading-6 font-semibold text-ink">{title}</h3>
+      <div className="flex flex-col gap-1">
+        <h3 className="text-[19px] leading-6 font-semibold text-ink">{title}</h3>
+        {period ? <p className="text-[15px] leading-5 text-ink-muted">{period}</p> : null}
+      </div>
       {children}
     </section>
   );
 }
 
 const NO_BASE = "Sin datos del periodo anterior para comparar";
+
+/** «Del 12 oct al 8 nov (28 días) · comparado con el periodo anterior: del … al …». Cada fuente tiene su propio final. */
+const periodText = (r: { from: string; to: string }, p: { from: string; to: string }, days: number) =>
+  `Del ${formatDayMedium(r.from)} al ${formatDayMedium(r.to)} (${days} días) · comparado con el periodo anterior: del ${formatDayMedium(p.from)} al ${formatDayMedium(p.to)}.`;
 
 /**
  * Sección «Tráfico y búsqueda» de un proyecto: periodo, frescura de los datos, indicadores con su variación, gráficos
@@ -123,8 +130,6 @@ function Dashboard({
   traffic: SeoDashboard["traffic"];
   ai: SeoDashboard["ai"];
 }) {
-  const range = d.range!;
-  const prev = d.previous!;
   const s = search;
   const t = traffic;
   const sp = s?.previousTotals;
@@ -133,11 +138,7 @@ function Dashboard({
 
   return (
     <>
-      <p className="text-[15px] leading-5 text-ink-muted">
-        Del {formatDayMedium(range.from)} al {formatDayMedium(range.to)} ({days} días), comparado con el periodo anterior: del {formatDayMedium(prev.from)} al {formatDayMedium(prev.to)}.
-      </p>
-
-      <Group title="En Google (Search Console)">
+      <Group title="En Google (Search Console)" period={s ? periodText(s.range, s.previous, days) : undefined}>
         <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
           <KpiTile label="Clics" value={s ? formatCount(s.totals.clicks) : null} delta={s && sp ? percentDelta(s.totals.clicks, sp.clicks) : null} hint={s && sp && sp.clicks === 0 ? NO_BASE : undefined} />
           <KpiTile label="Impresiones" value={s ? formatCount(s.totals.impressions) : null} delta={s && sp ? percentDelta(s.totals.impressions, sp.impressions) : null} hint={s && sp && sp.impressions === 0 ? NO_BASE : undefined} />
@@ -152,10 +153,10 @@ function Dashboard({
         {!s ? <p className="text-[15px] leading-5 text-ink-muted">{noGsc}</p> : null}
       </Group>
 
-      <Group title="En el sitio (GA4)">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
+      {/* Sin «usuarios»: GA4 los entrega por día, página, país y canal, y sumarlos cuenta varias veces a la misma persona. */}
+      <Group title="En el sitio (GA4)" period={t ? periodText(t.range, t.previous, days) : undefined}>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <KpiTile label="Sesiones" value={t ? formatCount(t.totals.sessions) : null} delta={t ? percentDelta(t.totals.sessions, t.previousTotals.sessions) : null} hint={t && t.previousTotals.sessions === 0 ? NO_BASE : undefined} />
-          <KpiTile label="Usuarios" value={t ? formatCount(t.totals.users) : null} delta={t ? percentDelta(t.totals.users, t.previousTotals.users) : null} hint={t && t.previousTotals.users === 0 ? NO_BASE : undefined} />
           <KpiTile label="Visitas desde IA" value={ai ? formatCount(ai.totals.sessions) : t ? "0" : null} delta={ai ? percentDelta(ai.totals.sessions, ai.previousTotals.sessions) : null} hint={ai && ai.previousTotals.sessions === 0 ? NO_BASE : "Desde asistentes como ChatGPT o Perplexity"} />
         </div>
         {!t ? <p className="text-[15px] leading-5 text-ink-muted">{noGa4}</p> : null}
@@ -212,7 +213,6 @@ function Dashboard({
           columns={[
             { header: "Página", mono: true, cell: (r) => r.page },
             { header: "Sesiones", numeric: true, cell: (r) => formatCount(r.sessions) },
-            { header: "Usuarios", numeric: true, cell: (r) => formatCount(r.users) },
           ]}
           rows={t?.topPages ?? []}
           rowKey={(r) => r.page}

@@ -6,6 +6,7 @@ import {
   ctr,
   deviceLabel,
   fillDays,
+  ga4CountryName,
   latestDate,
   periodRange,
   previousRange,
@@ -28,13 +29,19 @@ export type SearchTotals = { clicks: number; impressions: number; /** Fracción:
 export type TrafficTotals = { sessions: number; /** Suma de los usuarios diarios (un mismo usuario cuenta una vez por cada fila). */ users: number };
 
 export type SeoDashboard = {
-  /** Termina en el último día con datos de cualquiera de las tres tablas, no en «hoy». Null si no hay ningún dato. */
+  /**
+   * Termina en el último día con datos de cualquiera de las tres tablas, no en «hoy». Null si no hay ningún dato. Sirve para
+   * saber si hay algo que mostrar; cada fuente trae su propio rango, porque Search Console y GA4 cierran con distinto retraso.
+   */
   range: DateRange | null;
   previous: { from: string; to: string } | null;
   /** Estado de la última descarga de cada fuente; null si el proyecto no tiene esa conexión. */
   sync: { gsc: SeoSyncInfo | null; ga4: SeoSyncInfo | null };
   /** Search Console. Null si no hay filas en el periodo. */
   search: {
+    /** Periodo mostrado: termina en el último día con datos de Search Console (suele ir ~3 días por detrás de hoy). */
+    range: DateRange;
+    previous: DateRange;
     totals: SearchTotals;
     previousTotals: SearchTotals;
     daily: Array<{ date: string; clicks: number; impressions: number }>;
@@ -44,6 +51,9 @@ export type SeoDashboard = {
   } | null;
   /** GA4. Null si no hay filas en el periodo. */
   traffic: {
+    /** Periodo mostrado: termina en el último día con datos de GA4 (suele ir ~1 día por detrás de hoy). */
+    range: DateRange;
+    previous: DateRange;
     totals: TrafficTotals;
     previousTotals: TrafficTotals;
     daily: Array<{ date: string; sessions: number }>;
@@ -53,6 +63,8 @@ export type SeoDashboard = {
   } | null;
   /** Visitas que llegan desde asistentes de IA (GA4). Null si no hay filas en el periodo. */
   ai: {
+    range: DateRange;
+    previous: DateRange;
     totals: TrafficTotals;
     previousTotals: TrafficTotals;
     bySource: Array<{ source: string; sessions: number }>;
@@ -87,6 +99,8 @@ async function loadSearch(db: Database, projectId: string, range: DateRange, pre
   ]);
   if (current.rows === 0) return null;
   return {
+    range,
+    previous: prev,
     totals: searchTotals(current),
     previousTotals: searchTotals(before),
     daily: fillDays(range, daily, (date) => ({ date, clicks: 0, impressions: 0 })),
@@ -107,12 +121,14 @@ async function loadTraffic(db: Database, projectId: string, range: DateRange, pr
   ]);
   if (current.rows === 0) return null;
   return {
+    range,
+    previous: prev,
     totals: { sessions: current.sessions, users: current.users },
     previousTotals: { sessions: before.sessions, users: before.users },
     daily: fillDays(range, daily, (date) => ({ date, sessions: 0 })),
     channels: channels.map((c) => ({ channel: c.key, sessions: c.sessions })),
     topPages: pages.map((p) => ({ page: p.key, sessions: p.sessions, users: p.users })),
-    countries: countries.map((c) => ({ country: c.key, sessions: c.sessions })),
+    countries: countries.map((c) => ({ country: ga4CountryName(c.key), sessions: c.sessions })),
   };
 }
 
@@ -125,6 +141,8 @@ async function loadAi(db: Database, projectId: string, range: DateRange, prev: D
   ]);
   if (current.rows === 0) return null;
   return {
+    range,
+    previous: prev,
     totals: { sessions: current.sessions, users: current.users },
     previousTotals: { sessions: before.sessions, users: before.users },
     bySource: sources.map((s) => ({ source: s.key, sessions: s.sessions })),
@@ -147,6 +165,14 @@ export async function getSeoDashboard(projectId: string, opts: { days: number },
 
   const range = periodRange(end, opts.days);
   const prev = previousRange(range);
-  const [search, traffic, ai] = await Promise.all([loadSearch(db, projectId, range, prev), loadTraffic(db, projectId, range, prev), loadAi(db, projectId, range, prev)]);
+  // Cada fuente termina en su último día con datos: con un solo final, los últimos días de Search Console (que cierra ~3
+  // días tarde) saldrían como ceros y la comparación con el periodo anterior contaría menos días que él.
+  const forSource = (lastDay: string | null) => {
+    const r = periodRange(lastDay ?? end, opts.days);
+    return { r, p: previousRange(r) };
+  };
+  const s = forSource(last.search);
+  const t = forSource(latestDate([last.traffic, last.ai]));
+  const [search, traffic, ai] = await Promise.all([loadSearch(db, projectId, s.r, s.p), loadTraffic(db, projectId, t.r, t.p), loadAi(db, projectId, t.r, t.p)]);
   return { range, previous: { from: prev.from, to: prev.to }, sync, search, traffic, ai };
 }

@@ -255,3 +255,18 @@ export function countryName(code: string): string {
   const key = code.trim().toLowerCase();
   return COUNTRY_NAMES[key] ?? key.toUpperCase();
 }
+
+const GA4_COUNTRIES: Record<string, string> = {
+  "United States": "Estados Unidos", Spain: "España", Mexico: "México", Peru: "Perú", Brazil: "Brasil", "United Kingdom": "Reino Unido",
+  Canada: "Canadá", Germany: "Alemania", France: "Francia", Italy: "Italia", Panama: "Panamá", "Dominican Republic": "República Dominicana",
+  Japan: "Japón", Netherlands: "Países Bajos", Switzerland: "Suiza", Belgium: "Bélgica", Ireland: "Irlanda", "New Zealand": "Nueva Zelanda",
+  Russia: "Rusia", Turkey: "Turquía", Türkiye: "Turquía", Poland: "Polonia", Sweden: "Suecia", Norway: "Noruega", Denmark: "Dinamarca",
+  Finland: "Finlandia", Greece: "Grecia", "South Korea": "Corea del Sur", Singapore: "Singapur", Philippines: "Filipinas", Thailand: "Tailandia",
+  "United Arab Emirates": "Emiratos Árabes Unidos", "South Africa": "Sudáfrica", Egypt: "Egipto", Morocco: "Marruecos", Ukraine: "Ucrania",
+  Romania: "Rumania", Czechia: "Chequia", Hungary: "Hungría", China: "China", "(not set)": "Sin identificar",
+};
+
+/** Nombre en español de un país tal como lo entrega GA4 (en inglés). Los que ya coinciden o no se conocen quedan igual. */
+export function ga4CountryName(name: string): string {
+  return GA4_COUNTRIES[name] ?? name;
+}

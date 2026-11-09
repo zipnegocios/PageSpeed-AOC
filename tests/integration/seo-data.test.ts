@@ -61,6 +61,31 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
     expect(d.previous).toEqual({ from: day(-14), to: day(-8) });
   });
 
+  it("cada fuente termina en su último día con datos: Search Console, que cierra con retraso, no muestra ceros al final ni compara menos días", async () => {
+    // Search Console llega hasta day(-3); GA4, hasta day(-1).
+    for (let i = -20; i <= -3; i++) await search(projectId, day(i), "/a", "col", "MOBILE", 10, 100, 400);
+    for (let i = -20; i <= -1; i++) await traffic(projectId, day(i), "/a", "Colombia", "Direct", 5, 4);
+    await ai(projectId, day(-1), "chatgpt.com", "/a", 2, 2);
+
+    const d = await getSeoDashboard(projectId, { days: 7 }, db);
+    expect(d.range).toEqual({ from: day(-7), to: day(-1), days: 7 });
+
+    expect(d.search!.range).toEqual({ from: day(-9), to: day(-3), days: 7 });
+    expect(d.search!.previous).toEqual({ from: day(-16), to: day(-10), days: 7 });
+    expect(d.search!.daily).toHaveLength(7);
+    expect(d.search!.daily.at(-1)).toEqual({ date: day(-3), clicks: 10, impressions: 100 });
+    expect(d.search!.daily.every((p) => p.clicks === 10)).toBe(true);
+    // Ambos periodos suman 7 días de datos: sin variación artificial.
+    expect(d.search!.totals.clicks).toBe(70);
+    expect(d.search!.previousTotals.clicks).toBe(70);
+
+    expect(d.traffic!.range).toEqual({ from: day(-7), to: day(-1), days: 7 });
+    expect(d.traffic!.daily.at(-1)).toEqual({ date: day(-1), sessions: 5 });
+    expect(d.traffic!.totals.sessions).toBe(35);
+    expect(d.traffic!.previousTotals.sessions).toBe(35);
+    expect(d.ai!.range).toEqual(d.traffic!.range);
+  });
+
   describe("con datos sembrados", () => {
     beforeEach(async () => {
       // Search Console: dos páginas, tres países, dos dispositivos.
@@ -177,7 +202,7 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
       ]);
       expect(t.countries).toEqual([
         { country: "Colombia", sessions: 40 },
-        { country: "United States", sessions: 15 },
+        { country: "Estados Unidos", sessions: 15 },
       ]);
     });
 

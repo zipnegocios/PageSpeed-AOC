@@ -8,6 +8,7 @@ import {
   deviceLabel,
   eachDay,
   fillDays,
+  ga4CountryName,
   latestDate,
   parseSeoPeriod,
   percentChange,
@@ -110,5 +111,15 @@ describe("países y dispositivos", () => {
     expect(deviceLabel("DESKTOP")).toBe("Escritorio");
     expect(deviceLabel("TABLET")).toBe("Tableta");
     expect(deviceLabel("TV")).toBe("TV");
+  });
+});
+
+describe("países de GA4", () => {
+  it("traduce los nombres en inglés y deja los demás tal cual", () => {
+    expect(ga4CountryName("United States")).toBe("Estados Unidos");
+    expect(ga4CountryName("Spain")).toBe("España");
+    expect(ga4CountryName("(not set)")).toBe("Sin identificar");
+    expect(ga4CountryName("Colombia")).toBe("Colombia");
+    expect(ga4CountryName("Atlantis")).toBe("Atlantis");
   });
 });
