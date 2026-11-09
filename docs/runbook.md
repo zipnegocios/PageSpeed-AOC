@@ -88,6 +88,7 @@ Lo que se pierde: cambios hechos entre el último respaldo y la caída (hasta 24
 | Contraseña del propietario | En la consola de Postgres: `delete from admin_users where role = 'owner';` y reinicia el web con `ADMIN_EMAIL` y `ADMIN_PASSWORD` nuevos | Se crea la cuenta propietaria al arrancar; las demás personas siguen. Quita la contraseña de las variables después |
 | Agregar a una persona del equipo | Panel → Equipo → *Invitar a una persona* (solo el propietario) | Le llega un enlace de un solo uso (7 días) para crear su contraseña. Si el correo no sale, copia el enlace de la pantalla |
 | Contraseña olvidada de otra persona del equipo | Panel → Equipo → *Enviar enlace de contraseña nueva* | Crea una contraseña nueva y cierra sus sesiones anteriores |
+| Foto de perfil de una persona | Panel → avatar → Mi perfil. Se guarda en R2 bajo `_avatars/<id>/` (no pongas reglas de caducidad a ese prefijo); solo la ven los administradores con sesión | Quitar la foto borra el objeto |
 | Quitar a una persona del equipo | Panel → Equipo → *Quitar* | Deja de poder entrar y su sesión se cierra en su siguiente petición |
 | `SESSION_SECRET` | Cambiar la variable y reiniciar el web | Cierra todas las sesiones |
 | Link de un cliente filtrado | Ficha del cliente → *Generar link nuevo* | El anterior deja de funcionar al instante. También sirve *Suspender* |

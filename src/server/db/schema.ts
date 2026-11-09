@@ -406,6 +406,10 @@ export const adminUsers = pgTable("admin_users", {
   passwordHash: text("password_hash").notNull(),
   // `owner`: la cuenta que administra el equipo (una sola); `admin`: administra todo lo demás.
   role: text("role").notNull().default("admin"),
+  // Perfil: nombre visible y foto (clave del objeto en R2, bajo `_avatars/`).
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  avatarKey: text("avatar_key"),
   ...timestamps,
 });
 

@@ -28,7 +28,7 @@ const passwordInput = z
   .refine((v) => v.password === v.confirm, { message: "Las dos contraseñas no coinciden.", path: ["confirm"] });
 
 export type TeamView = {
-  members: Array<{ id: string; email: string; role: "owner" | "admin"; createdAt: Date }>;
+  members: Array<{ id: string; email: string; role: "owner" | "admin"; createdAt: Date; firstName: string | null; lastName: string | null }>;
   invites: Array<{ id: string; email: string; kind: InviteKind; createdAt: Date; expiresAt: Date }>;
 };
 
@@ -37,7 +37,7 @@ export async function listTeam(actor: AdminSummary, db: Database = getDb(), deps
   assertOwner(actor);
   const [members, pending] = await Promise.all([admins.listAdmins(db), invites.listPending(db, nowOf(deps))]);
   return {
-    members: members.map((m) => ({ id: m.id, email: m.email, role: m.role === "owner" ? "owner" : "admin", createdAt: m.createdAt })),
+    members: members.map((m) => ({ id: m.id, email: m.email, role: m.role === "owner" ? "owner" : "admin", createdAt: m.createdAt, firstName: m.firstName, lastName: m.lastName })),
     invites: pending.map((i) => ({ id: i.id, email: i.email, kind: i.kind as InviteKind, createdAt: i.createdAt, expiresAt: i.expiresAt })),
   };
 }

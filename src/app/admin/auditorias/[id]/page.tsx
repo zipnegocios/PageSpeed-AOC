@@ -75,7 +75,7 @@ function FailedChecksCard({ categories }: { categories: CategoryChecks[] | null 
 const TRIGGER_LABEL = { manual: "Manual", scheduled: "Programada", mcp: "Agente (MCP)" } as const;
 
 export default async function AuditPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<ViewerSearch> }) {
-  const session = await verifySession();
+  await verifySession();
   const { id } = await params;
   const search = await searchParams;
   const audit = await orNotFound(getAudit(id));
@@ -185,7 +185,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
 
   return (
     <AdminShell
-      email={session.email}
+     
       title={audit.routePath}
       subtitle={`${PROFILE_LABEL[audit.profile]} · ${audit.projectName}`}
       crumbs={[

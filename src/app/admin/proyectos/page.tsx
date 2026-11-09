@@ -15,7 +15,7 @@ type Phase = (typeof PHASES)[number];
 
 /** Todos los proyectos en un solo lugar, sin pasar por los clientes: buscar, filtrar por fase y abrir. */
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; fase?: string }> }) {
-  const session = await verifySession();
+  await verifySession();
   const { q = "", fase } = await searchParams;
   const phase: Phase = (PHASES as readonly string[]).includes(fase ?? "") ? (fase as Phase) : "todos";
   const all = await getFleet();
@@ -33,7 +33,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const now = new Date();
 
   return (
-    <AdminShell email={session.email} title="Proyectos" subtitle="Todos tus proyectos. Para ir directo a uno desde cualquier pantalla, pulsa / o Ctrl+K." crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Proyectos" subtitle="Todos tus proyectos. Para ir directo a uno desde cualquier pantalla, pulsa / o Ctrl+K." crumbs={[{ label: "Panel", href: "/admin" }]}>
       <Panel
         title={`${shown.length} ${shown.length === 1 ? "proyecto" : "proyectos"}`}
         actions={

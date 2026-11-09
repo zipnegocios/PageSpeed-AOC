@@ -261,6 +261,18 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 - Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Todas administran clientes, proyectos, agentes y cola; solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Si el correo no sale, el enlace se copia desde la pantalla.
 - Las invitaciones guardan solo el sha256 del token (`admin_invites`); el enlace `/invitacion/<token>` lleva `no-referrer`, `noindex` y `no-store`, y cada IP tiene un límite de intentos. Quitar a alguien o cambiar su contraseña cierra sus sesiones.
 
+## Perfil y barra superior
+
+- La barra superior lleva, a la derecha, el conmutador de proyectos, una **campana** de alertas (número de alertas abiertas
+  y, al abrirla, las 5 más recientes con «Ver todas las alertas») y el **avatar** de la persona, que abre su menú: Mi perfil,
+  Equipo (solo el propietario), Archivados y Salir. El menú es accesible (Esc, clic fuera, flechas, Inicio y Fin).
+- **Mi perfil** (`/admin/perfil`, cualquier administrador): foto, nombre y apellido (opcionales) y cambio de contraseña (pide
+  la actual, mínimo 12 caracteres, con límite de intentos); al cambiarla se cierran las demás sesiones y la actual se renueva.
+- La **foto** se recorta en cuadrado y se reduce a 256 px en el navegador, se valida en el servidor por firma (PNG, JPEG o
+  WebP, máximo 1 MB) y se guarda en R2 bajo `_avatars/<id>/…`; solo se sirve con sesión de administrador
+  (`/api/admin/avatar/<id>`). Reemplazarla o quitarla borra el objeto anterior. Migración 0010: `first_name`, `last_name`,
+  `avatar_key` en `admin_users`.
+
 ## Marca
 
 El producto se llama **PageSpeed**. El logo (un rayo y un chevron lima separados por una ranura diagonal, dentro de un marco con cuatro marcas de esquina) vive en `design/brand/`: `logo-mark.svg` (marca completa sobre navy), `logo-glyph.svg` (solo el glifo, de 12 a 32 px), `logo-mono.svg` (`currentColor`), `logo-lockup.svg` / `logo-lockup-light.svg` (glifo + PAGESPEED en trazados de Rajdhani) y `logo-favicon.svg`. En código, la geometría y el copyright salen de `src/lib/brand.ts` y se dibujan con `BrandMark`, `BrandGlyph` y `BrandLockup` (`src/lib/ui/components/brand-mark.tsx`); el PDF y los correos usan los mismos datos.

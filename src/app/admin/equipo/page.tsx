@@ -6,6 +6,7 @@ import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
+import { displayName } from "@/server/domain/profile";
 import { listTeam } from "@/server/services/team";
 import { AdminShell } from "../_components/admin-shell";
 import { resendInviteAction, revokeInviteAction, removeMemberAction, sendResetAction } from "./actions";
@@ -22,7 +23,7 @@ export default async function TeamPage() {
   const team = await listTeam(session);
 
   return (
-    <AdminShell email={session.email} title="Equipo" subtitle="Quién puede entrar al panel." crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Equipo" subtitle="Quién puede entrar al panel." crumbs={[{ label: "Panel", href: "/admin" }]}>
       <Card title="Invitar a una persona" description="Todas las personas del equipo administran clientes, proyectos, agentes y cola. Solo tú agregas o quitas personas.">
         <InviteForm />
       </Card>
@@ -32,7 +33,8 @@ export default async function TeamPage() {
           {team.members.map((m) => (
             <li key={m.id} className="flex flex-col gap-2 px-3 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold break-all text-ink">{m.email}</span>
+                <span className="font-semibold break-all text-ink">{displayName(m)}</span>
+                {displayName(m) !== m.email ? <span className="text-[15px] break-all text-ink-muted">{m.email}</span> : null}
                 <Badge tone={m.role === "owner" ? "primary" : "neutral"}>{m.role === "owner" ? "Propietario" : "Administrador"}</Badge>
                 {m.id === session.id ? <Badge>Tú</Badge> : null}
               </div>

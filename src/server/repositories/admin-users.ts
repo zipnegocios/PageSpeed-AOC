@@ -55,3 +55,13 @@ export async function setAdminPassword(db: Database, id: string, passwordHash: s
   const rows = await db.update(adminUsers).set({ passwordHash }).where(eq(adminUsers.id, id)).returning({ id: adminUsers.id });
   return rows.length > 0;
 }
+
+export async function updateProfile(db: Database, id: string, values: { firstName: string | null; lastName: string | null }): Promise<AdminUser | undefined> {
+  const [row] = await db.update(adminUsers).set(values).where(eq(adminUsers.id, id)).returning();
+  return row;
+}
+
+/** Guarda la clave de la foto en R2 (null la quita). */
+export async function setAvatarKey(db: Database, id: string, avatarKey: string | null): Promise<void> {
+  await db.update(adminUsers).set({ avatarKey }).where(eq(adminUsers.id, id));
+}

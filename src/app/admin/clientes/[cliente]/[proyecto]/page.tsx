@@ -61,7 +61,7 @@ const METRIC_LABELS = {
 const dateFormat = new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<HistorySearch> }) {
-  const session = await verifySession();
+  await verifySession();
   const { cliente, proyecto } = await params;
   const search = await searchParams;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
@@ -87,7 +87,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
   return (
     <AdminShell
-      email={session.email}
+     
       title={project.name}
       subtitle={<span className="break-all">{project.baseUrl}</span>}
       crumbs={[

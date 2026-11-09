@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: pageTitle("Cola"), robots: { index: f
 const FREQUENCY = { weekly: "Semanal", daily: "Diaria" } as const;
 
 export default async function QueuePage() {
-  const session = await verifySession();
+  await verifySession();
   const [status, backups] = await Promise.all([getQueueStatus(), getBackupStatus()]);
   const busy = (status.counts?.active ?? 0) + (status.counts?.waiting ?? 0) > 0;
 
@@ -34,7 +34,7 @@ export default async function QueuePage() {
     : [];
 
   return (
-    <AdminShell email={session.email} title="Cola de auditorías" crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Cola de auditorías" crumbs={[{ label: "Panel", href: "/admin" }]}>
       <AutoRefresh active={busy} intervalMs={5000} />
 
       {!status.redis ? <Alert tone="danger">Redis no responde: solo se muestran los datos de la base de datos.</Alert> : null}

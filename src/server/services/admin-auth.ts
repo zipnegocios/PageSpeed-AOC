@@ -2,7 +2,6 @@ import { getDb, type Database } from "@/server/db/client";
 import { getDummyHash, hashPassword, verifyPassword } from "@/server/auth/password";
 import { passwordVersion, type SessionClaims } from "@/server/auth/session-token";
 import {
-  countAdmins,
   countOwners,
   findAdminByEmail,
   findAdminById,
@@ -12,14 +11,31 @@ import {
 
 export const MIN_PASSWORD_LENGTH = 12;
 
-export type AdminSummary = { id: string; email: string; pv: string; role: "owner" | "admin" };
+export type AdminSummary = {
+  id: string;
+  email: string;
+  pv: string;
+  role: "owner" | "admin";
+  firstName: string | null;
+  lastName: string | null;
+  /** Clave de la foto en R2 (null si no hay); solo sirve para saber si hay foto y para cambiar la URL al cambiarla. */
+  avatarKey: string | null;
+};
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
 export function summarize(admin: AdminUser): AdminSummary {
-  return { id: admin.id, email: admin.email, pv: passwordVersion(admin.passwordHash), role: admin.role === "owner" ? "owner" : "admin" };
+  return {
+    id: admin.id,
+    email: admin.email,
+    pv: passwordVersion(admin.passwordHash),
+    role: admin.role === "owner" ? "owner" : "admin",
+    firstName: admin.firstName,
+    lastName: admin.lastName,
+    avatarKey: admin.avatarKey,
+  };
 }
 
 export type SeedResult = "created" | "exists" | "missing-env" | "invalid";
