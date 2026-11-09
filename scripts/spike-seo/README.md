@@ -35,8 +35,10 @@ Se ejecutan con `pnpm exec tsx scripts/spike-seo/<script>.ts`. Cada uno deja sus
 | `40-crawl.ts` | Rastreo mínimo desde el sitemap (`--pages 20 --pause 500`): título, canónica, `hreflang`, `lang`, JSON-LD | ninguna |
 | `50-probe.ts` | Sondeo de IA con preguntas repetidas (`--provider mock\|anthropic\|openai\|gemini\|perplexity\|all`, `--repeats 3`). Cada llamada real cuesta dinero | clave de cada proveedor |
 | `60-compare.ts` | Totales de GSC y GA4 para contrastar a mano con sus interfaces, y cobertura del cruce por página | ninguna (lee la salida) |
+| `70-report.ts` | Borrador del informe de hallazgos (`informe-fase-0.md`): responde las 11 preguntas del plan con la evidencia que haya, un veredicto propuesto y la lista de go / no-go. Lo que falte lo marca "sin datos" | ninguna (lee la salida) |
+| `80-sanitize.ts` | Fixtures saneados en `fixtures/`: hosts, rutas, consultas e identificadores sustituidos de forma determinista y cifras perturbadas. Si queda algún dato del original no escribe nada. Revísalos a ojo antes de copiarlos al repo | ninguna (lee la salida) |
 
-Orden sugerido: `00` → `10` → `20` → `60` → `30` → `40` → `50`.
+Orden sugerido: `00` → `10` → `20` → `60` → `30` → `40` → `50` → `70` → `80`.
 
 ## Qué no está hecho a propósito
 
@@ -54,4 +56,5 @@ Orden sugerido: `00` → `10` → `20` → `60` → `30` → `40` → `50`.
 - `lib/gsc.ts`, `lib/ga4.ts`, `lib/cloudflare.ts`: un cliente por fuente.
 - `lib/lang.ts`, `lib/urls.ts`, `lib/join.ts`: idioma por prefijo de ruta, normalización de URLs y cruce de GSC con GA4.
 - `lib/crawl.ts`, `lib/probe.ts`, `lib/providers/`: extracción SEO mínima y sondeo de IA (menciones y citas; un adaptador por proveedor).
-- Pruebas de las piezas puras y de los clientes (con `fetch` simulado): `tests/unit/spike-seo.test.ts`.
+- `lib/report.ts`, `lib/sanitize.ts`: informe de hallazgos y saneado de fixtures (funciones puras).
+- Pruebas de las piezas puras y de los clientes (con `fetch` simulado): `tests/unit/spike-*.test.ts`.
