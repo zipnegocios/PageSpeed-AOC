@@ -95,6 +95,25 @@ describe.skipIf(!ready)("servidor MCP", () => {
     return { client, project, home, audit };
   }
 
+  describe("identidad del servidor", () => {
+    it("al conectarse anuncia su nombre, su sitio y su logo con direcciones absolutas del origen configurado", async () => {
+      const { client } = await connect("read");
+      expect(client.getServerVersion()).toMatchObject({
+        name: "pagespeed",
+        title: "PageSpeed",
+        websiteUrl: "https://app.test",
+        icons: [
+          { src: "https://app.test/pwa/icon-512.png", mimeType: "image/png", sizes: ["512x512"] },
+          { src: "https://app.test/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+        ],
+      });
+      // Los archivos a los que apuntan existen (se sirven sin sesión desde public/ y src/app/).
+      const { existsSync } = await import("node:fs");
+      expect(existsSync("public/pwa/icon-512.png")).toBe(true);
+      expect(existsSync("src/app/icon.svg")).toBe(true);
+    });
+  });
+
   describe("acceso", () => {
     const raw = (key: string | null, extra: { headers?: Record<string, string> } = {}) =>
       fetchVia(key, () => deps)(URL_MCP, {

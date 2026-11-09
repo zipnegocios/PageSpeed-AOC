@@ -218,6 +218,11 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   reutilizar un refresco gastado la revoca, y se edita, revoca y elimina desde Panel → Agentes como cualquier clave.
   Solo se aceptan direcciones de retorno de `claude.ai`/`claude.com` y de bucle local. Requiere `APP_URL` con la URL
   pública https exacta. Las claves por cabecera (`Authorization: Bearer pagespeed_…`) siguen valiendo para Claude Code.
+- **Icono del conector:** el servidor se anuncia con título, sitio e iconos (`serverInfo.icons`, MCP 2025-11-25) para los
+  clientes que los muestran. **claude.ai web hoy no los lee** ([anthropics/claude-ai-mcp#152](https://github.com/anthropics/claude-ai-mcp/issues/152)):
+  según esa incidencia usa el favicon del dominio registrable (aquí `zipnegocios.com`, no el subdominio). Para cambiarlo
+  en claude.ai hay que arreglar/poner favicon a ese dominio, servir el MCP desde un dominio propio o listarlo en el
+  directorio oficial; nada de eso se hace desde este repositorio.
 - **Gestión de claves** (Panel → Agentes): cada clave se puede **editar** (nombre, permisos y alcance; vale desde la
   siguiente llamada del agente y la clave no cambia), **rotar** (genera un secreto nuevo, se muestra una sola vez, y el
   anterior deja de servir al instante), **revocar** (deja de servir al instante; sigue en la lista) y, ya revocada,
