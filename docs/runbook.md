@@ -44,7 +44,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 
 **Diaria (1 minuto)**: Panel → *Estado del sistema* en verde; **Cola**: worker en línea, sin fallos nuevos, **Respaldos "Al día"**; **Alertas**: lo abierto tiene dueño.
 
-**Semanal**: revisar los últimos fallos de la cola (códigos repetidos suelen ser un sitio caído o un host mal permitido) y el espacio de Postgres.
+**Semanal**: revisar los últimos fallos de la cola (códigos repetidos suelen ser un sitio caído o un host mal permitido) y el espacio de Postgres. El lunes, mirar la pestaña SEO de los proyectos en producción: el rastreo técnico del domingo (04:23 UTC) debe figurar «Completo»; uno «Fallido» o «Parcial» trae su motivo (ver «El rastreo técnico…» en la sección 7).
 
 **Trimestral**: probar una restauración (sección 5) en una base de pruebas. Un respaldo que nunca se restauró no es un respaldo.
 
@@ -110,6 +110,22 @@ El worker las reconcilia cada 15 minutos (las huérfanas vuelven a la cola o fal
 **«Datos reales de usuarios» sin datos o con error**
 Crea la clave en Google Cloud (console.cloud.google.com): selecciona o crea un proyecto → *APIs y servicios* → *Biblioteca* → activa «Chrome UX Report API» → *Credenciales* → *Crear credenciales* → *Clave de API*, y en *Restricciones de API* déjala solo para esa API. Cárgala como `CRUX_API_KEY` en el **worker**, redespliégalo y pulsa *Actualizar datos reales* en la ficha del proyecto. El botón actualiza solo ese proyecto (sea cual sea su fase; la ronda diaria únicamente recorre los de producción) y la tarjeta cuenta cómo salió. Si el panel dice «Falta definir CRUX_API_KEY», no llegó al worker; si sigue diciendo «Aún no hay datos reales» un minuto después de pulsar, el worker no está procesando la petición (¿sigue con la versión anterior?); si dice `BAD_KEY`, la clave no tiene permiso para esa API o su restricción de aplicación no permite la IP de salida del worker (compruébala con `node -e "fetch('https://api.ipify.org').then(r=>r.text()).then(console.log)"` en la consola del worker); `QUOTA`, se superó el límite (se reintenta al día siguiente). Un sitio o página con poco tráfico de Chrome muestra «no tiene suficiente tráfico»: es normal y no se arregla con la clave.
 
+**El rastreo técnico (pestaña SEO → «Auditoría técnica») sale «Fallido» o «Parcial»**
+El motivo está escrito en la propia pantalla. Los casos:
+- *«El sitio rechaza al rastreador (403 o 429)»* o *«un cortafuegos está frenando al rastreador»*: el sitio (casi siempre Cloudflare u otro WAF) bloquea al agente `PageSpeedAOC-SEO/1.0`. No hay nada que arreglar aquí: hay que pedir al cliente que lo permita (ver «Pedir a un cliente que permita el rastreador» abajo). No se guardan hallazgos de un rastreo bloqueado, para no llenar el panel de falsos errores.
+- *«El sitio pide iniciar sesión (401)»*: típico de un sitio en desarrollo protegido con contraseña. El rastreo no usa credenciales y no intenta saltarse la protección. Opciones: auditarlo cuando se publique, o pedir al cliente que habilite una excepción por IP del worker para el entorno de pruebas.
+- *«La portada del sitio no responde»*: el sitio está caído o el host no resuelve. Comprueba la dirección base del proyecto y avisa al cliente.
+- *«La dirección del proyecto no está entre sus hosts permitidos»*: arregla *Hosts permitidos* en el proyecto (el rastreo, como Lighthouse, solo toca esos hosts).
+- *«robots.txt prohíbe rastrear todo el sitio»*: el sitio tiene `Disallow: /`. Es lo habitual en un sitio en desarrollo; si no es lo que se quiere, el cliente debe corregir su `robots.txt`.
+- *«Se alcanzó el máximo de 300 páginas»* o *«el tiempo máximo»* (**parcial**): no es un fallo. Los resultados valen, pero no se evalúan las comprobaciones que necesitan ver todo el sitio (huérfanas, idiomas sin páginas). Si el sitio es más grande, los límites son constantes de `server/seo/crawler.ts` (`DEFAULT_LIMITS`; el tope duro es 1.000 páginas).
+- *«El rastreo se perdió (el worker se detuvo o Redis perdió el trabajo)»*: lo cierra la reconciliación (cada 15 minutos) cuando un rastreo lleva 45 minutos en curso, o 5 en cola, sin trabajo vivo en Redis. Vuelve a pedirlo con «Rastrear ahora».
+- *«El rastreo falló por un error inesperado»*: mira los logs de `page_speed_worker` (línea `[seo] rastreo`). El rastreo no se reintenta solo.
+Si un proyecto parece bloqueado con un rastreo «En cola» o «En curso» que no avanza, espera a la reconciliación o redespliega el worker; no hay que tocar la base de datos.
+
+**Pedir a un cliente que permita el rastreador**
+El rastreo se identifica con el agente de usuario `PageSpeedAOC-SEO/1.0` y sale por la misma IP que el worker (averíguala con `node -e "fetch('https://api.ipify.org').then(r=>r.text()).then(console.log)"` en la consola del worker). El agente de usuario se puede falsificar, así que lo ideal es permitir **el agente y la IP a la vez**. En Cloudflare, según el plan: una regla personalizada en *Seguridad → WAF* con «User Agent contiene `PageSpeedAOC-SEO` **y** IP de origen es `<IP del worker>`» y acción *Omitir* (o *Permitir*) las protecciones; si solo tiene *Bot Fight Mode* en el plan gratuito, que no se puede omitir con reglas, queda la lista de acceso por IP (*Seguridad → WAF → Herramientas → Reglas de acceso por IP*). Otros WAF o plugins de seguridad de WordPress tienen listas equivalentes de agentes o IP permitidas. Mensaje para el cliente:
+> Estamos auditando el SEO técnico de tu sitio (enlaces rotos, idiomas, datos estructurados) con un rastreador que se identifica como «PageSpeedAOC-SEO/1.0» y respeta tu robots.txt. Va despacio (2 peticiones a la vez) y solo lee páginas públicas. Tu cortafuegos lo está bloqueando; ¿puedes permitir ese agente de usuario desde la IP `<IP>`?
+
 **Muchas auditorías fallan con el mismo código**
 `TIMEOUT`/`PAGE_HUNG`: el sitio es lento o pesado; sube `AUDIT_TIMEOUT_MS` con cuidado. `SITE_DOWN`/`HTTP_5XX`: el sitio del cliente está caído (avísale). `FORBIDDEN_HOST`: el host salió de *Hosts permitidos* del proyecto. `CHROME_CRASH`: poca memoria en el worker.
 
@@ -139,6 +155,21 @@ Una semana en producción sin degradar los sitios alojados.
 5. Deja la semana corriendo. Revisa al final: fallos por código, respaldos diarios presentes en R2, alertas coherentes, correos recibidos.
 6. Prueba una restauración del último respaldo en una base de pruebas (sección 5).
 
+## 8 bis. Prueba de aceptación del rastreo técnico con un sitio real (criterio de salida de la fase 2)
+
+El rastreo solo se puede dar por bueno con un sitio real: los fallos que importan (WAF, HTML raro, idiomas mal declarados) no salen en los sitios de prueba. Elige un proyecto en producción con idiomas (por ejemplo el que ya tiene Search Console y GA4).
+
+1. Despliega el web (migración `0016`) y después el worker. Comprueba en los logs del worker: «worker listo» y que no hay errores al registrar «la ronda semanal de rastreo técnico».
+2. En el proyecto: pestaña SEO → declara sus idiomas (*Idiomas del sitio*) → *Rastrear ahora*. Debe terminar en pocos minutos (≈ 4 a 6 para 300 páginas). Anota las páginas revisadas y el estado.
+3. **Muestra de 10 páginas**: elige 10 (la portada, una de cada idioma, una con formulario, una del blog, una que sepas rota, una con `noindex`, una redirigida) y compara con una herramienta externa (Screaming Frog en su versión gratuita, hasta 500 URL, o «Ver código fuente» y Search Console) estos campos: estado, `title`, `meta description`, número de `h1`, canónica, `lang`, `hreflang` y datos estructurados. En cada campo, lo que muestra el panel debe coincidir. Anota cualquier diferencia y su causa.
+4. **Comparable con Screaming Frog**: enlaces internos rotos, redirecciones en cadena, títulos y descripciones duplicados o ausentes, y `hreflang` sin reciprocidad deben coincidir en cantidad (hasta el tope de páginas del rastreo). Las diferencias esperables: el panel agrupa por página y no cuenta recursos (imágenes, CSS, JS), y solo rastrea hasta 3 niveles.
+5. **Repetir no duplica ni pierde**: pulsa *Rastrear ahora* otra vez sin cambiar nada: debe dar los mismos totales, con «0 nuevos y 0 resueltos».
+6. **Un cambio se refleja**: corrige uno de los hallazgos en el sitio (por ejemplo, un título) y vuelve a rastrear: debe aparecer como «1 resuelto».
+7. **Cortesía**: en los logs del sitio (si el cliente los comparte) el agente `PageSpeedAOC-SEO/1.0` pide como mucho 2 páginas a la vez, y no toca lo que `robots.txt` prohíbe.
+8. **Falsos positivos**: revisa a ojo 5 hallazgos de cada gravedad. Si más de uno de cada cinco es falso, no se da por aceptado: anota qué regla falla (el código del hallazgo) y se ajusta antes de mostrar nada al cliente.
+
+Criterio de salida: el rastreo termina dentro de sus límites, la muestra coincide, repetirlo no cambia nada y los falsos positivos son escasos. Mientras no se cumpla, la auditoría sigue siendo solo para administradores (el portal no la muestra).
+
 ## 9. Lista de puesta en marcha
 
 - [ ] Variables de la sección 1 en web y worker; `APP_URL` con `https://`.
@@ -150,6 +181,7 @@ Una semana en producción sin degradar los sitios alojados.
 - [ ] Una auditoría real por cliente y un portal abierto desde un móvil.
 - [ ] Correo de alerta de prueba recibido (umbral alto en un proyecto en producción).
 - [ ] Rama `main` como predeterminada en GitHub; webhook de `redis` eliminado.
+- [ ] Rastreo técnico: prueba de aceptación de la sección 8 bis hecha en un proyecto real; los clientes con WAF permiten el agente `PageSpeedAOC-SEO`.
 
 ## Archivar y eliminar clientes y proyectos
 - **Archivar** (ficha del cliente o del proyecto) lo oculta y detiene sus auditorías; no borra nada. Se ve y se restaura desde *Archivados* (menú superior).
