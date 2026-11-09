@@ -130,6 +130,8 @@ export const projects = pgTable(
     authStrategy: authStrategy("auth_strategy").notNull().default("none"),
     // AES-256-GCM con AUTH_ENCRYPTION_KEY. Usuario de prueba dedicado, nunca el admin real.
     authConfigEnc: bytea("auth_config_enc"),
+    // El cliente ve «Tráfico y búsqueda» en su portal solo si el administrador lo activa (por defecto, oculto).
+    seoClientVisible: boolean("seo_client_visible").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },

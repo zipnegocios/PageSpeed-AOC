@@ -10,14 +10,13 @@ import {
   percentDelta,
   positionDelta,
 } from "@/lib/seo-format";
-import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { KpiTile } from "@/lib/ui/components/kpi-tile";
 import { SegmentedNav } from "@/lib/ui/components/segmented-nav";
-import { channelLabel, parseSeoPeriod, SEO_PERIODS, SEO_PERIOD_LABEL } from "@/server/domain/seo-data";
-import { getSeoDashboard, type SeoDashboard, type SeoSyncInfo } from "@/server/services/seo-data";
-import { requestSeoSyncAction } from "../actions";
+import { channelLabel, SEO_PERIODS, SEO_PERIOD_LABEL } from "@/server/domain/seo-data";
+import type { SeoDashboard, SeoSyncInfo } from "@/server/services/seo-data";
+import { panelHref, type PanelSearch } from "../panel-search";
 import { DataTable } from "./data-table";
 import { SeoChart } from "./seo-chart";
 
@@ -28,6 +27,9 @@ const SYNC_BADGE = {
   error: { tone: "danger", label: "Con error" },
   pending: { tone: "neutral", label: "Pendiente" },
 } as const;
+
+/** Quién mira: el administrador ve el estado de las descargas y puede pedir una; el cliente solo ve los datos. */
+export type SeoAudience = "admin" | "client";
 
 const share = (value: number, total: number) => (total > 0 ? formatPercent(value / total) : "—");
 
@@ -74,16 +76,26 @@ const NO_BASE = "Sin datos del periodo anterior para comparar";
 const periodText = (r: { from: string; to: string }, p: { from: string; to: string }, days: number) =>
   `Del ${formatDayMedium(r.from)} al ${formatDayMedium(r.to)} (${days} días) · comparado con el periodo anterior: del ${formatDayMedium(p.from)} al ${formatDayMedium(p.to)}.`;
 
+/** Hasta qué día llega cada fuente, sin estados ni errores técnicos: es lo único que necesita saber el cliente. */
+function ClientFreshness({ d }: { d: SeoDashboard }) {
+  const parts = [
+    d.sync.gsc?.syncedThrough ? `Búsqueda en Google hasta el ${formatDayLong(d.sync.gsc.syncedThrough)}` : null,
+    d.sync.ga4?.syncedThrough ? `visitas al sitio hasta el ${formatDayLong(d.sync.ga4.syncedThrough)}` : null,
+  ].filter((x): x is string => x !== null);
+  if (parts.length === 0) return null;
+  return <p className="text-[15px] leading-5 text-ink-muted">{parts.join(" · ")}. Se actualiza cada día.</p>;
+}
+
 /**
  * Sección «Tráfico y búsqueda» de un proyecto: periodo, frescura de los datos, indicadores con su variación, gráficos
- * diarios y rankings de Search Console, GA4 y visitas desde asistentes de IA. El llamador debe haber comprobado que el
- * proyecto tiene alguna conexión (gsc o ga4).
+ * diarios y rankings de Search Console, GA4 y visitas desde asistentes de IA. El llamador carga `dashboard`, ya
+ * comprobado (el proyecto tiene alguna conexión y, para el cliente, el administrador lo activó). Para el administrador,
+ * `syncForm` es el botón «Actualizar ahora»; el cliente no ve estados de descarga, errores ni botones.
  */
-export async function SeoDataSection({ projectId, basePath, dias, idioma }: { projectId: string; basePath: string; dias: string | string[] | undefined; idioma?: string | string[] | undefined }) {
-  const days = parseSeoPeriod(dias);
-  const d = await getSeoDashboard(projectId, { days, lang: Array.isArray(idioma) ? idioma[0] : idioma });
+export function SeoDataSection({ dashboard: d, days, basePath, search: current, audience = "admin", syncForm }: { dashboard: SeoDashboard; days: number; basePath: string; /** Parámetros de la dirección: se conservan los de otros paneles de la misma pantalla. */ search: PanelSearch; audience?: SeoAudience; syncForm?: ReactNode }) {
+  const client = audience === "client";
   // Enlaces del selector de periodo y de idioma: cada uno conserva lo que eligió el otro.
-  const href = (p: number, lang: string | null) => `${basePath}?dias=${p}${lang ? `&idioma=${lang}` : ""}#${ANCHOR}`;
+  const href = (p: number, lang: string | null) => panelHref(basePath, current, { periodo: String(p), idioma: lang }, ANCHOR);
   // El selector no cambia de orden con el volumen: «Todos», los idiomas declarados y, si hay, «Sin idioma» al final.
   const noLanguage = d.languages?.find((l) => l.lang === "none");
   const languageItems = d.languages
@@ -92,8 +104,16 @@ export async function SeoDataSection({ projectId, basePath, dias, idioma }: { pr
   const { search, traffic, ai } = d;
   const hasGsc = d.sync.gsc !== null;
   const hasGa4 = d.sync.ga4 !== null;
-  const noGsc = hasGsc ? "Sin datos de Search Console en este periodo. Pulsa «Actualizar ahora» para descargarlos." : "Conecta Search Console más abajo para ver estos datos.";
-  const noGa4 = hasGa4 ? "Sin visitas de GA4 en este periodo. Pulsa «Actualizar ahora» para descargarlas." : "Conecta Google Analytics 4 más abajo para ver estos datos.";
+  const noGsc = client
+    ? "Aún no hay datos de búsqueda en Google para este periodo."
+    : hasGsc
+      ? "Sin datos de Search Console en este periodo. Pulsa «Actualizar ahora» para descargarlos."
+      : "Conecta Search Console más abajo para ver estos datos.";
+  const noGa4 = client
+    ? "Aún no hay datos de visitas al sitio para este periodo."
+    : hasGa4
+      ? "Sin visitas de GA4 en este periodo. Pulsa «Actualizar ahora» para descargarlas."
+      : "Conecta Google Analytics 4 más abajo para ver estos datos.";
 
   return (
     <div id={ANCHOR} className="scroll-mt-4">
@@ -101,17 +121,23 @@ export async function SeoDataSection({ projectId, basePath, dias, idioma }: { pr
         <SegmentedNav label="Periodo" items={SEO_PERIODS.map((p) => ({ label: SEO_PERIOD_LABEL[p], href: href(p, d.lang), current: p === days }))} />
         {languageItems.length > 0 ? <SegmentedNav label="Idioma" items={languageItems.map((l) => ({ label: l.label, href: href(days, l.lang), current: l.lang === d.lang }))} /> : null}
 
-        <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface-100 p-3 md:p-4">
-          <ul className="grid gap-4 md:grid-cols-2">
-            {d.sync.gsc ? <SourceStatus name="Search Console" sync={d.sync.gsc} /> : null}
-            {d.sync.ga4 ? <SourceStatus name="Google Analytics 4" sync={d.sync.ga4} /> : null}
-          </ul>
-          <ActionForm action={requestSeoSyncAction.bind(null, projectId)} submitLabel="Actualizar ahora" pendingLabel="Pidiendo…" variant="secondary" className="max-w-xl" />
-        </div>
+        {client ? (
+          <ClientFreshness d={d} />
+        ) : (
+          <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface-100 p-3 md:p-4">
+            <ul className="grid gap-4 md:grid-cols-2">
+              {d.sync.gsc ? <SourceStatus name="Search Console" sync={d.sync.gsc} /> : null}
+              {d.sync.ga4 ? <SourceStatus name="Google Analytics 4" sync={d.sync.ga4} /> : null}
+            </ul>
+            {syncForm}
+          </div>
+        )}
 
         {d.range === null ? (
           <p className="rounded-sm border border-border bg-surface-100 px-4 py-6 text-center text-[15px] leading-5 text-ink-muted">
-            Aún no hay datos: pulsa «Actualizar ahora» para descargarlos de Google. La primera descarga puede tardar unos minutos; después se actualizan solos cada día.
+            {client
+              ? "Aún no hay datos. Estamos reuniendo la información de tu sitio; aparecerá aquí en cuanto esté lista."
+              : "Aún no hay datos: pulsa «Actualizar ahora» para descargarlos de Google. La primera descarga puede tardar unos minutos; después se actualizan solos cada día."}
           </p>
         ) : (
           <Dashboard d={d} days={days} noGsc={noGsc} noGa4={noGa4} search={search} traffic={traffic} ai={ai} href={href} />

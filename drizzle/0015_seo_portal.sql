@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "seo_client_visible" boolean DEFAULT false NOT NULL;

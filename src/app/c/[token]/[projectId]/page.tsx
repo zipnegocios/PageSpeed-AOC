@@ -2,15 +2,16 @@ import { PinGateFor } from "@/app/c/_components/pin-gate";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { SeoDataSection } from "@/app/_components/seo/seo-data-section";
 import { FieldDataCard } from "@/app/_components/field-data-card";
 import { HistoryPanel, type HistorySearch } from "@/app/_components/history-panel";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { Badge } from "@/lib/ui/components/badge";
-import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
 import { Card } from "@/lib/ui/components/card";
-import { Delta } from "@/lib/ui/components/delta";
 import { PortalPageCard, groupLatestByPage } from "@/app/c/_components/portal-page-card";
+import { parseSeoPeriod } from "@/server/domain/seo-data";
 import { getPortalOverview, getPortalProject } from "@/server/services/portal";
+import { getPortalSeoDashboard } from "@/server/services/seo-portal";
 import { BlockedNotice } from "../../_components/blocked-notice";
 import { PortalShell } from "../../_components/portal-shell";
 import { SuspendedNotice } from "../../_components/suspended-notice";
@@ -20,13 +21,6 @@ import { pageTitle } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: pageTitle("Tu informe"), robots: { index: false, follow: false } };
-
-const SCORES = [
-  ["performance", "Rendimiento"],
-  ["seo", "SEO"],
-  ["accessibility", "Accesibilidad"],
-  ["best_practices", "Buenas prácticas"],
-] as const;
 
 export default async function PortalProjectPage({
   params,
@@ -48,6 +42,9 @@ export default async function PortalProjectPage({
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (projectId !== project.slug) redirect(portalProjectPath(token, project.slug));
   const several = (await getPortalOverview(access.client.id)).length > 1;
+  // Solo si el administrador lo activó para este proyecto y tiene datos conectados; si no, el servicio devuelve null.
+  const days = parseSeoPeriod(search.periodo);
+  const seo = await getPortalSeoDashboard(access.client.id, project.id, { days, lang: Array.isArray(search.idioma) ? search.idioma[0] : search.idioma });
 
   return (
     <PortalShell
@@ -110,6 +107,8 @@ export default async function PortalProjectPage({
           </ul>
         </Card>
       ) : null}
+
+      {seo ? <SeoDataSection dashboard={seo} days={days} basePath={portalProjectPath(token, project.slug)} search={search} audience="client" /> : null}
 
       <HistoryPanel
         projectId={project.id}

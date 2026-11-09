@@ -5,6 +5,7 @@ import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clearGoogleAccount, removeConnection, saveConnection, saveGoogleAccount, testConnection } from "@/server/services/seo-connections";
 import { addMarket, removeMarket } from "@/server/services/seo-markets";
+import { setSeoClientVisible } from "@/server/services/seo-portal";
 import { requestSeoSync } from "@/server/services/seo-sync";
 
 /** Las direcciones llevan slugs de cliente y proyecto: se revalida todo el panel en lugar de adivinar cada ruta. */
@@ -82,5 +83,15 @@ export async function removeMarketAction(projectId: string, lang: string, _prev:
     await removeMarket(projectId, lang);
     refresh();
     return { ok: "Idioma quitado." };
+  });
+}
+
+/** Muestra u oculta «Tráfico y búsqueda» en el portal del cliente de este proyecto. */
+export async function setSeoClientVisibleAction(projectId: string, visible: boolean, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await setSeoClientVisible(projectId, visible);
+    refresh();
+    return { ok: visible ? "Listo: el cliente ya ve «Tráfico y búsqueda» en su portal." : "Listo: el cliente ya no ve «Tráfico y búsqueda» en su portal." };
   });
 }

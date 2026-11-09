@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { DataTable } from "@/app/admin/seo/_components/data-table";
-import { SeoChart } from "@/app/admin/seo/_components/seo-chart";
+import { DataTable } from "@/app/_components/seo/data-table";
+import { SeoChart } from "@/app/_components/seo/seo-chart";
 import { layoutSeries } from "@/lib/seo-chart-layout";
 import { ctrDelta, formatCount, formatPercent, formatPosition, percentDelta, positionDelta } from "@/lib/seo-format";
 

@@ -265,7 +265,7 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
   respaldos. Código: `domain/seo-sync.ts` (ventanas y agregación, puro), `services/seo-sync.ts` y `repositories/seo-sync.ts`.
   **El worker necesita `GOOGLE_SERVICE_ACCOUNT_JSON` (o `AUTH_ENCRYPTION_KEY` si la cuenta se guardó en el panel).**
 - **Pantalla «Tráfico y búsqueda»** (arriba de las conexiones, en la pestaña SEO del proyecto, si hay conexión a Search Console o GA4):
-  periodo de 7, 28 o 90 días (`?dias=`), estado de la última descarga de cada fuente y botón «Actualizar ahora»; indicadores con su
+  periodo de 7, 28 o 90 días (`?periodo=`), estado de la última descarga de cada fuente y botón «Actualizar ahora»; indicadores con su
   variación frente al periodo anterior (clics, impresiones, CTR, posición media —bajar es mejor—, sesiones y visitas desde IA); gráficos
   diarios; y rankings de páginas, países, dispositivos y canales, y de visitas desde ChatGPT, Perplexity, Gemini y otros. **Cada fuente
   termina en su último día con datos** (Search Console cierra ~3 días tarde y GA4 ~1), y la pantalla muestra el periodo de cada una, para
@@ -275,10 +275,18 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
 - **Idiomas del sitio (fase 1b):** la tarjeta «Idiomas del sitio» (pestaña SEO del proyecto) declara los idiomas por **prefijo de ruta**
   (`/es`, `/en`…), no por país: el idioma por defecto usa `/` y las páginas fuera de todo prefijo declarado quedan en «Sin idioma». Un
   prefijo por idioma, códigos de 2 o 3 letras; la tarjeta sugiere los prefijos que ya aparecen en los datos descargados. Con idiomas
-  declarados, la pantalla gana un selector (`?idioma=es`, `?idioma=none`; se conserva junto a `?dias=`) que filtra todos los indicadores,
+  declarados, la pantalla gana un selector (`?idioma=es`, `?idioma=none`; se conserva junto a `?periodo=`) que filtra todos los indicadores,
   gráficos y rankings, y una tabla «Por idioma» con clics, impresiones y sesiones de cada uno. Tabla `seo_markets` (migración `0014`),
   **entra en los respaldos**. Código: `domain/seo-markets.ts` (puro), `repositories/seo-markets.ts` (filtro SQL por prefijo) y
   `services/seo-markets.ts`.
+- **Vista del cliente (fase 1c):** el portal del cliente (`/c/<cliente>/<proyecto>`, con su PIN) muestra la misma sección «Tráfico y
+  búsqueda», solo de lectura y sin estados de descarga, errores ni botones: solo los datos y hasta qué día llegan. **Es opt-in por
+  proyecto**: la tarjeta «Visible para el cliente» (pestaña SEO del proyecto) la activa o la oculta; por defecto está oculta. Columna
+  `projects.seo_client_visible` (migración `0015`, entra en los respaldos). La única puerta del portal a estos datos es
+  `services/seo-portal.ts` (`getPortalSeoDashboard`): devuelve null si el proyecto no es de ese cliente, no está en producción, está
+  archivado, no fue activado o no tiene conexión a Search Console ni GA4; se comprueba en el servicio, no en la pantalla. El componente
+  es el mismo para el administrador y el cliente (`app/_components/seo/`, con `audience`). Sus parámetros (`?periodo=`, `?idioma=`) son
+  distintos de los de la evolución (`?dias=`), así que cada panel conserva lo que eligió en el otro.
 - **Despliegue:** el cambio toca `src/server` y la lista de respaldos del worker: despliega **primero el web** (aplica la migración)
   y **después el worker**.
 

@@ -7,9 +7,12 @@ export type PanelSearch = {
   campo?: string;
   cruta?: string;
   cdisp?: string;
+  /** Periodo y idioma de «Tráfico y búsqueda»: con otro nombre que `dias`, para no pisar el periodo de la evolución. */
+  periodo?: string;
+  idioma?: string;
 };
 
-const KEYS = ["ruta", "perfil", "m", "dias", "campo", "cruta", "cdisp"] as const;
+const KEYS = ["ruta", "perfil", "m", "dias", "campo", "cruta", "cdisp", "periodo", "idioma"] as const;
 
 export function panelHref(basePath: string, search: PanelSearch, patch: Partial<Record<keyof PanelSearch, string | null>>, anchor: string): string {
   const q = new URLSearchParams();

@@ -2,33 +2,44 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
+import { SeoDataSection } from "@/app/_components/seo/seo-data-section";
+import { requestSeoSyncAction } from "@/app/admin/seo/actions";
+import { ClientVisibilityCard } from "@/app/admin/seo/_components/client-visibility-card";
 import { ConnectionCard } from "@/app/admin/seo/_components/connection-card";
 import { MarketsCard } from "@/app/admin/seo/_components/markets-card";
-import { SeoDataSection } from "@/app/admin/seo/_components/seo-data-section";
 import { verifySession } from "@/lib/auth/session";
 import { pageTitle } from "@/lib/brand";
 import { orNotFound } from "@/lib/not-found";
 import { clientPath, projectPath } from "@/lib/urls";
+import { ActionForm } from "@/lib/ui/components/action-form";
 import { Alert } from "@/lib/ui/components/alert";
 import { SEO_KINDS } from "@/server/domain/seo-connections";
+import { parseSeoPeriod } from "@/server/domain/seo-data";
 import { getProjectByRef } from "@/server/services/projects";
 import { getConnections, getGoogleAccount } from "@/server/services/seo-connections";
+import { getSeoDashboard } from "@/server/services/seo-data";
 import { getMarkets, getMarketSuggestions } from "@/server/services/seo-markets";
+import { getSeoSharing } from "@/server/services/seo-portal";
 
 export const metadata: Metadata = { title: pageTitle("SEO del proyecto"), robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default async function ProjectSeoPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<{ dias?: string | string[]; idioma?: string | string[] }> }) {
+export default async function ProjectSeoPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<{ periodo?: string | string[]; idioma?: string | string[] }> }) {
   await verifySession();
   const { cliente, proyecto } = await params;
-  const { dias, idioma } = await searchParams;
+  const query = await searchParams;
+  const periodo = Array.isArray(query.periodo) ? query.periodo[0] : query.periodo;
+  const idioma = Array.isArray(query.idioma) ? query.idioma[0] : query.idioma;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (cliente !== project.clientSlug || proyecto !== project.slug) redirect(`${projectPath(project.clientSlug, project.slug)}/seo`);
   const [connections, google] = await Promise.all([getConnections(project.id), getGoogleAccount()]);
   const googleEmail = google.configured && !google.unreadable ? google.email : null;
   const hasData = Boolean(connections.gsc || connections.ga4);
-  const [markets, suggestions] = hasData ? await Promise.all([getMarkets(project.id), getMarketSuggestions(project.id)]) : [[], []];
+  const days = parseSeoPeriod(periodo);
+  const [markets, suggestions, sharing, dashboard] = hasData
+    ? await Promise.all([getMarkets(project.id), getMarketSuggestions(project.id), getSeoSharing(project.id), getSeoDashboard(project.id, { days, lang: idioma })])
+    : [[], [], null, null];
 
   return (
     <AdminShell
@@ -57,7 +68,16 @@ export default async function ProjectSeoPage({ params, searchParams }: { params:
           .
         </Alert>
       ) : null}
-      {hasData ? <SeoDataSection projectId={project.id} basePath={`${projectPath(project.clientSlug, project.slug)}/seo`} dias={dias} idioma={idioma} /> : null}
+      {dashboard ? (
+        <SeoDataSection
+          dashboard={dashboard}
+          days={days}
+          basePath={`${projectPath(project.clientSlug, project.slug)}/seo`}
+          search={{ periodo, idioma }}
+          syncForm={<ActionForm action={requestSeoSyncAction.bind(null, project.id)} submitLabel="Actualizar ahora" pendingLabel="Pidiendo…" variant="secondary" className="max-w-xl" />}
+        />
+      ) : null}
+      {sharing ? <ClientVisibilityCard projectId={project.id} sharing={sharing} /> : null}
       {hasData ? <MarketsCard projectId={project.id} markets={markets} suggestions={suggestions} /> : null}
       {SEO_KINDS.map((kind) => (
         <ConnectionCard key={kind} projectId={project.id} kind={kind} connection={connections[kind]} googleEmail={googleEmail} />
