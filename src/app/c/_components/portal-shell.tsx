@@ -8,7 +8,7 @@ import { PageTitle } from "@/lib/ui/components/page-title";
 export function PortalShell({ clientName, title, subtitle, children }: { clientName?: string; title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-      <header className="hud hud-brackets rise relative flex flex-col gap-2 rounded-lg px-4 py-4 md:px-6">
+      <header className="hud hud-brackets rise relative flex flex-col gap-2 rounded-lg px-4 py-4 sm:pr-48 md:px-6 md:pr-48">
         <SpeedTrail className="pointer-events-none absolute top-3 right-4 hidden opacity-70 sm:block" />
         <p className="flex items-center gap-2 text-[13px] font-bold tracking-[0.08em] text-ink-muted uppercase">
           <BrandGlyph className="h-5" />

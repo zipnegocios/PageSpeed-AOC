@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/lib/ui/components/brand-mark";
+import { CopyrightLine } from "@/lib/ui/components/copyright-line";
 import { PageTitle } from "@/lib/ui/components/page-title";
 import { pageTitle } from "@/lib/brand";
 
@@ -15,6 +16,7 @@ export default function NotFound() {
       <Link href="/admin" className="text-[17px] font-semibold text-link hover:underline">
         Volver al panel
       </Link>
+      <CopyrightLine className="mt-6" />
     </main>
   );
 }

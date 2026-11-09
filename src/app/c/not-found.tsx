@@ -1,7 +1,8 @@
+import { pageTitle } from "@/lib/brand";
 import { Card } from "@/lib/ui/components/card";
 import { PortalShell } from "./_components/portal-shell";
 
-export const metadata = { title: "Enlace no válido", robots: { index: false, follow: false } };
+export const metadata = { title: pageTitle("Enlace no válido"), robots: { index: false, follow: false } };
 
 export default function PortalNotFound() {
   return (
