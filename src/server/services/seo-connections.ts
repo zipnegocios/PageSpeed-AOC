@@ -27,7 +27,7 @@ const GOOGLE_ACCOUNT_SETTING = "seo.google_service_account";
 /** Variable de entorno con la cuenta de servicio de Google. Si existe, manda sobre la guardada en el panel. */
 export const GOOGLE_ACCOUNT_ENV = "GOOGLE_SERVICE_ACCOUNT_JSON";
 
-type Deps = {
+export type SeoDeps = {
   /** Solo pruebas: clave de cifrado distinta de AUTH_ENCRYPTION_KEY. */
   key?: string;
   /** Solo pruebas: valor de GOOGLE_SERVICE_ACCOUNT_JSON (null = sin definir), en lugar del entorno real. */
@@ -38,7 +38,7 @@ type Deps = {
   now?: () => Date;
 };
 
-const keyOf = (deps: Deps) => deps.key ?? process.env.AUTH_ENCRYPTION_KEY;
+const keyOf = (deps: SeoDeps) => deps.key ?? process.env.AUTH_ENCRYPTION_KEY;
 
 // ----------------------------------------------------------- cuenta de Google
 
@@ -47,13 +47,13 @@ export type GoogleAccountSummary =
   | { configured: true; email: string; /** `env`: viene de la variable de entorno; `panel`: se pegó en el panel. */ source: "env" | "panel"; unreadable?: boolean };
 
 /** Valor de la variable de entorno, o null si no está definida o está vacía. */
-function envValue(deps: Deps): string | null {
+function envValue(deps: SeoDeps): string | null {
   const value = deps.googleEnv !== undefined ? deps.googleEnv : process.env[GOOGLE_ACCOUNT_ENV];
   return value && value.trim() ? value : null;
 }
 
 /** La cuenta de la variable de entorno: la llave o un mensaje que dice qué está mal. Null si no hay variable. */
-function readEnvAccount(deps: Deps): { account: ServiceAccountKey } | { error: string } | null {
+function readEnvAccount(deps: SeoDeps): { account: ServiceAccountKey } | { error: string } | null {
   const value = envValue(deps);
   if (value === null) return null;
   try {
@@ -65,7 +65,7 @@ function readEnvAccount(deps: Deps): { account: ServiceAccountKey } | { error: s
 
 const ENV_MANAGED = `La cuenta de Google viene de la variable de entorno ${GOOGLE_ACCOUNT_ENV}. Para cambiarla, edita la variable en EasyPanel y reinicia el servicio.`;
 
-export async function getGoogleAccount(db: Database = getDb(), deps: Deps = {}): Promise<GoogleAccountSummary> {
+export async function getGoogleAccount(db: Database = getDb(), deps: SeoDeps = {}): Promise<GoogleAccountSummary> {
   const fromEnv = readEnvAccount(deps);
   if (fromEnv) return "account" in fromEnv ? { configured: true, email: fromEnv.account.client_email, source: "env" } : { configured: false, envError: fromEnv.error };
   const stored = await getSetting<{ enc?: string; email?: string }>(db, GOOGLE_ACCOUNT_SETTING);
@@ -82,7 +82,7 @@ export async function getGoogleAccount(db: Database = getDb(), deps: Deps = {}):
  * Guarda la llave JSON de la cuenta de servicio de Google (cifrada). Antes comprueba que Google la acepta, así que
  * una llave mal pegada o desactivada se rechaza aquí y no más tarde, al probar cada proyecto.
  */
-export async function saveGoogleAccount(raw: string, db: Database = getDb(), deps: Deps = {}): Promise<{ email: string }> {
+export async function saveGoogleAccount(raw: string, db: Database = getDb(), deps: SeoDeps = {}): Promise<{ email: string }> {
   if (envValue(deps) !== null) throw new DomainError("CONFLICT", ENV_MANAGED);
   const encryptionKey = requireEncryptionKey(deps.key);
   let account: ServiceAccountKey;
@@ -107,12 +107,12 @@ export async function saveGoogleAccount(raw: string, db: Database = getDb(), dep
   return { email: account.client_email };
 }
 
-export async function clearGoogleAccount(db: Database = getDb(), deps: Deps = {}): Promise<void> {
+export async function clearGoogleAccount(db: Database = getDb(), deps: SeoDeps = {}): Promise<void> {
   if (envValue(deps) !== null) throw new DomainError("CONFLICT", ENV_MANAGED);
   await deleteSetting(db, GOOGLE_ACCOUNT_SETTING);
 }
 
-async function loadGoogleAccount(db: Database, deps: Deps): Promise<ServiceAccountKey | null> {
+export async function loadGoogleAccount(db: Database, deps: SeoDeps): Promise<ServiceAccountKey | null> {
   const fromEnv = readEnvAccount(deps);
   if (fromEnv) {
     if ("error" in fromEnv) throw new DomainError("INVALID", fromEnv.error);
@@ -164,7 +164,7 @@ export async function saveConnection(
   kindRaw: string,
   input: { externalId: string; token?: string },
   db: Database = getDb(),
-  deps: Deps = {},
+  deps: SeoDeps = {},
 ): Promise<SeoConnection> {
   assertUuid(projectId, "Proyecto");
   const kind = parseKind(kindRaw);
@@ -188,7 +188,7 @@ export async function removeConnection(projectId: string, kindRaw: string, db: D
 export type TestResult = { ok: boolean; detail: string };
 
 /** Prueba la conexión contra Google o Cloudflare, anota el resultado y lo devuelve con un mensaje que dice qué hacer. */
-export async function testConnection(projectId: string, kindRaw: string, db: Database = getDb(), deps: Deps = {}): Promise<TestResult> {
+export async function testConnection(projectId: string, kindRaw: string, db: Database = getDb(), deps: SeoDeps = {}): Promise<TestResult> {
   assertUuid(projectId, "Proyecto");
   const kind = parseKind(kindRaw);
   const row = await repo.findOne(db, projectId, kind);
@@ -216,7 +216,7 @@ export async function testConnection(projectId: string, kindRaw: string, db: Dat
   return result;
 }
 
-async function checkGoogle(kind: "gsc" | "ga4", externalId: string, account: ServiceAccountKey, deps: Deps): Promise<TestResult> {
+async function checkGoogle(kind: "gsc" | "ga4", externalId: string, account: ServiceAccountKey, deps: SeoDeps): Promise<TestResult> {
   const http = { fetchImpl: deps.fetchImpl, sleep: deps.sleep };
   let token: string;
   try {
@@ -242,7 +242,7 @@ async function checkGoogle(kind: "gsc" | "ga4", externalId: string, account: Ser
   return { ok: true, detail: res.rowCount ? "Acceso correcto: la propiedad responde con datos." : "Acceso correcto, aunque la propiedad no tiene datos en la última semana." };
 }
 
-async function checkCloudflare(row: repo.SeoIntegration, deps: Deps): Promise<TestResult> {
+async function checkCloudflare(row: repo.SeoIntegration, deps: SeoDeps): Promise<TestResult> {
   if (!row.credentialEnc) return { ok: false, detail: "Falta el token de Cloudflare." };
   let token: string;
   try {

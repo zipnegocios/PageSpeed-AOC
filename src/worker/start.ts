@@ -5,7 +5,7 @@ import type { WorkerEnv } from "@/server/config/env";
 import { createDb } from "@/server/db/client";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
 import { clearHeartbeat, writeHeartbeat } from "@/server/queue/heartbeat";
-import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, type AuditJobData } from "@/server/queue/queues";
+import { LIGHTHOUSE_QUEUE, MAINTENANCE_QUEUE, SEO_QUEUE, type AuditJobData } from "@/server/queue/queues";
 import {
   BACKUP_CRON,
   BACKUP_JOB,
@@ -20,11 +20,16 @@ import {
   RECONCILE_EVERY_MS,
   RECONCILE_JOB,
   RECONCILE_SCHEDULER_ID,
+  SEO_SYNC_CRON,
+  SEO_SYNC_JOB,
+  SEO_SYNC_SCHEDULER_ID,
 } from "@/server/queue/schedulers";
 import { createMailer, type Mailer } from "@/server/notify/mailer";
 import { resolveAlertRecipient, sweepNotifications } from "@/server/services/alerts";
 import { runBackup } from "@/server/services/backups";
 import { refreshAllFieldData, refreshOneProjectFieldData, type FetchLike } from "@/server/services/crux";
+import type { SeoDeps } from "@/server/services/seo-connections";
+import { syncAllSeoData, syncProjectSeoData } from "@/server/services/seo-sync";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
 import { createAuditProcessor } from "./processors/audit.processor";
@@ -43,6 +48,8 @@ export type StartWorkerOptions = {
   heartbeatIntervalMs?: number;
   /** Solo pruebas: sustituye a las consultas a la API de Chrome UX Report. */
   cruxFetch?: FetchLike;
+  /** Solo pruebas: sustituye a las llamadas a Google y la cuenta de servicio en la descarga de Search Console y GA4. */
+  seoDeps?: SeoDeps;
   /** Solo pruebas: sustituye al envío SMTP. */
   mailer?: Mailer | null;
 };
@@ -129,6 +136,8 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
   const maintenance = new Queue(MAINTENANCE_QUEUE, { connection: redis, prefix: QUEUE_PREFIX });
   lighthouse.on("error", (err) => log.error({ err: err.message }, "error de la cola lighthouse"));
   maintenance.on("error", (err) => log.error({ err: err.message }, "error de la cola maintenance"));
+  const seo = new Queue(SEO_QUEUE, { connection: redis, prefix: QUEUE_PREFIX });
+  seo.on("error", (err) => log.error({ err: err.message }, "error de la cola seo"));
 
   const mailer =
     options.mailer !== undefined
@@ -184,6 +193,30 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     else if (!r.ok) log.error({ error: r.error, checked: r.checked }, "la actualización de datos reales falló");
     else log.info({ projects: r.projects, checked: r.checked, withData: r.withData }, "datos reales de usuarios actualizados");
   };
+
+  // Descarga de Search Console y GA4: cola propia (una a la vez) para no retrasar el mantenimiento ni las auditorías.
+  const runSeoSync = async (projectId?: string) => {
+    const deps: SeoDeps = { key: env.AUTH_ENCRYPTION_KEY || undefined, ...options.seoDeps };
+    if (projectId) {
+      const r = await syncProjectSeoData(projectId, db, deps);
+      const failed = r.results.filter((x) => !x.ok);
+      if (failed.length) log.warn({ projectId, errors: failed.map((f) => ({ kind: f.kind, detail: f.detail })) }, "la descarga de datos SEO terminó con errores");
+      else log.info({ projectId, sources: r.results.map((x) => ({ kind: x.kind, rows: x.rows, through: x.through })) }, "datos SEO descargados");
+      return;
+    }
+    const r = await syncAllSeoData(db, deps);
+    log.info(r, "ronda diaria de datos SEO");
+  };
+  const seoWorker = new Worker(
+    SEO_QUEUE,
+    async (job) => {
+      if (job.name === SEO_SYNC_JOB) return runSeoSync((job.data as { projectId?: string } | undefined)?.projectId);
+      log.warn({ name: job.name }, "trabajo seo desconocido");
+    },
+    { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1, lockDuration: 30 * 60_000 },
+  );
+  seoWorker.on("error", (err) => log.error({ err: err.message }, "error del worker seo"));
+  seoWorker.on("failed", (job, err) => log.error({ jobId: job?.id, name: job?.name, err: err.message }, "descarga seo fallida"));
 
   const planProject = createPlanProjectProcessor({ db, redis, lighthouse, maintenance, log });
   const runReconcile = () => reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
@@ -253,6 +286,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     log,
   );
 
+  await withDeadline(
+    seo
+      .upsertJobScheduler(SEO_SYNC_SCHEDULER_ID, { pattern: SEO_SYNC_CRON, tz: "UTC" }, { name: SEO_SYNC_JOB, data: {} })
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la descarga diaria de datos SEO")),
+    30_000,
+    "registro de la descarga de datos SEO",
+    log,
+  );
+
   const beat = () =>
     writeHeartbeat(redis, { chrome: chromeOk }).catch((err: Error) => log.error({ err: err.message }, "latido fallido"));
   await beat();
@@ -272,7 +314,8 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
         // Espera a que termine la auditoría en curso antes de salir.
         await worker.close();
         await maintenanceWorker.close();
-        await Promise.all([lighthouse.close(), maintenance.close()]).catch(() => undefined);
+        await seoWorker.close();
+        await Promise.all([lighthouse.close(), maintenance.close(), seo.close()]).catch(() => undefined);
         await clearHeartbeat(redis).catch(() => undefined);
         await redis.quit().catch(() => undefined);
         ownR2?.destroy();

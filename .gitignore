@@ -13,3 +13,6 @@ AGENTS.md
 # Fase 0 SEO: datos reales de clientes y credenciales. Nunca se suben.
 .spike/
 .env.spike
+
+# Copias de trabajo aisladas de los agentes de Claude
+.claude/worktrees/

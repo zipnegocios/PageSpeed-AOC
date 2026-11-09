@@ -255,6 +255,15 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
 - Datos: tabla `seo_integrations` (migración `0009`), una fila por proyecto y fuente; **entra en los respaldos diarios**. El código de
   los clientes de Google y Cloudflare vive en `src/server/seo/` y lo comparten la plataforma y los scripts del piloto
   (`scripts/spike-seo/`, ver su README). Servicio: `services/seo-connections.ts`; reglas puras: `domain/seo-connections.ts`.
+- **Descarga de datos (fase 1):** el worker tiene una cola propia, `seo`, y cada día (05:37 UTC) descarga Search Console y GA4 de todos
+  los proyectos vigentes con esas conexiones; también hay «Actualizar ahora» por proyecto. La primera vez trae 90 días y después repasa
+  los últimos 7 (Google corrige con retraso: Search Console tarda ~3 días en cerrar, GA4 ~1). Guarda totales por día en
+  `seo_search_daily` (página, país, dispositivo, clics, impresiones y posición × impresiones), `seo_traffic_daily` (página, país y grupo
+  de canal) y `seo_ai_referrals_daily` (visitas desde ChatGPT, Perplexity, Gemini…), con la página normalizada a ruta. Repetir una
+  descarga no duplica nada (cada ventana se reemplaza en una transacción) y un fallo a la mitad conserva lo ya guardado. El resultado
+  de cada fuente queda en `seo_integrations` (`synced_through`, `last_sync_at`, `sync_status`, `sync_detail`). Todo entra en los
+  respaldos. Código: `domain/seo-sync.ts` (ventanas y agregación, puro), `services/seo-sync.ts` y `repositories/seo-sync.ts`.
+  **El worker necesita `GOOGLE_SERVICE_ACCOUNT_JSON` (o `AUTH_ENCRYPTION_KEY` si la cuenta se guardó en el panel).**
 - **Despliegue:** el cambio toca `src/server` y la lista de respaldos del worker: despliega **primero el web** (aplica la migración)
   y **después el worker**.
 
