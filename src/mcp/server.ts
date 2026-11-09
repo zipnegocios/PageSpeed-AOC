@@ -1,5 +1,4 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
 import type { ApiKeyAuth } from "@/server/services/api-keys";
 import { describeError, TOOLS, type ToolContext, type ToolResult } from "./tools";
 
@@ -12,24 +11,8 @@ const failure = (message: string): ToolResult => ({ content: [{ type: "text", te
  * Servidor MCP de una petición. Solo registra las herramientas que la clave permite: lo que no
  * está en su alcance ni siquiera aparece en `tools/list`, y llamarlo por nombre da "no existe".
  */
-export function createMcpServer(auth: ApiKeyAuth, options: { log?: McpLog; context?: Partial<ToolContext>; appOrigin?: string } = {}): McpServer {
-  const origin = options.appOrigin?.replace(/\/+$/, "");
-  const server = new McpServer({
-    name: "pagespeed",
-    version: "1.0.0",
-    // Para los clientes que muestran la identidad del servidor (MCP 2025-11-25). claude.ai web hoy no lee estos campos.
-    title: BRAND_NAME,
-    description: BRAND_DESCRIPTION,
-    ...(origin
-      ? {
-          websiteUrl: origin,
-          icons: [
-            { src: `${origin}/pwa/icon-512.png`, mimeType: "image/png", sizes: ["512x512"] },
-            { src: `${origin}/icon.svg`, mimeType: "image/svg+xml", sizes: ["any"] },
-          ],
-        }
-      : {}),
-  });
+export function createMcpServer(auth: ApiKeyAuth, options: { log?: McpLog; context?: Partial<ToolContext> } = {}): McpServer {
+  const server = new McpServer({ name: "pagespeed", version: "1.0.0" });
   const allowed = new Set<string>(auth.scopes);
   const ctx: ToolContext = { keyName: auth.name, access: auth.access, ...options.context };
 

@@ -64,7 +64,7 @@ export async function handleMcpRequest(req: Request, deps: McpDeps): Promise<Res
     return rpcError(405, -32000, "Solo se admite POST (servidor sin sesión).", { Allow: "POST" });
   }
 
-  const server = createMcpServer(auth, { log: deps.log, context: deps.context, appOrigin: deps.appOrigin });
+  const server = createMcpServer(auth, { log: deps.log, context: deps.context });
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   try {
     await server.connect(transport);

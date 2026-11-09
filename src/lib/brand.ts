@@ -4,8 +4,6 @@
  */
 export const BRAND_NAME = "PageSpeed";
 export const BRAND_WORDMARK = "PAGESPEED";
-/** Una línea que dice qué es el producto (la ven los clientes MCP al conectarse). */
-export const BRAND_DESCRIPTION = "Auditorías de rendimiento web (Lighthouse) de los sitios de tus clientes.";
 
 export const COPYRIGHT_YEAR = 2026;
 export const COPYRIGHT_OWNER = "zipnegocios";
