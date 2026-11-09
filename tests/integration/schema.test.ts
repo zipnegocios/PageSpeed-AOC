@@ -64,7 +64,10 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "oauth_codes",
       "projects",
       "routes",
+      "seo_ai_referrals_daily",
       "seo_integrations",
+      "seo_search_daily",
+      "seo_traffic_daily",
       "settings",
     ]);
   });

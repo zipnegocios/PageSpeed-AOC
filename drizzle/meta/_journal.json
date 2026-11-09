@@ -92,6 +92,13 @@
       "when": 1794205072980,
       "tag": "0012_seo_conexiones",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794215251372,
+      "tag": "0013_seo_datos",
+      "breakpoints": true
     }
   ]
 }

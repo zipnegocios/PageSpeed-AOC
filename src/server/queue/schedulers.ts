@@ -25,6 +25,11 @@ export const CRUX_JOB = "crux";
 export const CRUX_SCHEDULER_ID = "crux";
 export const CRUX_CRON = "47 4 * * *";
 
+/** Descarga de Search Console y GA4 (cola seo): una vez al día, cuando Google ya cerró los datos de los días anteriores. */
+export const SEO_SYNC_JOB = "seo-sync";
+export const SEO_SYNC_SCHEDULER_ID = "seo-sync";
+export const SEO_SYNC_CRON = "37 5 * * *";
+
 export type ProjectSchedule = { projectId: string; pattern: string | null; next: Date | null };
 
 /**

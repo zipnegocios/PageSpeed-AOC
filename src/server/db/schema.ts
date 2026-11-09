@@ -3,6 +3,8 @@ import {
   boolean,
   check,
   customType,
+  date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -361,9 +363,81 @@ export const seoIntegrations = pgTable(
     detail: text("detail"),
     lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
     lastOkAt: timestamp("last_ok_at", { withTimezone: true }),
+    // Descarga de datos (solo gsc y ga4): hasta qué día hay datos guardados, cuándo se intentó y cómo salió.
+    syncedThrough: date("synced_through", { mode: "string" }),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    syncStatus: seoIntegrationStatus("sync_status").notNull().default("pending"),
+    // Mensaje legible de la última descarga. Nunca contiene credenciales.
+    syncDetail: text("sync_detail"),
     ...timestamps,
   },
   (t) => [unique("seo_integrations_project_kind_unique").on(t.projectId, t.kind)],
+);
+
+// ------------------------------------------------------ seo_search_daily
+// Search Console: totales por día, página, país y dispositivo. `page` es la ruta normalizada (sin host ni parámetros).
+// La posición media de un grupo se calcula como position_sum / impressions (posición ponderada por impresiones).
+export const seoSearchDaily = pgTable(
+  "seo_search_daily",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: date("date", { mode: "string" }).notNull(),
+    page: text("page").notNull(),
+    // Código de tres letras que entrega Search Console, en minúsculas (col, usa, esp…).
+    country: text("country").notNull(),
+    // MOBILE, DESKTOP o TABLET.
+    device: text("device").notNull(),
+    clicks: integer("clicks").notNull().default(0),
+    impressions: integer("impressions").notNull().default(0),
+    positionSum: doublePrecision("position_sum").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.date, t.page, t.country, t.device] }),
+    index("seo_search_daily_project_date_idx").on(t.projectId, t.date),
+  ],
+);
+
+// ----------------------------------------------------- seo_traffic_daily
+// GA4: sesiones y usuarios por día, página, país (nombre que entrega GA4) y grupo de canal (Organic Search, Direct…).
+export const seoTrafficDaily = pgTable(
+  "seo_traffic_daily",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: date("date", { mode: "string" }).notNull(),
+    page: text("page").notNull(),
+    country: text("country").notNull(),
+    channel: text("channel").notNull(),
+    sessions: integer("sessions").notNull().default(0),
+    users: integer("users").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.date, t.page, t.country, t.channel] }),
+    index("seo_traffic_daily_project_date_idx").on(t.projectId, t.date),
+  ],
+);
+
+// -------------------------------------------------- seo_ai_referrals_daily
+// GA4: sesiones que llegan desde asistentes de IA (chatgpt.com, perplexity…), por día, fuente y página de entrada.
+export const seoAiReferralsDaily = pgTable(
+  "seo_ai_referrals_daily",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: date("date", { mode: "string" }).notNull(),
+    source: text("source").notNull(),
+    page: text("page").notNull(),
+    sessions: integer("sessions").notNull().default(0),
+    users: integer("users").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.date, t.source, t.page] }),
+    index("seo_ai_referrals_daily_project_date_idx").on(t.projectId, t.date),
+  ],
 );
 
 // -------------------------------------------------------- mcp_api_keys

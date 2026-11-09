@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clearGoogleAccount, removeConnection, saveConnection, saveGoogleAccount, testConnection } from "@/server/services/seo-connections";
+import { requestSeoSync } from "@/server/services/seo-sync";
 
 /** Las direcciones llevan slugs de cliente y proyecto: se revalida todo el panel en lugar de adivinar cada ruta. */
 const refresh = () => revalidatePath("/admin", "layout");
@@ -51,5 +52,15 @@ export async function removeConnectionAction(projectId: string, kind: string, _p
     await removeConnection(projectId, kind);
     refresh();
     return { ok: "Conexión quitada." };
+  });
+}
+
+/** «Actualizar ahora»: pide al worker descargar los datos de Search Console y GA4 de este proyecto. */
+export async function requestSeoSyncAction(projectId: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const { queued } = await requestSeoSync(projectId);
+    refresh();
+    return { ok: queued ? "Actualización pedida. El worker descarga los datos de Google en unos minutos; recarga la página para verlos." : "Ya hay una actualización pendiente para este proyecto." };
   });
 }

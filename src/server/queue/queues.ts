@@ -4,6 +4,8 @@ import { getRedis, QUEUE_PREFIX } from "./connection";
 
 export const LIGHTHOUSE_QUEUE = "lighthouse";
 export const MAINTENANCE_QUEUE = "maintenance";
+/** Descargas de datos de SEO (Search Console y GA4): cola propia para que una descarga larga no retrase el mantenimiento. */
+export const SEO_QUEUE = "seo";
 
 /** Lo único que viaja en el trabajo: la fila de audit_logs es la fuente de verdad. */
 export type AuditJobData = { auditId: string };
@@ -53,4 +55,8 @@ export function lighthouseQueue(connection: Redis = getRedis()): Queue<AuditJobD
 
 export function maintenanceQueue(connection: Redis = getRedis()): Queue {
   return queue(MAINTENANCE_QUEUE, connection);
+}
+
+export function seoQueue(connection: Redis = getRedis()): Queue {
+  return queue(SEO_QUEUE, connection);
 }
