@@ -209,6 +209,11 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   herramienta lo comprueba antes de leer o cambiar (`src/mcp/access.ts`, reglas en `server/domain/mcp-access.ts`);
   lo que queda fuera responde «no encontrado», como si no existiera. Al crear la clave hay que elegir una de las dos
   cosas.
+- **Gestión de claves** (Panel → Agentes): cada clave se puede **editar** (nombre, permisos y alcance; vale desde la
+  siguiente llamada del agente y la clave no cambia), **rotar** (genera un secreto nuevo, se muestra una sola vez, y el
+  anterior deja de servir al instante), **revocar** (deja de servir al instante; sigue en la lista) y, ya revocada,
+  **eliminar** definitivamente (hay que escribir su nombre). Rotar y revocar piden confirmar antes de actuar. Las
+  auditorías que lanzó una clave conservan su nombre como texto.
 - Límites en memoria: 60 llamadas por minuto por clave y 20 claves inválidas cada 10 minutos por IP.
 - `run_audit` reutiliza `requestAudit` (idempotente, exige worker en línea, respeta la fase) con `trigger = mcp` y
   `requested_by = mcp:<nombre de la clave>`. Con una URL crea una ruta puntual (`source = adhoc`, sin monitoreo),

@@ -358,6 +358,8 @@ export const mcpApiKeys = pgTable("mcp_api_keys", {
   projectIds: uuid("project_ids").array().notNull().default(sql`'{}'::uuid[]`),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  // Cuándo se cambió por última vez el secreto de la clave (null si nunca se rotó).
+  rotatedAt: timestamp("rotated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

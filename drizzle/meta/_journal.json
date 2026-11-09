@@ -57,6 +57,13 @@
       "when": 1794186056419,
       "tag": "0007_equipo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794187123433,
+      "tag": "0008_claves_rotacion",
+      "breakpoints": true
     }
   ]
 }

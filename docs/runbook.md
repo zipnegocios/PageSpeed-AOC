@@ -91,7 +91,7 @@ Lo que se pierde: cambios hechos entre el último respaldo y la caída (hasta 24
 | Quitar a una persona del equipo | Panel → Equipo → *Quitar* | Deja de poder entrar y su sesión se cierra en su siguiente petición |
 | `SESSION_SECRET` | Cambiar la variable y reiniciar el web | Cierra todas las sesiones |
 | Link de un cliente filtrado | Ficha del cliente → *Generar link nuevo* | El anterior deja de funcionar al instante. También sirve *Suspender* |
-| Clave de agente (MCP) filtrada | Panel → Agentes → *Revocar* | Deja de funcionar al instante |
+| Clave de agente (MCP) filtrada | Panel → Agentes → *Rotar clave* (genera una nueva; la anterior deja de servir al instante) o *Revocar* | El agente queda sin acceso hasta que le pongas la nueva. Una clave revocada se puede *Eliminar definitivamente* de la lista |
 | `AUTH_ENCRYPTION_KEY` | No se puede rotar sin más: las credenciales guardadas quedan ilegibles. Cambia la clave en web **y** worker, redespliega ambos y vuelve a introducir el acceso de cada proyecto (tarjeta *Acceso a páginas privadas*) | Mientras tanto esas rutas fallan con `AUTH_CONFIG` |
 | Token de R2 / SMTP | Rotar en el proveedor y actualizar la variable en **web y worker**; redesplegar ambos | — |
 

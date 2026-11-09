@@ -1,0 +1,1 @@
+ALTER TABLE "mcp_api_keys" ADD COLUMN "rotated_at" timestamp with time zone;

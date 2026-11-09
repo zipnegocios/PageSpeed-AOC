@@ -56,6 +56,6 @@ Tu clave solo ve las herramientas de su nivel. Si una no aparece en `tools/list`
 ## Límites y errores
 
 - 60 llamadas por minuto por clave. Si recibes 429, espera lo que indique `Retry-After`.
-- 401: la clave no existe o fue revocada. 403: origen no permitido. 405: usa POST.
+- 401: la clave no existe, fue revocada o se rotó (la anterior deja de servir al instante). Pide una nueva a la persona administradora; no insistas con la vieja. 403: origen no permitido. 405: usa POST.
 - Los errores de las herramientas llegan como texto claro en español («Proyecto no encontrado.», «El worker de auditorías no está en línea…»). Cuéntaselos a la persona tal cual y no reintentes sin entender la causa.
 - Los datos de proyectos y clientes son confidenciales: no los repitas fuera de la conversación y nunca incluyas la clave en lo que escribas.

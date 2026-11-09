@@ -11,7 +11,7 @@ import { createRedis } from "@/server/queue/connection";
 import { writeHeartbeat } from "@/server/queue/heartbeat";
 import { lighthouseQueue } from "@/server/queue/queues";
 import * as alerts from "@/server/services/alerts";
-import { createApiKey, revokeApiKey } from "@/server/services/api-keys";
+import { createApiKey, deleteApiKey, revokeApiKey, rotateApiKey, updateApiKey } from "@/server/services/api-keys";
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
@@ -66,11 +66,11 @@ describe.skipIf(!ready)("servidor MCP", () => {
 
   async function connect(preset: "read" | "audit" | "configure", scope: { clientIds?: string[]; projectIds?: string[] } = {}) {
     const selected = (scope.clientIds?.length ?? 0) + (scope.projectIds?.length ?? 0) > 0;
-    const { key } = await createApiKey({ name: `agente-${preset}`, preset, access: selected ? "selected" : "all", ...scope }, db);
+    const { key, view } = await createApiKey({ name: `agente-${preset}`, preset, access: selected ? "selected" : "all", ...scope }, db);
     const client = new Client({ name: "prueba", version: "1.0.0" });
     await client.connect(new StreamableHTTPClientTransport(new URL(URL_MCP), { fetch: fetchVia(key, () => deps) }));
     opened.push(client);
-    return { client, key };
+    return { client, key, id: view.id };
   }
   const call = async (client: Client, name: string, args: Record<string, unknown> = {}) => {
     const r = (await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }>; isError?: boolean };
@@ -446,6 +446,90 @@ describe.skipIf(!ready)("servidor MCP", () => {
       expect(view.scope.projects.map((p) => p.name)).toEqual(["Blog"]);
       const full = await createApiKey({ name: "total", preset: "read", access: "all", clientIds: [t.client.id] }, db);
       expect(full.view.scope).toEqual({ all: true, clients: [], projects: [] });
+    });
+  });
+
+  describe("gestión de claves: rotar, editar y eliminar", () => {
+    const listTools = (key: string) =>
+      fetchVia(key, () => deps)(URL_MCP, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      });
+
+    it("rotar invalida la clave anterior al instante y la nueva conserva permisos y alcance", async () => {
+      const t = await seed("production");
+      const { key: old, id } = await connect("audit", { projectIds: [t.project.id] });
+      expect((await listTools(old)).status).toBe(200);
+
+      const { key: fresh, view } = await rotateApiKey(id, db);
+      expect(fresh).not.toBe(old);
+      expect(fresh.startsWith("pagespeed_")).toBe(true);
+      expect(view.rotatedAt).toBeInstanceOf(Date);
+      expect(view).toMatchObject({ name: "agente-audit", preset: "audit", active: true });
+      expect(view.scope.projects.map((p) => p.id)).toEqual([t.project.id]);
+
+      expect((await listTools(old)).status).toBe(401);
+      expect((await listTools(fresh)).status).toBe(200);
+      const [row] = await db.select().from(s.mcpApiKeys).where(eq(s.mcpApiKeys.id, id));
+      expect(row!.lastUsedAt === null || row!.lastUsedAt.getTime() >= row!.rotatedAt!.getTime() - 1000).toBe(true);
+      expect(row!.keyHash).not.toContain(fresh);
+    });
+
+    it("editar cambia permisos y alcance, y un agente ya conectado lo nota en su siguiente llamada", async () => {
+      const t = await seed("production");
+      const clientB = await clients.createClient({ name: "Beta" }, db);
+      const projectB = await projects.createProject(clientB.id, { name: "Blog", baseUrl: "https://beta.test" }, db);
+      const { client: agent, key, id } = await connect("read", { projectIds: [t.project.id] });
+      expect((await agent.listTools()).tools.map((x) => x.name)).not.toContain("run_audit");
+      expect((await call(agent, "list_projects")).json.projects).toHaveLength(1);
+
+      const view = await updateApiKey(id, { name: "Agente renombrado", preset: "audit", access: "selected", clientIds: [clientB.id], projectIds: [] }, db);
+      expect(view).toMatchObject({ name: "Agente renombrado", preset: "audit" });
+      expect(view.scope.clients.map((c) => c.name)).toEqual(["Beta"]);
+
+      expect((await agent.listTools()).tools.map((x) => x.name)).toContain("run_audit");
+      expect((await call(agent, "list_projects")).json.projects.map((p: { project_id: string }) => p.project_id)).toEqual([projectB.id]);
+      expect((await call(agent, "get_project", { project_id: t.project.id })).isError).toBe(true);
+      expect((await listTools(key)).status).toBe(200); // la clave es la misma
+
+      await updateApiKey(id, { name: "Agente renombrado", preset: "configure", access: "all" }, db);
+      expect((await call(agent, "list_projects")).json.projects).toHaveLength(2);
+    });
+
+    it("al editar se valida igual que al crear", async () => {
+      const t = await seed("production");
+      const { id } = await connect("read");
+      await expect(updateApiKey(id, { name: "x", preset: "read", access: "all" }, db)).rejects.toThrow(/al menos 2 caracteres/);
+      await expect(updateApiKey(id, { name: "Agente", preset: "read", access: "selected" }, db)).rejects.toThrow(/al menos un cliente o un proyecto/);
+      await expect(updateApiKey(id, { name: "Agente", preset: "read", access: "selected", clientIds: ["00000000-0000-4000-8000-000000000000"] }, db)).rejects.toThrow(/ya no existe/);
+      const ok = await updateApiKey(id, { name: "Agente", preset: "read", access: "selected", clientIds: [t.client.id], projectIds: [t.project.id] }, db);
+      expect(ok.scope.projects).toEqual([]); // el proyecto ya entra por su cliente
+    });
+
+    it("una clave revocada no se edita ni se rota; solo se elimina estando revocada", async () => {
+      const { id } = await connect("read");
+      await expect(deleteApiKey(id, db)).rejects.toThrow(/Revócala primero/);
+      expect(await db.select().from(s.mcpApiKeys)).toHaveLength(1);
+
+      await revokeApiKey(id, db);
+      await expect(rotateApiKey(id, db)).rejects.toThrow(/ya está revocada/);
+      await expect(updateApiKey(id, { name: "Otro nombre", preset: "read", access: "all" }, db)).rejects.toThrow(/ya está revocada/);
+
+      await deleteApiKey(id, db);
+      expect(await db.select().from(s.mcpApiKeys)).toHaveLength(0);
+      await expect(deleteApiKey(id, db)).rejects.toThrow(/no existe/);
+      await expect(deleteApiKey("no-es-uuid", db)).rejects.toThrow(/no encontrad/);
+    });
+
+    it("las auditorías que lanzó una clave conservan su nombre al eliminarla", async () => {
+      const t = await seed("production");
+      const { client: agent, id } = await connect("audit");
+      await call(agent, "run_audit", { route_id: t.home.id, profile: "mobile" });
+      await revokeApiKey(id, db);
+      await deleteApiKey(id, db);
+      const rows = await db.select().from(s.auditLogs).where(eq(s.auditLogs.trigger, "mcp"));
+      expect(rows.map((r) => r.requestedBy)).toEqual(["mcp:agente-audit"]);
     });
   });
 });

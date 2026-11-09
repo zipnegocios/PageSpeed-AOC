@@ -9,7 +9,7 @@ import { listClients } from "@/server/repositories/clients";
 import { listAllProjects } from "@/server/repositories/projects";
 import { assertUuid, parseInput } from "./shared";
 
-const createInput = z
+const keyFieldsInput = z
   .object({
     name: z.string().trim().min(2, "Ponle un nombre de al menos 2 caracteres.").max(60, "El nombre admite hasta 60 caracteres."),
     preset: z.enum(PRESET_IDS, { error: "Elige los permisos de la clave." }),
@@ -36,6 +36,8 @@ export type ApiKeyView = {
   lastUsedAt: Date | null;
   createdAt: Date;
   revokedAt: Date | null;
+  /** Cuándo se cambió por última vez el secreto (null si nunca se rotó). */
+  rotatedAt: Date | null;
   /** A qué datos llega la clave, con los nombres ya resueltos (los que ya no existen no se listan). */
   scope: ApiKeyScopeView;
 };
@@ -58,6 +60,7 @@ const toView = (r: repo.ApiKeyRow, names: Names): ApiKeyView => ({
   lastUsedAt: r.lastUsedAt,
   createdAt: r.createdAt,
   revokedAt: r.revokedAt,
+  rotatedAt: r.rotatedAt,
   scope: {
     all: r.allAccess,
     clients: r.allAccess ? [] : r.clientIds.flatMap((id) => (names.clients.has(id) ? [{ id, name: names.clients.get(id)! }] : [])),
@@ -65,32 +68,64 @@ const toView = (r: repo.ApiKeyRow, names: Names): ApiKeyView => ({
   },
 });
 
-/** Crea una clave. La clave en claro solo existe en este resultado: en la base se guarda su hash. */
-export async function createApiKey(raw: unknown, db: Database = getDb()): Promise<{ key: string; view: ApiKeyView }> {
-  const input = parseInput(createInput, raw);
+/** Valida los campos de una clave y deja el alcance listo para guardar (ids que existen, sin proyectos redundantes). */
+async function resolveFields(raw: unknown, db: Database) {
+  const input = parseInput(keyFieldsInput, raw);
   const names = await loadNames(db);
 
   const all = input.access === "all";
   const clientIds = all ? [] : [...new Set(input.clientIds)];
-  // Un proyecto de un cliente ya elegido es redundante: se guarda solo el cliente.
   const projectIds = all ? [] : [...new Set(input.projectIds)];
   if (clientIds.some((id) => !names.clients.has(id)) || projectIds.some((id) => !names.projects.has(id))) {
     throw new DomainError("INVALID", "Alguno de los clientes o proyectos elegidos ya no existe. Recarga la página e inténtalo de nuevo.");
   }
+  // Un proyecto de un cliente ya elegido es redundante: se guarda solo el cliente.
   const listing = await listAllProjects(db);
   const clientOf = new Map(listing.map((p) => [p.id, p.clientId]));
   const keptProjects = projectIds.filter((id) => !clientIds.includes(clientOf.get(id) ?? ""));
 
+  return {
+    names,
+    fields: { name: input.name, scopes: scopesForPreset(input.preset), allAccess: all, clientIds, projectIds: keptProjects },
+  };
+}
+
+/** Crea una clave. La clave en claro solo existe en este resultado: en la base se guarda su hash. */
+export async function createApiKey(raw: unknown, db: Database = getDb()): Promise<{ key: string; view: ApiKeyView }> {
+  const { names, fields } = await resolveFields(raw, db);
   const key = generateApiKey();
-  const row = await repo.insertApiKey(db, {
-    name: input.name,
-    keyHash: hashApiKey(key),
-    scopes: scopesForPreset(input.preset),
-    allAccess: all,
-    clientIds,
-    projectIds: keptProjects,
-  });
+  const row = await repo.insertApiKey(db, { ...fields, keyHash: hashApiKey(key) });
   return { key, view: toView(row, names) };
+}
+
+/**
+ * Cambia el nombre, los permisos y el alcance de una clave activa. La clave en sí no cambia; los cambios valen desde la
+ * siguiente llamada del agente (la autenticación lee la fila en cada petición).
+ */
+export async function updateApiKey(id: string, raw: unknown, db: Database = getDb()): Promise<ApiKeyView> {
+  assertUuid(id, "Clave");
+  const { names, fields } = await resolveFields(raw, db);
+  const row = await repo.updateKey(db, id, fields);
+  if (!row) throw new DomainError("NOT_FOUND", "La clave no existe o ya está revocada: no se puede editar.");
+  return toView(row, names);
+}
+
+/** Cambia el secreto de una clave activa. La anterior deja de valer al instante; la nueva solo existe en este resultado. */
+export async function rotateApiKey(id: string, db: Database = getDb(), now: Date = new Date()): Promise<{ key: string; view: ApiKeyView }> {
+  assertUuid(id, "Clave");
+  const key = generateApiKey();
+  const row = await repo.rotateKeyHash(db, id, hashApiKey(key), now);
+  if (!row) throw new DomainError("NOT_FOUND", "La clave no existe o ya está revocada: no se puede rotar.");
+  return { key, view: toView(row, await loadNames(db)) };
+}
+
+/** Borra una clave ya revocada. Una activa hay que revocarla primero. */
+export async function deleteApiKey(id: string, db: Database = getDb()): Promise<void> {
+  assertUuid(id, "Clave");
+  if (await repo.deleteRevoked(db, id)) return;
+  const row = await repo.findKey(db, id);
+  if (!row) throw new DomainError("NOT_FOUND", "La clave no existe.");
+  throw new DomainError("CONFLICT", "La clave sigue activa. Revócala primero y después podrás eliminarla.");
 }
 
 export async function listApiKeys(db: Database = getDb()): Promise<ApiKeyView[]> {
