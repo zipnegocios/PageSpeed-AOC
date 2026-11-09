@@ -170,13 +170,18 @@ export function evaluate(input: RulesInput): Issue[] {
 
   const inlinks = internalInlinks(pages, site.hosts);
 
-  for (const p of pages) pageStatusRules(p, add);
-
-  // Enlaces rotos: un hallazgo por destino, con las páginas que lo enlazan.
+  // Enlaces rotos: un hallazgo por destino, con las páginas que lo enlazan. Una página rota que alguien enlaza se informa
+  // solo así (lleva el estado y los orígenes); `status_error` queda para las que nadie enlaza, como las del sitemap.
+  const brokenTargets = new Set<string>();
   for (const [target, sources] of inlinks) {
     const page = byPath.get(target);
-    if (page && !page.blockedByRobots && failing(page)) add("broken_link", target, { count: sources.size, from: sample([...sources].sort()), status: page.status });
+    if (page && !page.blockedByRobots && failing(page)) {
+      add("broken_link", target, { count: sources.size, from: sample([...sources].sort()), status: page.status, inSitemap: page.inSitemap });
+      brokenTargets.add(target);
+    }
   }
+  for (const p of pages) pageStatusRules(p, add, brokenTargets);
+
   if (!site.truncated) {
     for (const p of pages) {
       if (p.inSitemap && p.path !== "/" && !failing(p) && !p.blockedByRobots && (inlinks.get(p.path)?.size ?? 0) === 0) add("orphan_page", p.path);
@@ -222,7 +227,7 @@ function siteRules(site: SiteFacts, add: Add): void {
   if (site.httpRedirectsToHttps === false) add("http_not_redirected", SITE);
 }
 
-function pageStatusRules(p: CrawledPage, add: Add): void {
+function pageStatusRules(p: CrawledPage, add: Add, brokenTargets: Set<string>): void {
   if (p.blockedByRobots) {
     if (p.inSitemap) add("sitemap_url_blocked", p.path);
     return;
@@ -232,7 +237,7 @@ function pageStatusRules(p: CrawledPage, add: Add): void {
     return;
   }
   if (p.status === 0 || p.status >= 400) {
-    add("status_error", p.path, { status: p.status, inSitemap: p.inSitemap });
+    if (!brokenTargets.has(p.path)) add("status_error", p.path, { status: p.status, inSitemap: p.inSitemap });
     return;
   }
   if (p.hops > 1) add("redirect_chain", p.path, { hops: p.hops, to: p.finalPath ?? p.path });

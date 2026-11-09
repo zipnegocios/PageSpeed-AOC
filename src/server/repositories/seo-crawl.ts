@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
-import { seoCrawlIssues, seoCrawlPages, seoCrawlRuns } from "@/server/db/schema";
+import { clients, projects, seoCrawlIssues, seoCrawlPages, seoCrawlRuns, seoIntegrations } from "@/server/db/schema";
 import type { PageRow } from "@/server/domain/seo-crawl-rows";
 import { summarize, type Issue } from "@/server/domain/seo-crawl-rules";
 
@@ -106,16 +106,20 @@ export async function failRun(db: Database, runId: string, detail: string, outco
   return rows.length > 0;
 }
 
-/** Rastreos «en curso» desde antes de `startedBefore` (o «en cola» desde antes de `queuedBefore`): el trabajo se perdió. */
-export async function failStaleRuns(db: Database, startedBefore: Date, queuedBefore: Date, detail: string): Promise<number> {
+/** Rastreos en cola o en curso, del más antiguo al más reciente: la reconciliación decide cuáles se perdieron. */
+export async function listOpenRuns(db: Database): Promise<RunRow[]> {
+  return db.select().from(seoCrawlRuns).where(inArray(seoCrawlRuns.status, ["queued", "running"])).orderBy(seoCrawlRuns.queuedAt);
+}
+
+/** Proyectos en producción (ni archivados ni de un cliente archivado) con conexión a Search Console o GA4: los que se rastrean cada semana. */
+export async function listCrawlProjectIds(db: Database): Promise<string[]> {
   const rows = await db
-    .update(seoCrawlRuns)
-    .set({ status: "failed", finishedAt: new Date(), outcome: "stale", detail })
-    .where(
-      sql`(${seoCrawlRuns.status} = 'running' and ${seoCrawlRuns.startedAt} < ${startedBefore}) or (${seoCrawlRuns.status} = 'queued' and ${seoCrawlRuns.queuedAt} < ${queuedBefore})`,
-    )
-    .returning({ id: seoCrawlRuns.id });
-  return rows.length;
+    .selectDistinct({ projectId: seoIntegrations.projectId })
+    .from(seoIntegrations)
+    .innerJoin(projects, eq(projects.id, seoIntegrations.projectId))
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .where(and(inArray(seoIntegrations.kind, ["gsc", "ga4"]), eq(projects.phase, "production"), isNull(projects.deletedAt), isNull(clients.deletedAt)));
+  return rows.map((r) => r.projectId);
 }
 
 /** Los últimos rastreos de un proyecto, del más reciente al más antiguo, de cualquier estado. */

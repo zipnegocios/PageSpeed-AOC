@@ -20,6 +20,10 @@ import {
   RECONCILE_EVERY_MS,
   RECONCILE_JOB,
   RECONCILE_SCHEDULER_ID,
+  SEO_CRAWL_CRON,
+  SEO_CRAWL_JOB,
+  SEO_CRAWL_SCHEDULER_ID,
+  SEO_CRAWL_WEEKLY_JOB,
   SEO_SYNC_CRON,
   SEO_SYNC_JOB,
   SEO_SYNC_SCHEDULER_ID,
@@ -29,6 +33,7 @@ import { resolveAlertRecipient, sweepNotifications } from "@/server/services/ale
 import { runBackup } from "@/server/services/backups";
 import { refreshAllFieldData, refreshOneProjectFieldData, type FetchLike } from "@/server/services/crux";
 import type { SeoDeps } from "@/server/services/seo-connections";
+import { reconcileCrawlRuns, runCrawl, scheduleWeeklyCrawls, type CrawlDeps } from "@/server/services/seo-crawl";
 import { syncAllSeoData, syncProjectSeoData } from "@/server/services/seo-sync";
 import { createR2, r2ConfigFromEnv, type R2Store } from "@/server/storage/r2";
 import { runLighthouse, type LighthouseRunner } from "./lighthouse/runner";
@@ -50,6 +55,8 @@ export type StartWorkerOptions = {
   cruxFetch?: FetchLike;
   /** Solo pruebas: sustituye a las llamadas a Google y la cuenta de servicio en la descarga de Search Console y GA4. */
   seoDeps?: SeoDeps;
+  /** Solo pruebas: sustituye la descarga y los relojes del rastreo técnico (`allowPrivate` del worker también aplica). */
+  seoCrawlDeps?: Omit<CrawlDeps, "allowPrivate">;
   /** Solo pruebas: sustituye al envío SMTP. */
   mailer?: Mailer | null;
 };
@@ -207,10 +214,22 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     const r = await syncAllSeoData(db, deps);
     log.info(r, "ronda diaria de datos SEO");
   };
+  // Rastreo técnico de un sitio: un trabajo por rastreo, en la misma cola (una a la vez).
+  const runSeoCrawl = async (runId?: string) => {
+    if (!runId) return log.warn("trabajo de rastreo sin runId");
+    const r = await runCrawl(runId, db, { allowPrivate: options.allowPrivate, ...options.seoCrawlDeps });
+    log.info({ runId, status: r.status, outcome: r.outcome, pages: r.pages, issues: r.issues, detail: r.detail }, "rastreo técnico terminado");
+  };
   const seoWorker = new Worker(
     SEO_QUEUE,
     async (job) => {
       if (job.name === SEO_SYNC_JOB) return runSeoSync((job.data as { projectId?: string } | undefined)?.projectId);
+      if (job.name === SEO_CRAWL_JOB) return runSeoCrawl((job.data as { runId?: string } | undefined)?.runId);
+      if (job.name === SEO_CRAWL_WEEKLY_JOB) {
+        const r = await scheduleWeeklyCrawls({ db, queue: seo });
+        log.info(r, "ronda semanal de rastreo técnico");
+        return;
+      }
       log.warn({ name: job.name }, "trabajo seo desconocido");
     },
     { connection: redis, prefix: QUEUE_PREFIX, concurrency: 1, lockDuration: 30 * 60_000 },
@@ -219,7 +238,12 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
   seoWorker.on("failed", (job, err) => log.error({ jobId: job?.id, name: job?.name, err: err.message }, "descarga seo fallida"));
 
   const planProject = createPlanProjectProcessor({ db, redis, lighthouse, maintenance, log });
-  const runReconcile = () => reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
+  const runReconcile = async () => {
+    const report = await reconcile({ db, lighthouse, maintenance, log, timeoutMs: env.AUDIT_TIMEOUT_MS });
+    const crawls = await reconcileCrawlRuns({ db, queue: seo });
+    if (crawls.failed > 0) log.warn(crawls, "rastreos técnicos perdidos marcados como fallidos");
+    return report;
+  };
   const maintenanceWorker = new Worker(
     MAINTENANCE_QUEUE,
     async (job) => {
@@ -292,6 +316,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la descarga diaria de datos SEO")),
     30_000,
     "registro de la descarga de datos SEO",
+    log,
+  );
+
+  await withDeadline(
+    seo
+      .upsertJobScheduler(SEO_CRAWL_SCHEDULER_ID, { pattern: SEO_CRAWL_CRON, tz: "UTC" }, { name: SEO_CRAWL_WEEKLY_JOB, data: {} })
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la ronda semanal de rastreo técnico")),
+    30_000,
+    "registro de la ronda semanal de rastreo técnico",
     log,
   );
 

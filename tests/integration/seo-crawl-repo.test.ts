@@ -204,27 +204,30 @@ describe.skipIf(!dbUrl)("datos del rastreo técnico (SEO)", () => {
     });
   });
 
-  describe("rastreos perdidos", () => {
-    it("marca como fallidos los que llevan demasiado en curso o en cola, y deja los recientes y los terminados", async () => {
-      const longAgo = new Date(Date.now() - 3 * 3_600_000);
-      const done = await finished(a, 400);
+  describe("rastreos abiertos y proyectos que se rastrean", () => {
+    it("lista los rastreos en cola y en curso, del más antiguo al más reciente, sin los terminados ni los fallidos", async () => {
+      await finished(a, 400);
+      await finished(a, 300, "failed");
       const running = await repo.createRun(db, a, "manual");
       await repo.markRunning(db, running.id, {});
-      await db.update(s.seoCrawlRuns).set({ startedAt: longAgo }).where(eq(s.seoCrawlRuns.id, running.id));
       const queued = await repo.createRun(db, b, "manual");
-      await db.update(s.seoCrawlRuns).set({ queuedAt: longAgo }).where(eq(s.seoCrawlRuns.id, queued.id));
+      await db.update(s.seoCrawlRuns).set({ queuedAt: new Date(Date.now() - 3_600_000) }).where(eq(s.seoCrawlRuns.id, queued.id));
+      expect((await repo.listOpenRuns(db)).map((r) => r.id)).toEqual([queued.id, running.id]);
+    });
 
-      const cut = new Date(Date.now() - 45 * 60_000);
-      expect(await repo.failStaleRuns(db, cut, cut, "El rastreo se perdió")).toBe(2);
-      expect(await repo.getRun(db, running.id)).toMatchObject({ status: "failed", outcome: "stale", detail: "El rastreo se perdió" });
-      expect((await repo.getRun(db, queued.id))?.status).toBe("failed");
-      expect((await repo.getRun(db, done))?.status).toBe("succeeded");
-
-      // Uno reciente no se toca.
-      const fresh = await repo.createRun(db, a, "manual");
-      await repo.markRunning(db, fresh.id, {});
-      expect(await repo.failStaleRuns(db, cut, cut, "x")).toBe(0);
-      expect((await repo.getRun(db, fresh.id))?.status).toBe("running");
+    it("rastrea los proyectos en producción con Search Console o GA4, no los de desarrollo, archivados ni sin conexión", async () => {
+      const client = await clients.createClient({ name: "Otro" }, db);
+      const prod = (await projects.createProject(client.id, { name: "Prod", baseUrl: "https://p.test", phase: "production" }, db)).id;
+      const dev = (await projects.createProject(client.id, { name: "Dev", baseUrl: "https://d.test" }, db)).id;
+      const archived = (await projects.createProject(client.id, { name: "Arch", baseUrl: "https://a.test", phase: "production" }, db)).id;
+      const none = (await projects.createProject(client.id, { name: "Sin", baseUrl: "https://n.test", phase: "production" }, db)).id;
+      const cloudflareOnly = (await projects.createProject(client.id, { name: "CF", baseUrl: "https://c.test", phase: "production" }, db)).id;
+      for (const [projectId, kind] of [[prod, "gsc"], [dev, "gsc"], [archived, "ga4"], [cloudflareOnly, "cloudflare"], [prod, "ga4"]] as const) {
+        await db.insert(s.seoIntegrations).values({ projectId, kind, externalId: "x", status: "ok" });
+      }
+      await db.update(s.projects).set({ deletedAt: new Date() }).where(eq(s.projects.id, archived));
+      void none;
+      expect(await repo.listCrawlProjectIds(db)).toEqual([prod]);
     });
   });
 

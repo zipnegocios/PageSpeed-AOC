@@ -30,6 +30,14 @@ export const SEO_SYNC_JOB = "seo-sync";
 export const SEO_SYNC_SCHEDULER_ID = "seo-sync";
 export const SEO_SYNC_CRON = "37 5 * * *";
 
+/** Rastreo técnico de los sitios (cola seo): el agendador semanal solo encola; cada rastreo es un trabajo propio con su `runId`. */
+export const SEO_CRAWL_JOB = "seo-crawl";
+export const SEO_CRAWL_WEEKLY_JOB = "seo-crawl-weekly";
+export const SEO_CRAWL_SCHEDULER_ID = "seo-crawl-weekly";
+/** Domingos a las 04:23 UTC, antes de la descarga diaria de datos (05:37) y lejos del respaldo (03:17). */
+export const SEO_CRAWL_CRON = "23 4 * * 0";
+export const crawlJobId = (runId: string) => `seo-crawl-${runId}`;
+
 export type ProjectSchedule = { projectId: string; pattern: string | null; next: Date | null };
 
 /**

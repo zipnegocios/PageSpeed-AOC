@@ -94,17 +94,24 @@ describe("línea base", () => {
 });
 
 describe("acceso", () => {
-  it("página con error 4xx, 5xx o sin respuesta, con su estado y si está en el sitemap", () => {
+  it("página con error 4xx, 5xx o sin respuesta que nadie enlaza (por ejemplo, del sitemap), con su estado", () => {
     for (const status of [404, 500, 0]) {
-      const issues = run(withPage("/a", { status, facts: null }));
-      expect(on(issues, "status_error")).toEqual(["/a"]);
+      const issues = run([...healthyPages(), page("/sola", { status, facts: null })]);
+      expect(on(issues, "status_error")).toEqual(["/sola"]);
       expect(issues.find((i) => i.code === "status_error")?.evidence).toMatchObject({ status, inSitemap: true });
     }
   });
 
-  it("bucle de redirecciones: un solo hallazgo, sin ruido de otros", () => {
-    const issues = run(withPage("/a", { loop: true, hops: 5, status: 0, facts: null }));
-    expect(on(issues, "redirect_loop")).toEqual(["/a"]);
+  it("una página con error que sí enlazan otras se informa una sola vez, como enlace roto", () => {
+    const issues = run(withPage("/a", { status: 404, facts: null }));
+    expect(on(issues, "broken_link")).toEqual(["/a"]);
+    expect(on(issues, "status_error")).toEqual([]);
+    expect(issues.find((i) => i.code === "broken_link")?.evidence).toMatchObject({ status: 404, count: 1, from: ["/"], inSitemap: true });
+  });
+
+  it("bucle de redirecciones: se informa como bucle y no además como página con error", () => {
+    const issues = run([...healthyPages(), page("/sola", { loop: true, hops: 5, status: 0, facts: null })]);
+    expect(on(issues, "redirect_loop")).toEqual(["/sola"]);
     expect(on(issues, "status_error")).toEqual([]);
   });
 
