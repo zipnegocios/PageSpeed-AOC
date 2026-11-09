@@ -272,6 +272,13 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
   que ni caiga a cero al final ni se compare contra menos días. No se muestran «usuarios»: GA4 los entrega por día, página, país y canal, y
   sumarlos cuenta varias veces a la misma persona. Código: `domain/seo-data.ts` (puro), `services/seo-data.ts`
   (`getSeoDashboard`, solo agregaciones SQL) y `app/admin/seo/_components/`.
+- **Idiomas del sitio (fase 1b):** la tarjeta «Idiomas del sitio» (pestaña SEO del proyecto) declara los idiomas por **prefijo de ruta**
+  (`/es`, `/en`…), no por país: el idioma por defecto usa `/` y las páginas fuera de todo prefijo declarado quedan en «Sin idioma». Un
+  prefijo por idioma, códigos de 2 o 3 letras; la tarjeta sugiere los prefijos que ya aparecen en los datos descargados. Con idiomas
+  declarados, la pantalla gana un selector (`?idioma=es`, `?idioma=none`; se conserva junto a `?dias=`) que filtra todos los indicadores,
+  gráficos y rankings, y una tabla «Por idioma» con clics, impresiones y sesiones de cada uno. Tabla `seo_markets` (migración `0014`),
+  **entra en los respaldos**. Código: `domain/seo-markets.ts` (puro), `repositories/seo-markets.ts` (filtro SQL por prefijo) y
+  `services/seo-markets.ts`.
 - **Despliegue:** el cambio toca `src/server` y la lista de respaldos del worker: despliega **primero el web** (aplica la migración)
   y **después el worker**.
 

@@ -99,6 +99,13 @@
       "when": 1794215251372,
       "tag": "0013_seo_datos",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794220335254,
+      "tag": "0014_seo_idiomas",
+      "breakpoints": true
     }
   ]
 }

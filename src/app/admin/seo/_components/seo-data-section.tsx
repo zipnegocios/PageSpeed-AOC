@@ -79,9 +79,16 @@ const periodText = (r: { from: string; to: string }, p: { from: string; to: stri
  * diarios y rankings de Search Console, GA4 y visitas desde asistentes de IA. El llamador debe haber comprobado que el
  * proyecto tiene alguna conexión (gsc o ga4).
  */
-export async function SeoDataSection({ projectId, basePath, dias }: { projectId: string; basePath: string; dias: string | string[] | undefined }) {
+export async function SeoDataSection({ projectId, basePath, dias, idioma }: { projectId: string; basePath: string; dias: string | string[] | undefined; idioma?: string | string[] | undefined }) {
   const days = parseSeoPeriod(dias);
-  const d = await getSeoDashboard(projectId, { days });
+  const d = await getSeoDashboard(projectId, { days, lang: Array.isArray(idioma) ? idioma[0] : idioma });
+  // Enlaces del selector de periodo y de idioma: cada uno conserva lo que eligió el otro.
+  const href = (p: number, lang: string | null) => `${basePath}?dias=${p}${lang ? `&idioma=${lang}` : ""}#${ANCHOR}`;
+  // El selector no cambia de orden con el volumen: «Todos», los idiomas declarados y, si hay, «Sin idioma» al final.
+  const noLanguage = d.languages?.find((l) => l.lang === "none");
+  const languageItems = d.languages
+    ? [{ lang: null as string | null, label: "Todos" }, ...d.markets.map((m) => ({ lang: m.lang as string | null, label: m.label })), ...(noLanguage ? [{ lang: "none" as string | null, label: noLanguage.label }] : [])]
+    : [];
   const { search, traffic, ai } = d;
   const hasGsc = d.sync.gsc !== null;
   const hasGa4 = d.sync.ga4 !== null;
@@ -91,7 +98,8 @@ export async function SeoDataSection({ projectId, basePath, dias }: { projectId:
   return (
     <div id={ANCHOR} className="scroll-mt-4">
       <Card title="Tráfico y búsqueda" description="Qué tanto aparece el sitio en Google y qué visitas recibe, con el cambio frente al periodo anterior.">
-        <SegmentedNav label="Periodo" items={SEO_PERIODS.map((p) => ({ label: SEO_PERIOD_LABEL[p], href: `${basePath}?dias=${p}#${ANCHOR}`, current: p === days }))} />
+        <SegmentedNav label="Periodo" items={SEO_PERIODS.map((p) => ({ label: SEO_PERIOD_LABEL[p], href: href(p, d.lang), current: p === days }))} />
+        {languageItems.length > 0 ? <SegmentedNav label="Idioma" items={languageItems.map((l) => ({ label: l.label, href: href(days, l.lang), current: l.lang === d.lang }))} /> : null}
 
         <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface-100 p-3 md:p-4">
           <ul className="grid gap-4 md:grid-cols-2">
@@ -106,7 +114,7 @@ export async function SeoDataSection({ projectId, basePath, dias }: { projectId:
             Aún no hay datos: pulsa «Actualizar ahora» para descargarlos de Google. La primera descarga puede tardar unos minutos; después se actualizan solos cada día.
           </p>
         ) : (
-          <Dashboard d={d} days={days} noGsc={noGsc} noGa4={noGa4} search={search} traffic={traffic} ai={ai} />
+          <Dashboard d={d} days={days} noGsc={noGsc} noGa4={noGa4} search={search} traffic={traffic} ai={ai} href={href} />
         )}
       </Card>
     </div>
@@ -121,7 +129,9 @@ function Dashboard({
   search,
   traffic,
   ai,
+  href,
 }: {
+  href: (days: number, lang: string | null) => string;
   d: SeoDashboard;
   days: number;
   noGsc: string;
@@ -134,6 +144,8 @@ function Dashboard({
   const t = traffic;
   const sp = s?.previousTotals;
   const clickTotal = s?.totals.clicks ?? 0;
+  const languageClicks = d.languages?.reduce((a, l) => a + l.clicks, 0) ?? 0;
+  const languageSessions = d.languages?.reduce((a, l) => a + l.sessions, 0) ?? 0;
   const sessionTotal = t?.totals.sessions ?? 0;
 
   return (
@@ -166,6 +178,24 @@ function Dashboard({
         {s ? <SeoChart title="Clics por día" unit="clics" series={s.daily.map((p) => ({ date: p.date, value: p.clicks }))} tone={1} /> : null}
         {t ? <SeoChart title="Sesiones por día" unit="sesiones" series={t.daily.map((p) => ({ date: p.date, value: p.sessions }))} tone={2} /> : null}
       </div>
+
+      {d.languages && d.languages.length > 0 ? (
+        <Group title="Por idioma" period="El reparto entre todos los idiomas, sin importar el que tengas elegido arriba.">
+          <DataTable
+            title="Clics y sesiones por idioma"
+            columns={[
+              { header: "Idioma", cell: (r) => <a href={href(days, r.lang)} className="font-semibold text-ink underline underline-offset-2 hover:text-primary">{r.label}</a> },
+              { header: "Clics", numeric: true, cell: (r) => (s ? formatCount(r.clicks) : "—") },
+              { header: "% de clics", numeric: true, hideOnMobile: true, cell: (r) => (s ? share(r.clicks, languageClicks) : "—") },
+              { header: "Sesiones", numeric: true, cell: (r) => (t ? formatCount(r.sessions) : "—") },
+              { header: "% de sesiones", numeric: true, hideOnMobile: true, cell: (r) => (t ? share(r.sessions, languageSessions) : "—") },
+            ]}
+            rows={d.languages}
+            rowKey={(r) => r.lang}
+            empty="Aún no hay datos por idioma."
+          />
+        </Group>
+      ) : null}
 
       <Group title="Búsqueda en Google">
         <DataTable

@@ -2,13 +2,16 @@ import { and, between, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Database } from "@/server/db/client";
 import { seoAiReferralsDaily, seoSearchDaily, seoTrafficDaily } from "@/server/db/schema";
+import type { Market } from "@/server/domain/seo-markets";
+import { languageCase, type PageFilter } from "./seo-markets";
 
 /**
  * Lecturas agregadas de los datos diarios de búsqueda y tráfico. Todo se agrega en SQL (`group by`, `sum`): nunca se
  * traen filas sin agregar. Las sumas se convierten a `double precision` para que lleguen como número y no como texto.
  */
 
-type Range = { from: string; to: string };
+/** Periodo y, opcionalmente, un filtro de página (para quedarse con un solo idioma). */
+type Range = { from: string; to: string; pageFilter?: PageFilter };
 
 const num = (column: PgColumn | SQL) => sql<number>`coalesce(sum(${column}), 0)::double precision`;
 /** Día como texto «AAAA-MM-DD», sin depender de cómo el controlador convierta las fechas. */
@@ -31,7 +34,7 @@ export async function lastDates(db: Database, projectId: string): Promise<{ sear
 
 export type SearchTotalsRow = { rows: number; clicks: number; impressions: number; positionSum: number };
 
-const searchIn = (projectId: string, r: Range) => and(eq(seoSearchDaily.projectId, projectId), between(seoSearchDaily.date, r.from, r.to));
+const searchIn = (projectId: string, r: Range) => and(eq(seoSearchDaily.projectId, projectId), between(seoSearchDaily.date, r.from, r.to), r.pageFilter?.(seoSearchDaily.page));
 
 export async function searchTotals(db: Database, projectId: string, r: Range): Promise<SearchTotalsRow> {
   const [row] = await db
@@ -71,7 +74,7 @@ export async function searchBy(db: Database, projectId: string, r: Range, by: "p
 
 export type TrafficTotalsRow = { rows: number; sessions: number; users: number };
 
-const trafficIn = (projectId: string, r: Range) => and(eq(seoTrafficDaily.projectId, projectId), between(seoTrafficDaily.date, r.from, r.to));
+const trafficIn = (projectId: string, r: Range) => and(eq(seoTrafficDaily.projectId, projectId), between(seoTrafficDaily.date, r.from, r.to), r.pageFilter?.(seoTrafficDaily.page));
 
 export async function trafficTotals(db: Database, projectId: string, r: Range): Promise<TrafficTotalsRow> {
   const [row] = await db
@@ -101,7 +104,7 @@ export async function trafficBy(db: Database, projectId: string, r: Range, by: "
 
 // ------------------------------------------------------- visitas desde IA
 
-const aiIn = (projectId: string, r: Range) => and(eq(seoAiReferralsDaily.projectId, projectId), between(seoAiReferralsDaily.date, r.from, r.to));
+const aiIn = (projectId: string, r: Range) => and(eq(seoAiReferralsDaily.projectId, projectId), between(seoAiReferralsDaily.date, r.from, r.to), r.pageFilter?.(seoAiReferralsDaily.page));
 
 export async function aiTotals(db: Database, projectId: string, r: Range): Promise<TrafficTotalsRow> {
   const [row] = await db
@@ -121,4 +124,26 @@ export async function aiBy(db: Database, projectId: string, r: Range, by: "sourc
     .groupBy(column)
     .orderBy(desc(sessions), column)
     .limit(limit);
+}
+
+// ------------------------------------------------------ desglose por idioma
+
+/** Clics e impresiones de Search Console por idioma (según el prefijo de la ruta). Ignora cualquier filtro de idioma. */
+export async function searchByLanguage(db: Database, projectId: string, r: { from: string; to: string }, markets: Market[]): Promise<Array<{ lang: string; clicks: number; impressions: number }>> {
+  const lang = languageCase(markets, seoSearchDaily.page);
+  return db
+    .select({ lang, clicks: num(seoSearchDaily.clicks), impressions: num(seoSearchDaily.impressions) })
+    .from(seoSearchDaily)
+    .where(searchIn(projectId, r))
+    .groupBy(sql`1`);
+}
+
+/** Sesiones de GA4 por idioma (según el prefijo de la ruta). */
+export async function trafficByLanguage(db: Database, projectId: string, r: { from: string; to: string }, markets: Market[]): Promise<Array<{ lang: string; sessions: number }>> {
+  const lang = languageCase(markets, seoTrafficDaily.page);
+  return db
+    .select({ lang, sessions: num(seoTrafficDaily.sessions) })
+    .from(seoTrafficDaily)
+    .where(trafficIn(projectId, r))
+    .groupBy(sql`1`);
 }

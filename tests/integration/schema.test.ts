@@ -66,6 +66,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "routes",
       "seo_ai_referrals_daily",
       "seo_integrations",
+      "seo_markets",
       "seo_search_daily",
       "seo_traffic_daily",
       "settings",

@@ -374,6 +374,24 @@ export const seoIntegrations = pgTable(
   (t) => [unique("seo_integrations_project_kind_unique").on(t.projectId, t.kind)],
 );
 
+// ------------------------------------------------------------ seo_markets
+// Idiomas del sitio de un proyecto, identificados por el prefijo de la ruta (`es` → `/es`). El prefijo `/` es el idioma
+// por defecto: lo que no cae bajo ningún otro prefijo. Con esto los datos de búsqueda y tráfico se separan por idioma.
+export const seoMarkets = pgTable(
+  "seo_markets",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // Código de idioma de 2 o 3 letras en minúsculas: es, en, pt.
+    lang: text("lang").notNull(),
+    // Ruta que lo identifica: "/es", "/en"… o "/" para el idioma por defecto.
+    prefix: text("prefix").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.lang] }), unique("seo_markets_project_prefix_unique").on(t.projectId, t.prefix)],
+);
+
 // ------------------------------------------------------ seo_search_daily
 // Search Console: totales por día, página, país y dispositivo. `page` es la ruta normalizada (sin host ni parámetros).
 // La posición media de un grupo se calcula como position_sum / impressions (posición ponderada por impresiones).

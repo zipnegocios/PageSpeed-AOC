@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clearGoogleAccount, removeConnection, saveConnection, saveGoogleAccount, testConnection } from "@/server/services/seo-connections";
+import { addMarket, removeMarket } from "@/server/services/seo-markets";
 import { requestSeoSync } from "@/server/services/seo-sync";
 
 /** Las direcciones llevan slugs de cliente y proyecto: se revalida todo el panel en lugar de adivinar cada ruta. */
@@ -62,5 +63,24 @@ export async function requestSeoSyncAction(projectId: string, _prev: ActionState
     const { queued } = await requestSeoSync(projectId);
     refresh();
     return { ok: queued ? "Actualización pedida. El worker descarga los datos de Google en unos minutos; recarga la página para verlos." : "Ya hay una actualización pendiente para este proyecto." };
+  });
+}
+
+/** Declara un idioma del sitio. Los campos llevan prefijo `market_` para no chocar con otros formularios de la página. */
+export async function addMarketAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const market = await addMarket(projectId, { lang: field(fd, "market_lang"), prefix: field(fd, "market_prefix"), isDefault: fd.get("market_default") === "on" });
+    refresh();
+    return { ok: `${market.label} agregado${market.isDefault ? " como idioma por defecto" : ` con el prefijo ${market.prefix}`}.` };
+  });
+}
+
+export async function removeMarketAction(projectId: string, lang: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await removeMarket(projectId, lang);
+    refresh();
+    return { ok: "Idioma quitado." };
   });
 }

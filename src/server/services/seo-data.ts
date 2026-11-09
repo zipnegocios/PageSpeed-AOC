@@ -12,7 +12,9 @@ import {
   previousRange,
   type DateRange,
 } from "@/server/domain/seo-data";
+import { langLabel, NO_LANG, parseLangParam, ROOT, type Market } from "@/server/domain/seo-markets";
 import * as data from "@/server/repositories/seo-data";
+import * as marketsRepo from "@/server/repositories/seo-markets";
 import * as integrations from "@/server/repositories/seo-integrations";
 import { assertUuid } from "./shared";
 
@@ -37,6 +39,12 @@ export type SeoDashboard = {
   previous: { from: string; to: string } | null;
   /** Estado de la última descarga de cada fuente; null si el proyecto no tiene esa conexión. */
   sync: { gsc: SeoSyncInfo | null; ga4: SeoSyncInfo | null };
+  /** Idiomas declarados del proyecto (vacío si no declaró ninguno). */
+  markets: Array<{ lang: string; prefix: string; isDefault: boolean; label: string }>;
+  /** Idioma aplicado a todos los números (`?idioma=`), o null si se ven todos. */
+  lang: string | null;
+  /** Reparto por idioma de Search Console y GA4, siempre sobre todos los idiomas. Null si no hay idiomas declarados. */
+  languages: Array<{ lang: string; label: string; isDefault: boolean; clicks: number; impressions: number; sessions: number }> | null;
   /** Search Console. Null si no hay filas en el periodo. */
   search: {
     /** Periodo mostrado: termina en el último día con datos de Search Console (suele ir ~3 días por detrás de hoy). */
@@ -88,14 +96,15 @@ const searchTotals = (row: data.SearchTotalsRow): SearchTotals => ({
 const syncInfo = (row: integrations.SeoIntegration | undefined): SeoSyncInfo | null =>
   row ? { status: row.syncStatus, syncedThrough: row.syncedThrough, lastSyncAt: row.lastSyncAt, detail: row.syncDetail } : null;
 
-async function loadSearch(db: Database, projectId: string, range: DateRange, prev: DateRange): Promise<SeoDashboard["search"]> {
+async function loadSearch(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["search"]> {
+  const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
   const [current, before, daily, pages, countries, devices] = await Promise.all([
-    data.searchTotals(db, projectId, range),
-    data.searchTotals(db, projectId, prev),
-    data.searchDaily(db, projectId, range),
-    data.searchBy(db, projectId, range, "page", TOP_PAGES),
-    data.searchBy(db, projectId, range, "country", TOP_COUNTRIES),
-    data.searchBy(db, projectId, range, "device", 3),
+    data.searchTotals(db, projectId, scope(range)),
+    data.searchTotals(db, projectId, scope(prev)),
+    data.searchDaily(db, projectId, scope(range)),
+    data.searchBy(db, projectId, scope(range), "page", TOP_PAGES),
+    data.searchBy(db, projectId, scope(range), "country", TOP_COUNTRIES),
+    data.searchBy(db, projectId, scope(range), "device", 3),
   ]);
   if (current.rows === 0) return null;
   return {
@@ -110,14 +119,15 @@ async function loadSearch(db: Database, projectId: string, range: DateRange, pre
   };
 }
 
-async function loadTraffic(db: Database, projectId: string, range: DateRange, prev: DateRange): Promise<SeoDashboard["traffic"]> {
+async function loadTraffic(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["traffic"]> {
+  const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
   const [current, before, daily, channels, pages, countries] = await Promise.all([
-    data.trafficTotals(db, projectId, range),
-    data.trafficTotals(db, projectId, prev),
-    data.trafficDaily(db, projectId, range),
-    data.trafficBy(db, projectId, range, "channel", TOP_CHANNELS),
-    data.trafficBy(db, projectId, range, "page", TOP_PAGES),
-    data.trafficBy(db, projectId, range, "country", TOP_COUNTRIES),
+    data.trafficTotals(db, projectId, scope(range)),
+    data.trafficTotals(db, projectId, scope(prev)),
+    data.trafficDaily(db, projectId, scope(range)),
+    data.trafficBy(db, projectId, scope(range), "channel", TOP_CHANNELS),
+    data.trafficBy(db, projectId, scope(range), "page", TOP_PAGES),
+    data.trafficBy(db, projectId, scope(range), "country", TOP_COUNTRIES),
   ]);
   if (current.rows === 0) return null;
   return {
@@ -132,12 +142,13 @@ async function loadTraffic(db: Database, projectId: string, range: DateRange, pr
   };
 }
 
-async function loadAi(db: Database, projectId: string, range: DateRange, prev: DateRange): Promise<SeoDashboard["ai"]> {
+async function loadAi(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["ai"]> {
+  const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
   const [current, before, sources, pages] = await Promise.all([
-    data.aiTotals(db, projectId, range),
-    data.aiTotals(db, projectId, prev),
-    data.aiBy(db, projectId, range, "source", TOP_AI_SOURCES),
-    data.aiBy(db, projectId, range, "page", TOP_AI_PAGES),
+    data.aiTotals(db, projectId, scope(range)),
+    data.aiTotals(db, projectId, scope(prev)),
+    data.aiBy(db, projectId, scope(range), "source", TOP_AI_SOURCES),
+    data.aiBy(db, projectId, scope(range), "page", TOP_AI_PAGES),
   ]);
   if (current.rows === 0) return null;
   return {
@@ -150,18 +161,43 @@ async function loadAi(db: Database, projectId: string, range: DateRange, prev: D
   };
 }
 
+async function loadLanguages(db: Database, projectId: string, s: DateRange, t: DateRange, markets: Market[]): Promise<NonNullable<SeoDashboard["languages"]>> {
+  const [search, traffic] = await Promise.all([data.searchByLanguage(db, projectId, s, markets), data.trafficByLanguage(db, projectId, t, markets)]);
+  const rows = new Map(markets.map((m) => [m.lang, { lang: m.lang, label: langLabel(m.lang), isDefault: m.prefix === ROOT, clicks: 0, impressions: 0, sessions: 0 }]));
+  for (const r of search) {
+    const row = rows.get(r.lang) ?? { lang: r.lang, label: langLabel(r.lang), isDefault: false, clicks: 0, impressions: 0, sessions: 0 };
+    row.clicks += r.clicks;
+    row.impressions += r.impressions;
+    rows.set(r.lang, row);
+  }
+  for (const r of traffic) {
+    const row = rows.get(r.lang) ?? { lang: r.lang, label: langLabel(r.lang), isDefault: false, clicks: 0, impressions: 0, sessions: 0 };
+    row.sessions += r.sessions;
+    rows.set(r.lang, row);
+  }
+  // «Sin idioma» solo aparece si de verdad hay páginas que no encajan en ningún prefijo.
+  const list = [...rows.values()].filter((r) => r.lang !== NO_LANG || r.clicks + r.sessions > 0);
+  return list.sort((a, b) => b.clicks + b.sessions - (a.clicks + a.sessions) || a.label.localeCompare(b.label, "es"));
+}
+
 /**
  * Todo lo que muestra la sección «Tráfico y búsqueda» de un proyecto: totales del periodo y del anterior, series
  * diarias, rankings y estado de la última descarga. El periodo termina en el último día con datos, no en «hoy».
  */
-export async function getSeoDashboard(projectId: string, opts: { days: number }, db: Database = getDb()): Promise<SeoDashboard> {
+export async function getSeoDashboard(projectId: string, opts: { days: number; /** Código de idioma (`?idioma=`); lo que no sirva se ignora. */ lang?: string }, db: Database = getDb()): Promise<SeoDashboard> {
   assertUuid(projectId, "Proyecto");
   if (!Number.isInteger(opts.days) || opts.days < 1 || opts.days > 366) throw new DomainError("INVALID", "El periodo debe ser de 1 a 366 días.");
-  const [rows, last] = await Promise.all([integrations.listForProject(db, projectId), data.lastDates(db, projectId)]);
+  const [rows, last, declared] = await Promise.all([integrations.listForProject(db, projectId), data.lastDates(db, projectId), marketsRepo.listMarkets(db, projectId)]);
+  // Para mostrar: el idioma por defecto primero y luego por nombre (igual que getMarkets).
+  const markets = declared
+    .map((m) => ({ lang: m.lang, prefix: m.prefix, isDefault: m.prefix === ROOT, label: langLabel(m.lang) }))
+    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.label.localeCompare(b.label, "es"));
+  const lang = parseLangParam(opts.lang, declared) ?? null;
+  const filter = lang ? marketsRepo.languageFilter(declared, lang) : undefined;
   const sync = { gsc: syncInfo(rows.find((r) => r.kind === "gsc")), ga4: syncInfo(rows.find((r) => r.kind === "ga4")) };
 
   const end = latestDate([last.search, last.traffic, last.ai]);
-  if (!end) return { range: null, previous: null, sync, search: null, traffic: null, ai: null };
+  if (!end) return { range: null, previous: null, sync, markets, lang, languages: null, search: null, traffic: null, ai: null };
 
   const range = periodRange(end, opts.days);
   const prev = previousRange(range);
@@ -173,6 +209,11 @@ export async function getSeoDashboard(projectId: string, opts: { days: number },
   };
   const s = forSource(last.search);
   const t = forSource(latestDate([last.traffic, last.ai]));
-  const [search, traffic, ai] = await Promise.all([loadSearch(db, projectId, s.r, s.p), loadTraffic(db, projectId, t.r, t.p), loadAi(db, projectId, t.r, t.p)]);
-  return { range, previous: { from: prev.from, to: prev.to }, sync, search, traffic, ai };
+  const [search, traffic, ai, languages] = await Promise.all([
+    loadSearch(db, projectId, s.r, s.p, filter),
+    loadTraffic(db, projectId, t.r, t.p, filter),
+    loadAi(db, projectId, t.r, t.p, filter),
+    declared.length > 0 ? loadLanguages(db, projectId, s.r, t.r, declared) : Promise.resolve(null),
+  ]);
+  return { range, previous: { from: prev.from, to: prev.to }, sync, markets, lang, languages, search, traffic, ai };
 }

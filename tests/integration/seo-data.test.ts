@@ -40,7 +40,7 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
     db.insert(s.seoAiReferralsDaily).values({ projectId: project, date, source, page, sessions, users });
 
   it("sin datos: rango nulo, secciones nulas y estado de descarga según las conexiones", async () => {
-    expect(await getSeoDashboard(projectId, { days: 28 }, db)).toEqual({ range: null, previous: null, sync: { gsc: null, ga4: null }, search: null, traffic: null, ai: null });
+    expect(await getSeoDashboard(projectId, { days: 28 }, db)).toEqual({ range: null, previous: null, sync: { gsc: null, ga4: null }, markets: [], lang: null, languages: null, search: null, traffic: null, ai: null });
 
     await db.insert(s.seoIntegrations).values([
       { projectId, kind: "gsc", externalId: "sc-domain:acme.test", syncStatus: "ok", syncedThrough: "2026-06-29", lastSyncAt: new Date("2026-06-30T10:00:00Z"), syncDetail: "Descargados 12 días." },
