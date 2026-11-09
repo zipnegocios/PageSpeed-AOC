@@ -30,3 +30,35 @@ describe("cuenta de servicio desde una variable de entorno", () => {
     expect(() => parseServiceAccountEnv(Buffer.from("no es json").toString("base64"))).toThrow(/ni ese JSON/);
   });
 });
+
+describe("el mensaje describe qué parece el valor sin mostrarlo", () => {
+  const msg = (v: string) => {
+    try {
+      parseServiceAccountEnv(v);
+    } catch (err) {
+      return (err as Error).message;
+    }
+    return "";
+  };
+  const apiKey = "AIzaSyDx1234567890abcdefghijklmnopqrstuv";
+
+  it("reconoce una clave de API", () => {
+    expect(msg(apiKey)).toMatch(/Parece una clave de API.*cuenta de servicio/);
+    expect(msg(`"${apiKey}"`)).toMatch(/clave de API/);
+    expect(msg(apiKey)).not.toContain(apiKey);
+  });
+
+  it("reconoce la llave privada sola, una ruta de archivo y un base64 que no es JSON", () => {
+    expect(msg("-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----")).toMatch(/llave privada sola/);
+    expect(msg("/etc/secretos/llave.json")).toMatch(/ruta o el nombre de un archivo/);
+    expect(msg("llave-servicio.json")).toMatch(/ruta o el nombre de un archivo/);
+    expect(msg("C:\\Users\\yo\\llave.json")).toMatch(/ruta o el nombre de un archivo/);
+    const b64 = Buffer.from("esto no es un json, es solo texto largo para superar el mínimo").toString("base64");
+    expect(msg(b64)).toMatch(/Parece base64 \(\d+ caracteres\), pero al decodificarlo no es un JSON/);
+  });
+
+  it("describe un mensaje de error pegado por accidente y cualquier otra cosa", () => {
+    expect(msg("base64: invalid option -- w")).toMatch(/espacios o saltos de línea.*no se generó bien/);
+    expect(msg("valor-raro")).toMatch(/Tiene 10 caracteres y no empieza por «\{»/);
+  });
+});

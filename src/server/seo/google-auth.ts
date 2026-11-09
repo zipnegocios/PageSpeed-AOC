@@ -28,12 +28,25 @@ export function parseServiceAccountKey(text: string): ServiceAccountKey {
  * JSON codificado en base64, que evita los problemas de comillas de algunos editores de variables. Tolera que el valor
  * venga envuelto en comillas.
  */
+/**
+ * Qué parece el valor que no sirvió, para que el mensaje oriente sin mostrar su contenido (puede ser un secreto):
+ * solo se dice el tipo de cosa que parece y cuántos caracteres tiene.
+ */
+function describeEnvValue(text: string): string {
+  if (/^AIza[\w-]{30,}$/.test(text)) return "Parece una clave de API (empieza por «AIza»). Esa no sirve: hace falta el JSON de una cuenta de servicio.";
+  if (/^-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text)) return "Parece la llave privada sola. Hace falta el archivo JSON completo, que la incluye junto al correo de la cuenta.";
+  if (/^["']?(\/|~|\.{1,2}\/|[A-Za-z]:\\)/.test(text) || /\.json["']?$/i.test(text)) return "Parece una ruta o el nombre de un archivo. Hay que poner el contenido del archivo, no dónde está.";
+  if (/^[A-Za-z0-9+/=\s]+$/.test(text) && text.replace(/\s/g, "").length >= 40) return `Parece base64 (${text.replace(/\s/g, "").length} caracteres), pero al decodificarlo no es un JSON. Revisa que se codificó el archivo correcto y completo.`;
+  if (/\s/.test(text)) return `Tiene ${text.length} caracteres con espacios o saltos de línea y no empieza por «{»: si es un mensaje de error de un comando, el valor no se generó bien.`;
+  return `Tiene ${text.length} caracteres y no empieza por «{». Debe ser el JSON (empieza por «{») o ese JSON en base64.`;
+}
+
 export function parseServiceAccountEnv(value: string): ServiceAccountKey {
   let text = value.trim();
   if (text.length > 1 && (text[0] === "'" || text[0] === '"') && text.endsWith(text[0] as string)) text = text.slice(1, -1).trim();
   if (text.startsWith("{")) return parseServiceAccountKey(text);
   const decoded = Buffer.from(text, "base64").toString("utf8").trim();
-  if (!decoded.startsWith("{")) throw new Error("El valor no es el JSON de la cuenta de servicio ni ese JSON codificado en base64.");
+  if (!decoded.startsWith("{")) throw new Error(`El valor no es el JSON de la cuenta de servicio ni ese JSON codificado en base64. ${describeEnvValue(text)}`);
   return parseServiceAccountKey(decoded);
 }
 
