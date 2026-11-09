@@ -54,7 +54,8 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 2. El **worker** se redespliega a mano cuando el cambio toca `src/worker`, `src/server`, dependencias o `docker/Dockerfile.worker`. Cada entrega indica si hace falta.
 3. Si el cambio incluye migración, despliega primero el web (la aplica) y luego el worker.
 4. Redesplegar el worker espera a que termine la auditoría en curso (apagado ordenado). No pierde la cola: está en Redis y Postgres.
-5. **Marcha atrás**: en EasyPanel, vuelve a desplegar el commit anterior. Las migraciones solo añaden: un commit anterior sigue funcionando con el esquema nuevo. Si una migración fue destructiva, restaura un respaldo (sección 5).
+5. La imagen del worker instala sus dependencias **con las versiones exactas de `pnpm-lock.yaml`** (también las indirectas), así que lo que corre en producción es lo que se probó y un proveedor que publique sus paquetes a medias no rompe el despliegue. Al actualizar dependencias, cambia el lockfile y vuelve a desplegar el worker.
+6. **Marcha atrás**: en EasyPanel, vuelve a desplegar el commit anterior. Las migraciones solo añaden: un commit anterior sigue funcionando con el esquema nuevo. Si una migración fue destructiva, restaura un respaldo (sección 5).
 
 ## 5. Respaldos y restauración
 

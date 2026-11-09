@@ -3,6 +3,7 @@
 // eso y nada más (sin Next, React ni Tailwind). Uso: node scripts/worker-manifest.mjs
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { builtinModules, createRequire } from "node:module";
+import { lockOverrides } from "./worker-lock.mjs";
 
 const dir = new URL("../dist/worker/", import.meta.url);
 const entry = new URL("index.js", dir);
@@ -39,6 +40,10 @@ for (const name of unique) {
   dependencies[name] = JSON.parse(readFileSync(manifestPath, "utf8")).version;
 }
 
+// Las dependencias indirectas se fijan a las versiones del lockfile: lo que corre en producción es lo que se probó.
+const lockFile = new URL("../pnpm-lock.yaml", import.meta.url);
+const overrides = existsSync(lockFile) ? lockOverrides(readFileSync(lockFile, "utf8"), unique) : {};
+
 const manifest = {
   name: "pagespeed-worker",
   version: "0.0.0",
@@ -46,6 +51,7 @@ const manifest = {
   type: "module",
   engines: { node: ">=22.19" },
   dependencies,
+  overrides,
 };
 writeFileSync(new URL("package.json", dir), JSON.stringify(manifest, null, 2) + "\n");
-console.log(`worker-manifest: ${unique.length} dependencias -> ${unique.join(", ")}`);
+console.log(`worker-manifest: ${unique.length} dependencias -> ${unique.join(", ")} (+ ${Object.keys(overrides).length} indirectas fijadas por el lockfile)`);
