@@ -6,7 +6,8 @@ import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clientPath, projectPath } from "@/lib/urls";
 import { parsePeriod } from "@/server/domain/history";
-import { requestAudit } from "@/server/services/audits";
+import { describeFirstScan } from "@/server/domain/first-scan";
+import { requestAudit, requestFirstScan } from "@/server/services/audits";
 import { sendProjectReport } from "@/server/services/report-email";
 import { requestFieldDataRefresh } from "@/server/services/crux";
 import { clearProjectAuth, setProjectAuth } from "@/server/services/project-auth";
@@ -128,7 +129,7 @@ export async function importRoutesAction(id: string, _prev: ActionState, fd: For
       fd.getAll("path").map((p) => String(p)),
     );
     refresh(id);
-    return { ok: `${result.added} rutas activadas para monitoreo${result.skipped ? ` (${result.skipped} ya existían)` : ""}.` };
+    return { ok: `${result.added} rutas activadas para monitoreo${result.skipped ? ` (${result.skipped} ya existían)` : ""}. Ya puedes lanzar el primer escaneo desde el botón «Escanear» de la tarjeta Rutas.` };
   });
 }
 
@@ -173,6 +174,16 @@ export async function requestAuditAction(
     refresh(projectId);
     if (result.created === 0) return { ok: "Ya había una auditoría pendiente para esta ruta." };
     return { ok: result.created === 1 ? "Auditoría en cola." : `${result.created} auditorías en cola (móvil y escritorio).` };
+  });
+}
+
+/** Primer escaneo: móvil y escritorio en todas las rutas que todavía no tienen auditoría. */
+export async function requestFirstScanAction(projectId: string, _prev: ActionState): Promise<ActionState> {
+  const session = await verifySession();
+  return guarded(async () => {
+    const result = await requestFirstScan(projectId, { requestedBy: session.email });
+    refresh(projectId);
+    return { ok: describeFirstScan(result) };
   });
 }
 

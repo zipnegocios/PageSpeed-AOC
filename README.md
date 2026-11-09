@@ -39,6 +39,13 @@ evalúa las alertas y lo avisa en los logs.
   id). Al dispararse, el worker pide móvil y escritorio de cada ruta monitoreada. Pasar a desarrollo, cambiar
   la frecuencia o archivar actualiza el agendador; si Redis no responde en ese momento, el cambio se guarda
   igual y la reconciliación lo corrige.
+- **Primer escaneo:** en la tarjeta *Rutas* de la ficha del proyecto, el botón «Escanear N rutas (móvil y escritorio)» lanza ambos
+  dispositivos en todas las rutas que todavía no tienen auditoría (en cola, en curso o terminada con éxito; una fallida se reintenta).
+  Sirve en desarrollo y en producción, y también para rutas inactivas. Deja para después las rutas que piden sesión si el proyecto no
+  tiene «Acceso a páginas privadas» configurado, y las de un host ya no permitido. Respeta el límite de la cola (50 esperando): si se
+  llena a la mitad, conserva lo encolado, dice cuántas quedaron fuera y basta volver a pulsar cuando avance. Sin worker en línea
+  falla con el mismo aviso que «Auditar». Pulsarlo dos veces no duplica nada. Código: `domain/first-scan.ts` y `requestFirstScan`
+  en `services/audits.ts`.
 - **Panel de inicio (`/admin`):** el primer pantallazo tras el login, organizado en paneles sólidos con esquinas HUD sobre una
   retícula técnica: resumen de la flota (rendimiento medio, SEO/Accesibilidad/Buenas prácticas, alertas, en curso), una
   tarjeta por proyecto (anillos de puntuación, agentes, miniatura de 30 días, última auditoría), auditorías recientes de

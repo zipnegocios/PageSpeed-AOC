@@ -3,7 +3,8 @@ import type { Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import { getDb, type Database } from "@/server/db/client";
 import { assertRouteAuditable, planProfiles, type AuditTrigger, type Profile } from "@/server/domain/audit-rules";
-import { DomainError } from "@/server/domain/errors";
+import { DomainError, isDomainError } from "@/server/domain/errors";
+import { coveredKey, planFirstScan, type FirstScanPlan, type FirstScanResult } from "@/server/domain/first-scan";
 import { readHeartbeat } from "@/server/queue/heartbeat";
 import { failedChecks, type CategoryChecks } from "@/server/domain/failed-checks";
 import { topOpportunities, type LhrLike, type Opportunity } from "@/server/domain/score-extraction";
@@ -11,7 +12,7 @@ import { getRedis } from "@/server/queue/connection";
 import { auditJobOptions, lighthouseQueue, PRIORITY, type AuditJobData } from "@/server/queue/queues";
 import * as repo from "@/server/repositories/audits";
 import { findProject } from "@/server/repositories/projects";
-import { findRoute } from "@/server/repositories/routes";
+import { findRoute, listRoutes } from "@/server/repositories/routes";
 import { localizeLhr, type UiLocale } from "@/server/report/lighthouse-report";
 import { getR2, type R2Store } from "@/server/storage/r2";
 import { assertUuid, isUniqueViolation } from "./shared";
@@ -113,6 +114,47 @@ export async function requestAudit(input: RequestAuditInput, deps: RequestAuditD
     created++;
   }
   return { audits, created, alreadyPending };
+}
+
+/** Qué falta por auditar en el primer escaneo del proyecto: rutas y perfiles sin auditoría. */
+export async function getFirstScanPlan(projectId: string, db: Database = getDb()): Promise<FirstScanPlan> {
+  assertUuid(projectId, "Proyecto");
+  const project = await findProject(db, projectId);
+  if (!project) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+  const [routes, covered] = await Promise.all([listRoutes(db, projectId), repo.listCovered(db, projectId)]);
+  return planFirstScan(
+    routes,
+    new Set(covered.map((c) => coveredKey(c.routeId, c.profile))),
+    { authConfigured: project.authStrategy !== "none" && project.authConfigEnc !== null, allowedHosts: project.allowedHosts },
+  );
+}
+
+/**
+ * Primer escaneo: lanza móvil y escritorio en todas las rutas que todavía no tienen auditoría. Respeta el límite de la
+ * cola: si se llena a la mitad, deja lo ya encolado y dice cuántas quedaron fuera. Si el worker no está en línea o la
+ * cola ya estaba llena antes de empezar, falla con el mismo aviso que el botón «Auditar» de cada ruta.
+ */
+export async function requestFirstScan(projectId: string, input: { requestedBy: string }, deps: RequestAuditDeps = {}): Promise<FirstScanResult> {
+  const db = deps.db ?? getDb();
+  const plan = await getFirstScanPlan(projectId, db);
+  const result: FirstScanResult = { queued: 0, routesQueued: 0, alreadyPending: 0, remaining: 0, skippedAuth: plan.skippedAuth, skippedHost: plan.skippedHost };
+
+  let processed = 0;
+  for (const item of plan.items) {
+    try {
+      const r = await requestAudit({ routeId: item.routeId, profiles: item.profiles, trigger: "manual", requestedBy: input.requestedBy }, { ...deps, db });
+      result.queued += r.created;
+      result.alreadyPending += r.alreadyPending;
+      if (r.created > 0) result.routesQueued += 1;
+      processed += item.profiles.length;
+    } catch (err) {
+      // Con algo ya encolado, una cola llena o un Redis que se cae a la mitad no deshacen lo hecho: se informa lo que quedó.
+      if (isDomainError(err) && (err.code === "CONFLICT" || err.code === "UPSTREAM") && result.queued > 0) break;
+      throw err;
+    }
+  }
+  result.remaining = plan.audits - processed;
+  return result;
 }
 
 export async function listAudits(projectId: string, limit = 20, db: Database = getDb()) {

@@ -69,6 +69,14 @@ export async function findPending(db: Database, routeId: string, profile: "mobil
   return row;
 }
 
+/** Rutas y perfiles del proyecto que ya tienen una auditoría en cola, en curso o terminada con éxito. */
+export async function listCovered(db: Database, projectId: string): Promise<Array<{ routeId: string; profile: "mobile" | "desktop" }>> {
+  return db
+    .selectDistinct({ routeId: auditLogs.routeId, profile: auditLogs.profile })
+    .from(auditLogs)
+    .where(and(eq(auditLogs.projectId, projectId), inArray(auditLogs.status, ["queued", "running", "succeeded"])));
+}
+
 export async function insertAudit(db: Database, values: typeof auditLogs.$inferInsert): Promise<AuditLog> {
   const [row] = await db.insert(auditLogs).values(values).returning();
   if (!row) throw new Error("No se pudo crear la auditoría");
