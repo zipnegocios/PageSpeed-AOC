@@ -55,6 +55,7 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     const project = await projects.createProject(client.id, { name: "Tienda", baseUrl: "https://acme.test" }, db);
     await db.update(s.projects).set({ phase: "production", authConfigEnc: Buffer.from([1, 2, 3, 250]) }).where(eq(s.projects.id, project.id));
     const home = await routes.addRoute(project.id, { path: "/" }, db);
+    await db.insert(s.seoIntegrations).values({ projectId: project.id, kind: "cloudflare", externalId: "a".repeat(32), credentialEnc: Buffer.from([9, 8, 7, 250]), status: "ok", detail: "Acceso correcto", lastCheckedAt: new Date("2026-10-30T09:00:00.123Z"), lastOkAt: new Date("2026-10-30T09:00:00.123Z") });
     const [a] = await db
       .insert(s.auditLogs)
       .values({

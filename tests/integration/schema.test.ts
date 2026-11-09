@@ -62,6 +62,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "notifications",
       "projects",
       "routes",
+      "seo_integrations",
       "settings",
     ]);
   });

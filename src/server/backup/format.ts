@@ -10,6 +10,7 @@ export const BACKUP_TABLES: ReadonlyArray<{ name: string; table: PgTable; order:
   { name: "clients", table: s.clients, order: [s.clients.id] },
   { name: "projects", table: s.projects, order: [s.projects.id] },
   { name: "routes", table: s.routes, order: [s.routes.id] },
+  { name: "seo_integrations", table: s.seoIntegrations, order: [s.seoIntegrations.id] },
   { name: "alert_thresholds", table: s.alertThresholds, order: [s.alertThresholds.projectId, s.alertThresholds.metric] },
   { name: "audit_logs", table: s.auditLogs, order: [s.auditLogs.id] },
   { name: "alert_states", table: s.alertStates, order: [s.alertStates.id] },

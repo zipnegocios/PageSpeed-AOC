@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin", label: "Panel", exact: true },
   { href: "/admin/proyectos", label: "Proyectos" },
   { href: "/admin/clientes", label: "Clientes" },
+  { href: "/admin/seo", label: "SEO" },
   { href: "/admin/archivados", label: "Archivados" },
   { href: "/admin/alertas", label: "Alertas" },
   { href: "/admin/agentes", label: "Agentes" },
@@ -24,12 +25,16 @@ export function AdminNav({ showTeam = false }: { showTeam?: boolean }) {
       {(showTeam ? [...ITEMS, TEAM_ITEM] : [...ITEMS]).map((item) => {
         // /admin/clientes/<cliente>/<proyecto> es una ficha de proyecto: cuenta como "Proyectos", no como "Clientes".
         const isProjectPage = /^\/admin\/clientes\/[^/]+\/[^/]+/.test(pathname);
+        // La pestaña SEO de un proyecto (/admin/clientes/<cliente>/<proyecto>/seo) cuenta como «SEO».
+        const isProjectSeoPage = /^\/admin\/clientes\/[^/]+\/[^/]+\/seo(\/|$)/.test(pathname);
         const active =
           item.href === "/admin/proyectos"
-            ? pathname === item.href || pathname.startsWith(`${item.href}/`) || isProjectPage
+            ? pathname === item.href || pathname.startsWith(`${item.href}/`) || (isProjectPage && !isProjectSeoPage)
             : item.href === "/admin/clientes"
               ? (pathname === item.href || pathname.startsWith(`${item.href}/`)) && !isProjectPage
-              : "exact" in item && item.exact
+              : item.href === "/admin/seo"
+                ? pathname === item.href || pathname.startsWith(`${item.href}/`) || isProjectSeoPage
+                : "exact" in item && item.exact
                 ? pathname === item.href
                 : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (

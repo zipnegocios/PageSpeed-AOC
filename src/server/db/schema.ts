@@ -52,6 +52,8 @@ export const auditProfile = pgEnum("audit_profile", ["mobile", "desktop"]);
 export const auditTrigger = pgEnum("audit_trigger", ["scheduled", "manual", "mcp"]);
 export const auditStatus = pgEnum("audit_status", ["queued", "running", "succeeded", "failed"]);
 export const alertKind = pgEnum("alert_kind", ["threshold", "audit_failure"]);
+export const seoIntegrationKind = pgEnum("seo_integration_kind", ["gsc", "ga4", "cloudflare"]);
+export const seoIntegrationStatus = pgEnum("seo_integration_status", ["pending", "ok", "error"]);
 export const alertStateStatus = pgEnum("alert_state_status", ["open", "resolved", "suppressed"]);
 export const notificationType = pgEnum("notification_type", [
   "initial",
@@ -337,6 +339,31 @@ export const fieldData = pgTable(
     unique("field_data_unique").on(t.projectId, t.target, t.formFactor),
     check("field_data_status", sql`${t.status} in ('ok', 'no_data')`),
   ],
+);
+
+// ------------------------------------------------------ seo_integrations
+// Fuentes de datos del módulo SEO y visibilidad en IA, por proyecto. La cuenta de servicio de Google es una sola
+// para todo el panel (vive cifrada en `settings`); aquí solo van el identificador de la propiedad y, para
+// Cloudflare, el token de solo lectura (cifrado con AUTH_ENCRYPTION_KEY, igual que el acceso a páginas privadas).
+export const seoIntegrations = pgTable(
+  "seo_integrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    kind: seoIntegrationKind("kind").notNull(),
+    // gsc: propiedad ("sc-domain:ejemplo.com" o "https://ejemplo.com/"); ga4: ID numérico; cloudflare: ID de zona.
+    externalId: text("external_id").notNull(),
+    credentialEnc: bytea("credential_enc"),
+    status: seoIntegrationStatus("status").notNull().default("pending"),
+    // Mensaje legible del último chequeo. Nunca contiene credenciales.
+    detail: text("detail"),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    lastOkAt: timestamp("last_ok_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [unique("seo_integrations_project_kind_unique").on(t.projectId, t.kind)],
 );
 
 // -------------------------------------------------------- mcp_api_keys

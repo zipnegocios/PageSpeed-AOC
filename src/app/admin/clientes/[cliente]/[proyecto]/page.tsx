@@ -95,7 +95,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         { label: "Clientes", href: "/admin/clientes" },
         { label: project.clientName, href: clientPath(project.clientSlug) },
       ]}
-      actions={<Badge tone={production ? "primary" : "neutral"}>{production ? "Producción" : "Desarrollo"}</Badge>}
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={`${base}/seo`} className="press inline-flex min-h-11 items-center rounded-md border border-border-strong px-4 text-[17px] font-semibold text-ink hover:bg-surface-300">
+            SEO y visibilidad
+          </Link>
+          <Badge tone={production ? "primary" : "neutral"}>{production ? "Producción" : "Desarrollo"}</Badge>
+        </div>
+      }
     >
       <section aria-labelledby="paginas-titulo" className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">

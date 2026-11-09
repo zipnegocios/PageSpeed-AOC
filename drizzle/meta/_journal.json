@@ -64,6 +64,13 @@
       "when": 1794187123433,
       "tag": "0008_claves_rotacion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794204053981,
+      "tag": "0009_seo_conexiones",
+      "breakpoints": true
     }
   ]
 }

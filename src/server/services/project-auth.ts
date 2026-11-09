@@ -14,7 +14,8 @@ export function authKeyStatus(key?: string): KeyStatus {
   return keyStatus(keyOf(key));
 }
 
-function requireKey(key?: string): string {
+/** La clave de cifrado de credenciales, o un error legible si falta o no es válida. */
+export function requireEncryptionKey(key?: string): string {
   const k = keyOf(key);
   const status = keyStatus(k);
   if (status === "missing") throw new DomainError("INVALID", "Falta AUTH_ENCRYPTION_KEY en el servicio. Defínela (openssl rand -base64 32) en el web y en el worker antes de guardar credenciales.");
@@ -57,7 +58,7 @@ export async function setProjectAuth(
   options: { key?: string } = {},
 ): Promise<AuthSummary> {
   assertUuid(projectId, "Proyecto");
-  const key = requireKey(options.key);
+  const key = requireEncryptionKey(options.key);
   const project = await findProject(db, projectId);
   if (!project) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
 

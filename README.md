@@ -222,6 +222,25 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 - Probar con el inspector oficial: `npx @modelcontextprotocol/inspector` (transporte HTTP, cabecera Authorization);
   las pruebas de integración usan el cliente MCP real del SDK.
 
+## SEO y visibilidad (en construcción)
+
+Módulo aparte, dentro del mismo panel, para medir cómo se encuentra y se usa cada sitio: búsqueda (Search Console), visitas
+(GA4), bots de IA (Cloudflare) y, más adelante, auditoría SEO técnica y presencia en asistentes de IA. Diseño, plan y fases en
+el documento de diseño del módulo; lo que existe hoy es la **primera pieza: las conexiones**.
+
+- **Menú SEO** (`/admin/seo`): la **cuenta de servicio de Google** se configura una sola vez para todo el panel (pasos en
+  pantalla, se pega la llave JSON, se comprueba con Google al guardar y queda cifrada con `AUTH_ENCRYPTION_KEY` en `settings`; solo
+  se muestra su correo). Debajo, el estado de las conexiones de cada proyecto.
+- **Pestaña SEO de un proyecto** (`/admin/clientes/<cliente>/<proyecto>/seo`, con acceso desde su ficha): una tarjeta por fuente
+  (Search Console, GA4, Cloudflare) con los pasos para dar acceso al correo de la cuenta de servicio, el campo del identificador
+  (propiedad de GSC, ID numérico de GA4, ID de zona y token de Cloudflare, cifrado) y **Probar conexión**, que responde en español
+  qué corregir (por ejemplo, «agrega este correo con el rol Lector»). Los identificadores se validan y normalizan al guardar.
+- Datos: tabla `seo_integrations` (migración `0009`), una fila por proyecto y fuente; **entra en los respaldos diarios**. El código de
+  los clientes de Google y Cloudflare vive en `src/server/seo/` y lo comparten la plataforma y los scripts del piloto
+  (`scripts/spike-seo/`, ver su README). Servicio: `services/seo-connections.ts`; reglas puras: `domain/seo-connections.ts`.
+- **Despliegue:** el cambio toca `src/server` y la lista de respaldos del worker: despliega **primero el web** (aplica la migración)
+  y **después el worker**.
+
 ## Operación, respaldos y endurecimiento
 
 - **Runbook:** `docs/runbook.md` (recursos, despliegues, incidentes, rotación de secretos, prueba de aceptación).
