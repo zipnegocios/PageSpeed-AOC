@@ -181,40 +181,92 @@ export type GuardedFetchOptions = {
 
 export type GuardedResponse = { status: number; finalUrl: string; contentType: string; text: string };
 
+export type HopOptions = {
+  allowedHosts: string[];
+  timeoutMs?: number;
+  maxBytes?: number;
+  /** Si la respuesta pasa de `maxBytes`: false = error (por defecto); true = se entrega lo leído y `truncated: true`. */
+  truncate?: boolean;
+  accept?: string;
+  userAgent?: string;
+  /** Solo para pruebas: permite conectar a direcciones privadas. Nunca en producción. */
+  allowPrivate?: boolean;
+};
+
+/** Una sola petición, sin seguir redirecciones: el estado, las cabeceras que importan y el cuerpo (no se lee en las 3xx). */
+export type HopResponse = {
+  status: number;
+  url: string;
+  contentType: string;
+  location: string | null;
+  xRobotsTag: string | null;
+  text: string;
+  truncated: boolean;
+};
+
+/**
+ * Una petición GET con todas las salvaguardas anti-SSRF: solo http(s), host dentro de la lista permitida, sin IP privadas
+ * (también al resolver el DNS), límite de tiempo y de tamaño. No sigue redirecciones: quien llama decide, y vuelve a
+ * llamar con el destino, que se valida igual.
+ */
+export async function fetchHop(rawUrl: string, opts: HopOptions): Promise<HopResponse> {
+  const { allowedHosts, timeoutMs = 8000, maxBytes = 5_000_000, truncate = false, allowPrivate = false } = opts;
+  const url = parseHttpUrl(rawUrl);
+  assertHostAllowed(url, allowedHosts);
+  const host = normalizeHost(url.hostname);
+  if (isIP(host) && !allowPrivate && isPrivateAddress(host)) {
+    throw new DomainError("FORBIDDEN_HOST", "No se permite conectar a direcciones privadas o reservadas.");
+  }
+
+  let response;
+  try {
+    response = await undiciFetch(url, {
+      redirect: "manual",
+      dispatcher: agentFor(allowPrivate),
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { "user-agent": opts.userAgent ?? "PageSpeed/1.0", accept: opts.accept ?? "*/*" },
+    });
+  } catch (err) {
+    throw translateFetchError(err, host);
+  }
+
+  const base = {
+    status: response.status,
+    url: url.toString(),
+    contentType: response.headers.get("content-type") ?? "",
+    location: response.headers.get("location"),
+    xRobotsTag: response.headers.get("x-robots-tag"),
+  };
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel().catch(() => undefined);
+    return { ...base, text: "", truncated: false };
+  }
+  try {
+    const body = await readCapped(response.body, maxBytes, truncate);
+    return { ...base, ...body };
+  } catch (err) {
+    if (err instanceof DomainError) throw err;
+    // Un corte de conexión a mitad del cuerpo.
+    throw translateFetchError(err, host);
+  }
+}
+
 /**
  * GET con salvaguardas anti-SSRF: solo http(s), host dentro de la lista permitida en cada salto
  * de redirección, sin IPs privadas, con límite de tiempo, de tamaño y de redirecciones.
  */
 export async function fetchGuarded(rawUrl: string, opts: GuardedFetchOptions): Promise<GuardedResponse> {
-  const { allowedHosts, timeoutMs = 8000, maxBytes = 5_000_000, maxRedirects = 3, allowPrivate = false } = opts;
+  const { maxRedirects = 3 } = opts;
   let url = parseHttpUrl(rawUrl);
 
   for (let hop = 0; ; hop++) {
-    assertHostAllowed(url, allowedHosts);
-    const host = normalizeHost(url.hostname);
-    if (isIP(host) && !allowPrivate && isPrivateAddress(host)) {
-      throw new DomainError("FORBIDDEN_HOST", "No se permite conectar a direcciones privadas o reservadas.");
-    }
-
-    let response;
-    try {
-      response = await undiciFetch(url, {
-        redirect: "manual",
-        dispatcher: agentFor(allowPrivate),
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: { "user-agent": "PageSpeed/1.0", accept: opts.accept ?? "*/*" },
-      });
-    } catch (err) {
-      throw translateFetchError(err, host);
-    }
+    const response = await fetchHop(url.toString(), opts);
 
     if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      await response.body?.cancel().catch(() => undefined);
-      if (!location) throw new DomainError("UPSTREAM", "El sitio respondió una redirección sin destino.");
+      if (!response.location) throw new DomainError("UPSTREAM", "El sitio respondió una redirección sin destino.");
       if (hop >= maxRedirects) throw new DomainError("UPSTREAM", "Demasiadas redirecciones.");
       try {
-        url = parseHttpUrl(new URL(location, url).toString());
+        url = parseHttpUrl(new URL(response.location, url).toString());
       } catch (err) {
         if (err instanceof DomainError) throw err;
         throw new DomainError("UPSTREAM", "El sitio redirige a una dirección no válida.");
@@ -222,27 +274,25 @@ export async function fetchGuarded(rawUrl: string, opts: GuardedFetchOptions): P
       continue;
     }
 
-    const text = await readCapped(response.body, maxBytes);
-    return {
-      status: response.status,
-      finalUrl: url.toString(),
-      contentType: response.headers.get("content-type") ?? "",
-      text,
-    };
+    return { status: response.status, finalUrl: url.toString(), contentType: response.contentType, text: response.text };
   }
 }
 
-async function readCapped(body: AsyncIterable<Uint8Array> | null, maxBytes: number): Promise<string> {
-  if (!body) return "";
+async function readCapped(body: AsyncIterable<Uint8Array> | null, maxBytes: number, truncate: boolean): Promise<{ text: string; truncated: boolean }> {
+  if (!body) return { text: "", truncated: false };
   const chunks: Uint8Array[] = [];
   let total = 0;
   for await (const chunk of body) {
+    if (total + chunk.byteLength > maxBytes) {
+      // Salir del bucle cierra el iterador y cancela la descarga.
+      if (!truncate) throw new DomainError("UPSTREAM", "La respuesta es demasiado grande.");
+      chunks.push(chunk.subarray(0, maxBytes - total));
+      return { text: Buffer.concat(chunks).toString("utf8"), truncated: true };
+    }
     total += chunk.byteLength;
-    // Salir del bucle cierra el iterador y cancela la descarga.
-    if (total > maxBytes) throw new DomainError("UPSTREAM", "La respuesta es demasiado grande.");
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return { text: Buffer.concat(chunks).toString("utf8"), truncated: false };
 }
 
 function translateFetchError(err: unknown, host: string): DomainError {
