@@ -1,0 +1,9 @@
+{
+  "brands": ["Marca de ejemplo"],
+  "domain": "ejemplo.com",
+  "prompts": [
+    { "lang": "es", "prompt": "¿Cuáles son las mejores empresas de desarrollo web para pymes?" },
+    { "lang": "es", "prompt": "¿Qué empresa recomiendas para una tienda en línea en Latinoamérica?" },
+    { "lang": "en", "prompt": "What are the best web development agencies for small businesses?" }
+  ]
+}
