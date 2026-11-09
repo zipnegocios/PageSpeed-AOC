@@ -42,7 +42,8 @@ const fetchImpl: FetchLike = async (url) => {
   if (url.endsWith("/client/v4/graphql")) return fake.cfGraphql === "ok" ? json({ data: { viewer: { zones: [{ httpRequestsAdaptiveGroups: [] }] } } }) : json({ data: { viewer: { zones: [] } } });
   throw new Error(`URL inesperada: ${url}`);
 };
-const deps = { key: KEY, fetchImpl, sleep: async () => undefined };
+// googleEnv: null = sin variable de entorno, para que la del equipo donde se corren las pruebas no interfiera.
+const deps = { key: KEY, fetchImpl, sleep: async () => undefined, googleEnv: null as string | null };
 
 describe.skipIf(!dbUrl)("conexiones SEO", () => {
   const { db, pool } = createDb(dbUrl ?? "", 4);
@@ -71,14 +72,14 @@ describe.skipIf(!dbUrl)("conexiones SEO", () => {
     it("la guarda cifrada, comprueba que Google la acepta y solo muestra el correo", async () => {
       expect(await getGoogleAccount(db, deps)).toEqual({ configured: false });
       expect(await withGoogle()).toEqual({ email: EMAIL });
-      expect(await getGoogleAccount(db, deps)).toEqual({ configured: true, email: EMAIL });
+      expect(await getGoogleAccount(db, deps)).toEqual({ configured: true, email: EMAIL, source: "panel" });
       expect(fake.calls).toContain("https://oauth2.googleapis.com/token");
       const [row] = await db.select().from(s.settings).where(eq(s.settings.key, "seo.google_service_account"));
       const stored = JSON.stringify(row!.value);
       expect(stored).not.toContain("PRIVATE KEY");
       expect(stored).not.toContain(JSON.parse(saKeyJson).private_key.slice(40, 80));
       // Con otra clave de cifrado se ve, pero no se puede leer.
-      expect(await getGoogleAccount(db, { key: OTHER })).toEqual({ configured: true, email: EMAIL, unreadable: true });
+      expect(await getGoogleAccount(db, { ...deps, key: OTHER })).toEqual({ configured: true, email: EMAIL, source: "panel", unreadable: true });
     });
 
     it("rechaza lo que no es una llave, la que Google no acepta y la falta de clave de cifrado", async () => {
@@ -95,6 +96,60 @@ describe.skipIf(!dbUrl)("conexiones SEO", () => {
       await withGoogle();
       await clearGoogleAccount(db);
       expect(await getGoogleAccount(db, deps)).toEqual({ configured: false });
+    });
+  });
+
+  describe("cuenta de Google por variable de entorno", () => {
+    const asBase64 = () => Buffer.from(saKeyJson).toString("base64");
+
+    it("la reconoce (JSON o base64), muestra solo el correo y se puede usar sin haber pegado nada en el panel", async () => {
+      expect(await getGoogleAccount(db, deps)).toEqual({ configured: false });
+      for (const value of [saKeyJson, asBase64(), `'${saKeyJson}'`, `  ${asBase64()}\n`]) {
+        expect(await getGoogleAccount(db, { ...deps, googleEnv: value })).toEqual({ configured: true, email: EMAIL, source: "env" });
+      }
+      // No se guardó nada en la base.
+      expect(await db.select().from(s.settings)).toHaveLength(0);
+
+      const { project } = await setup();
+      await saveConnection(project.id, "gsc", { externalId: "acme.test" }, db, deps);
+      const r = await testConnection(project.id, "gsc", db, { ...deps, googleEnv: asBase64() });
+      expect(r).toEqual({ ok: true, detail: "Acceso correcto como propietario." });
+      expect(fake.calls).toContain("https://oauth2.googleapis.com/token");
+    });
+
+    it("funciona aunque falte AUTH_ENCRYPTION_KEY: esa cuenta no se guarda en la base", async () => {
+      const { project } = await setup();
+      await saveConnection(project.id, "ga4", { externalId: "123456789" }, db, deps);
+      const r = await testConnection(project.id, "ga4", db, { ...deps, key: undefined, googleEnv: saKeyJson });
+      expect(r.ok).toBe(true);
+    });
+
+    it("manda sobre la guardada en el panel", async () => {
+      await withGoogle();
+      const other = JSON.stringify({ client_email: "otra@demo.iam.gserviceaccount.com", private_key: JSON.parse(saKeyJson).private_key });
+      expect(await getGoogleAccount(db, { ...deps, googleEnv: other })).toEqual({ configured: true, email: "otra@demo.iam.gserviceaccount.com", source: "env" });
+      expect(await getGoogleAccount(db, deps)).toEqual({ configured: true, email: EMAIL, source: "panel" });
+    });
+
+    it("si el valor no sirve lo dice con el nombre de la variable y las pruebas de conexión lo repiten", async () => {
+      for (const bad of ["AIzaSyEjemploDeUnaClaveDeApi1234567890abcd", "{ no es json", JSON.stringify({ client_email: EMAIL })]) {
+        const summary = await getGoogleAccount(db, { ...deps, googleEnv: bad });
+        expect(summary.configured).toBe(false);
+        expect("envError" in summary ? summary.envError : "").toContain("GOOGLE_SERVICE_ACCOUNT_JSON");
+      }
+      const { project } = await setup();
+      await saveConnection(project.id, "gsc", { externalId: "acme.test" }, db, deps);
+      const r = await testConnection(project.id, "gsc", db, { ...deps, googleEnv: "AIzaSyEjemploDeUnaClaveDeApi1234567890abcd" });
+      expect(r.ok).toBe(false);
+      expect(r.detail).toMatch(/GOOGLE_SERVICE_ACCOUNT_JSON no sirve/);
+    });
+
+    it("con la variable definida, el panel no guarda ni quita la cuenta y explica por qué", async () => {
+      await expect(saveGoogleAccount(saKeyJson, db, { ...deps, googleEnv: saKeyJson })).rejects.toThrow(/variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON/);
+      await expect(clearGoogleAccount(db, { ...deps, googleEnv: saKeyJson })).rejects.toThrow(/EasyPanel/);
+      // Una variable vacía cuenta como no definida.
+      expect(await getGoogleAccount(db, { ...deps, googleEnv: "   " })).toEqual({ configured: false });
+      await expect(saveGoogleAccount(saKeyJson, db, { ...deps, googleEnv: "" })).resolves.toEqual({ email: EMAIL });
     });
   });
 

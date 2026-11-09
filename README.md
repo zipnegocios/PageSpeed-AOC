@@ -243,9 +243,11 @@ Módulo aparte, dentro del mismo panel, para medir cómo se encuentra y se usa c
 (GA4), bots de IA (Cloudflare) y, más adelante, auditoría SEO técnica y presencia en asistentes de IA. Diseño, plan y fases en
 el documento de diseño del módulo; lo que existe hoy es la **primera pieza: las conexiones**.
 
-- **Menú SEO** (`/admin/seo`): la **cuenta de servicio de Google** se configura una sola vez para todo el panel (pasos en
-  pantalla, se pega la llave JSON, se comprueba con Google al guardar y queda cifrada con `AUTH_ENCRYPTION_KEY` en `settings`; solo
-  se muestra su correo). Debajo, el estado de las conexiones de cada proyecto.
+- **Menú SEO** (`/admin/seo`): la **cuenta de servicio de Google** se configura una sola vez para todo el panel, de dos formas: con la
+  variable de entorno **`GOOGLE_SERVICE_ACCOUNT_JSON`** en el servicio web (el JSON de la llave en una línea, o ese JSON en base64:
+  `base64 -w0 llave.json`; manda sobre la otra y no se guarda en la base), o pegando la llave en pantalla (se comprueba con Google al
+  guardar y queda cifrada con `AUTH_ENCRYPTION_KEY` en `settings`). En ambos casos solo se muestra su correo. **No sirve una clave de
+  API**: Search Console y GA4 acceden a datos privados y exigen una cuenta de servicio (OAuth). Debajo, el estado de las conexiones de cada proyecto.
 - **Pestaña SEO de un proyecto** (`/admin/clientes/<cliente>/<proyecto>/seo`, con acceso desde su ficha): una tarjeta por fuente
   (Search Console, GA4, Cloudflare) con los pasos para dar acceso al correo de la cuenta de servicio, el campo del identificador
   (propiedad de GSC, ID numérico de GA4, ID de zona y token de Cloudflare, cifrado) y **Probar conexión**, que responde en español

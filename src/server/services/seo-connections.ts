@@ -15,7 +15,7 @@ import * as repo from "@/server/repositories/seo-integrations";
 import { deleteSetting, getSetting, setSetting } from "@/server/repositories/settings";
 import { buildAiCrawlerQuery, cfGraphql, verifyToken } from "@/server/seo/cloudflare";
 import { GA4_SCOPE, runReport } from "@/server/seo/ga4";
-import { getAccessToken, parseServiceAccountKey, type ServiceAccountKey } from "@/server/seo/google-auth";
+import { getAccessToken, parseServiceAccountEnv, parseServiceAccountKey, type ServiceAccountKey } from "@/server/seo/google-auth";
 import { GSC_SCOPE, listSites } from "@/server/seo/gsc";
 import { SpikeHttpError, type FetchLike } from "@/server/seo/http";
 import { requireEncryptionKey } from "./project-auth";
@@ -24,9 +24,14 @@ import { assertUuid } from "./shared";
 /** Dónde se guarda la cuenta de servicio de Google: una sola para todo el panel, cifrada. */
 const GOOGLE_ACCOUNT_SETTING = "seo.google_service_account";
 
+/** Variable de entorno con la cuenta de servicio de Google. Si existe, manda sobre la guardada en el panel. */
+export const GOOGLE_ACCOUNT_ENV = "GOOGLE_SERVICE_ACCOUNT_JSON";
+
 type Deps = {
   /** Solo pruebas: clave de cifrado distinta de AUTH_ENCRYPTION_KEY. */
   key?: string;
+  /** Solo pruebas: valor de GOOGLE_SERVICE_ACCOUNT_JSON (null = sin definir), en lugar del entorno real. */
+  googleEnv?: string | null;
   /** Solo pruebas: sustituye a `fetch`. */
   fetchImpl?: FetchLike;
   sleep?: (ms: number) => Promise<void>;
@@ -37,16 +42,39 @@ const keyOf = (deps: Deps) => deps.key ?? process.env.AUTH_ENCRYPTION_KEY;
 
 // ----------------------------------------------------------- cuenta de Google
 
-export type GoogleAccountSummary = { configured: false } | { configured: true; email: string; unreadable?: boolean };
+export type GoogleAccountSummary =
+  | { configured: false; /** La variable de entorno existe pero su contenido no sirve. */ envError?: string }
+  | { configured: true; email: string; /** `env`: viene de la variable de entorno; `panel`: se pegó en el panel. */ source: "env" | "panel"; unreadable?: boolean };
+
+/** Valor de la variable de entorno, o null si no está definida o está vacía. */
+function envValue(deps: Deps): string | null {
+  const value = deps.googleEnv !== undefined ? deps.googleEnv : process.env[GOOGLE_ACCOUNT_ENV];
+  return value && value.trim() ? value : null;
+}
+
+/** La cuenta de la variable de entorno: la llave o un mensaje que dice qué está mal. Null si no hay variable. */
+function readEnvAccount(deps: Deps): { account: ServiceAccountKey } | { error: string } | null {
+  const value = envValue(deps);
+  if (value === null) return null;
+  try {
+    return { account: parseServiceAccountEnv(value) };
+  } catch (err) {
+    return { error: `La variable ${GOOGLE_ACCOUNT_ENV} no sirve: ${err instanceof Error ? err.message : "formato no válido"}` };
+  }
+}
+
+const ENV_MANAGED = `La cuenta de Google viene de la variable de entorno ${GOOGLE_ACCOUNT_ENV}. Para cambiarla, edita la variable en EasyPanel y reinicia el servicio.`;
 
 export async function getGoogleAccount(db: Database = getDb(), deps: Deps = {}): Promise<GoogleAccountSummary> {
+  const fromEnv = readEnvAccount(deps);
+  if (fromEnv) return "account" in fromEnv ? { configured: true, email: fromEnv.account.client_email, source: "env" } : { configured: false, envError: fromEnv.error };
   const stored = await getSetting<{ enc?: string; email?: string }>(db, GOOGLE_ACCOUNT_SETTING);
   if (!stored?.enc || !stored.email) return { configured: false };
   try {
     decryptJson(Buffer.from(stored.enc, "base64"), keyOf(deps));
-    return { configured: true, email: stored.email };
+    return { configured: true, email: stored.email, source: "panel" };
   } catch {
-    return { configured: true, email: stored.email, unreadable: true };
+    return { configured: true, email: stored.email, source: "panel", unreadable: true };
   }
 }
 
@@ -55,6 +83,7 @@ export async function getGoogleAccount(db: Database = getDb(), deps: Deps = {}):
  * una llave mal pegada o desactivada se rechaza aquí y no más tarde, al probar cada proyecto.
  */
 export async function saveGoogleAccount(raw: string, db: Database = getDb(), deps: Deps = {}): Promise<{ email: string }> {
+  if (envValue(deps) !== null) throw new DomainError("CONFLICT", ENV_MANAGED);
   const encryptionKey = requireEncryptionKey(deps.key);
   let account: ServiceAccountKey;
   try {
@@ -78,11 +107,17 @@ export async function saveGoogleAccount(raw: string, db: Database = getDb(), dep
   return { email: account.client_email };
 }
 
-export async function clearGoogleAccount(db: Database = getDb()): Promise<void> {
+export async function clearGoogleAccount(db: Database = getDb(), deps: Deps = {}): Promise<void> {
+  if (envValue(deps) !== null) throw new DomainError("CONFLICT", ENV_MANAGED);
   await deleteSetting(db, GOOGLE_ACCOUNT_SETTING);
 }
 
 async function loadGoogleAccount(db: Database, deps: Deps): Promise<ServiceAccountKey | null> {
+  const fromEnv = readEnvAccount(deps);
+  if (fromEnv) {
+    if ("error" in fromEnv) throw new DomainError("INVALID", fromEnv.error);
+    return fromEnv.account;
+  }
   const stored = await getSetting<{ enc?: string }>(db, GOOGLE_ACCOUNT_SETTING);
   if (!stored?.enc) return null;
   try {

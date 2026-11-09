@@ -23,6 +23,20 @@ export function parseServiceAccountKey(text: string): ServiceAccountKey {
   return { client_email: key.client_email, private_key: key.private_key };
 }
 
+/**
+ * Cuenta de servicio desde una variable de entorno. Acepta el JSON de la llave (en una línea o en varias) o ese mismo
+ * JSON codificado en base64, que evita los problemas de comillas de algunos editores de variables. Tolera que el valor
+ * venga envuelto en comillas.
+ */
+export function parseServiceAccountEnv(value: string): ServiceAccountKey {
+  let text = value.trim();
+  if (text.length > 1 && (text[0] === "'" || text[0] === '"') && text.endsWith(text[0] as string)) text = text.slice(1, -1).trim();
+  if (text.startsWith("{")) return parseServiceAccountKey(text);
+  const decoded = Buffer.from(text, "base64").toString("utf8").trim();
+  if (!decoded.startsWith("{")) throw new Error("El valor no es el JSON de la cuenta de servicio ni ese JSON codificado en base64.");
+  return parseServiceAccountKey(decoded);
+}
+
 const cache = new Map<string, { token: string; expiresAt: number }>();
 
 /**

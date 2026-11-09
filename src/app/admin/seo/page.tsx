@@ -11,7 +11,7 @@ import { CopyButton } from "@/lib/ui/components/copy-button";
 import { TextareaField } from "@/lib/ui/components/field";
 import { KIND_LABEL, SEO_KINDS } from "@/server/domain/seo-connections";
 import { authKeyStatus } from "@/server/services/project-auth";
-import { getGoogleAccount, getSeoOverview } from "@/server/services/seo-connections";
+import { getGoogleAccount, getSeoOverview, GOOGLE_ACCOUNT_ENV } from "@/server/services/seo-connections";
 import { AdminShell } from "../_components/admin-shell";
 import { clearGoogleAccountAction, saveGoogleAccountAction } from "./actions";
 
@@ -44,7 +44,7 @@ export default async function SeoPage() {
       <Card
         title="Cuenta de servicio de Google"
         description="Se configura una sola vez para todo el panel. Con ella se leen Search Console y GA4 de los clientes que te den acceso."
-        actions={<Badge tone={google.configured && !google.unreadable ? "ok" : google.configured ? "danger" : "neutral"}>{google.configured ? (google.unreadable ? "No se puede leer" : "Conectada") : "Sin configurar"}</Badge>}
+        actions={<Badge tone={google.configured && !google.unreadable ? "ok" : google.configured || google.envError ? "danger" : "neutral"}>{google.configured ? (google.unreadable ? "No se puede leer" : "Conectada") : google.envError ? "Variable no válida" : "Sin configurar"}</Badge>}
       >
         {keyStatus !== "ok" ? (
           <Alert tone="danger">
@@ -54,6 +54,8 @@ export default async function SeoPage() {
           </Alert>
         ) : null}
 
+        {!google.configured && google.envError ? <Alert tone="danger">{google.envError}</Alert> : null}
+
         {google.configured ? (
           <div className="flex flex-col gap-2">
             <p className="text-[15px] leading-5 text-ink-muted">Correo de la cuenta (es el que se agrega en cada cliente):</p>
@@ -61,6 +63,11 @@ export default async function SeoPage() {
             <div>
               <CopyButton value={google.email} label="Copiar el correo" />
             </div>
+            {google.source === "env" ? (
+              <p className="text-[15px] leading-5 text-ink-muted">
+                Viene de la variable de entorno <span className="font-mono text-ink">{GOOGLE_ACCOUNT_ENV}</span>. Para cambiarla, edítala en EasyPanel y reinicia el servicio.
+              </p>
+            ) : null}
             {!google.unreadable ? (
               <Alert tone="info">
                 Siguiente paso: abre la pestaña <strong>SEO</strong> de un proyecto (desde la lista de abajo) y agrega ese correo en el Search Console y el GA4 del cliente. Ahí mismo la plataforma te lo explica paso a paso.
@@ -70,34 +77,48 @@ export default async function SeoPage() {
           </div>
         ) : null}
 
-        <details className="rounded-sm border border-border p-4" open={!google.configured}>
-          <summary className="cursor-pointer text-[19px] font-semibold text-ink">{google.configured ? "Cambiar la llave" : "Cómo conectarla"}</summary>
-          <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-[15px] leading-5 text-ink-muted">
-            <li>
-              En {ext("https://console.cloud.google.com/apis/library", "Google Cloud")}, crea un proyecto (o usa el de CrUX) y habilita <strong className="text-ink">Google Search Console API</strong> y <strong className="text-ink">Google Analytics Data API</strong>.
-            </li>
-            <li>
-              En {ext("https://console.cloud.google.com/iam-admin/serviceaccounts", "Cuentas de servicio")}, crea una cuenta (sin roles). Dentro de ella, <strong className="text-ink">Claves → Agregar clave → Crear clave nueva → JSON</strong>.
-            </li>
-            <li>Abre el archivo descargado, copia todo su contenido y pégalo abajo. Se guarda cifrado y no se vuelve a mostrar.</li>
-            <li>Después, en la pestaña SEO de cada proyecto, la plataforma te dice dónde agregar el correo de la cuenta.</li>
-          </ol>
-          <ActionForm action={saveGoogleAccountAction} submitLabel="Guardar y comprobar" pendingLabel="Comprobando con Google…" resetOnSuccess className="mt-4 max-w-2xl">
-            <TextareaField
-              label="Contenido del archivo JSON"
-              id="serviceAccount"
-              required
-              rows={6}
-              autoComplete="off"
-              spellCheck={false}
-              className="font-mono [-webkit-text-security:disc]"
-              placeholder='{ "type": "service_account", … }'
-              hint="Se comprueba con Google al guardar: si la llave no sirve, te lo dice aquí mismo."
-            />
-          </ActionForm>
-        </details>
+        {!(google.configured && google.source === "env") ? (
+          <details className="rounded-sm border border-border p-4" open={!google.configured}>
+            <summary className="cursor-pointer text-[19px] font-semibold text-ink">{google.configured ? "Cambiar la llave" : "Cómo conectarla"}</summary>
+            <div className="mt-3 flex flex-col gap-3">
+              <Alert tone="info">
+                <strong>No sirve una clave de API</strong> (las de «Claves de API» en Google Cloud): Search Console y Google Analytics acceden a datos privados y exigen una <strong>cuenta de servicio</strong>, que se crea en el paso 2.
+              </Alert>
+              <ol className="flex list-decimal flex-col gap-2 pl-5 text-[15px] leading-5 text-ink-muted">
+                <li>
+                  En {ext("https://console.cloud.google.com/apis/library", "Google Cloud")}, crea un proyecto (o usa el de CrUX) y habilita <strong className="text-ink">Google Search Console API</strong> y <strong className="text-ink">Google Analytics Data API</strong>.
+                </li>
+                <li>
+                  En {ext("https://console.cloud.google.com/iam-admin/serviceaccounts", "Cuentas de servicio")}, crea una cuenta (sin roles). Dentro de ella, <strong className="text-ink">Claves → Agregar clave → Crear clave nueva → JSON</strong>.
+                </li>
+                <li>Abre el archivo descargado y entrega su contenido a la plataforma de una de estas dos formas.</li>
+                <li>Después, en la pestaña SEO de cada proyecto, la plataforma te dice dónde agregar el correo de la cuenta.</li>
+              </ol>
+              <div className="rounded-sm border border-border p-3 text-[15px] leading-5 text-ink-muted">
+                <p className="font-semibold text-ink">Opción A: variable de entorno en EasyPanel</p>
+                <p className="mt-1">
+                  En el servicio web, define <span className="font-mono text-ink">{GOOGLE_ACCOUNT_ENV}</span> con el contenido del archivo (en una sola línea) o con ese mismo contenido codificado en base64 (<span className="font-mono text-ink">base64 -w0 llave.json</span>), y reinicia el servicio. Si la variable existe, el panel la usa y no pide pegar nada.
+                </p>
+              </div>
+              <p className="text-[15px] font-semibold text-ink">Opción B: pegarla aquí (se guarda cifrada)</p>
+            </div>
+            <ActionForm action={saveGoogleAccountAction} submitLabel="Guardar y comprobar" pendingLabel="Comprobando con Google…" resetOnSuccess className="mt-4 max-w-2xl">
+              <TextareaField
+                label="Contenido del archivo JSON"
+                id="serviceAccount"
+                required
+                rows={6}
+                autoComplete="off"
+                spellCheck={false}
+                className="font-mono [-webkit-text-security:disc]"
+                placeholder='{ "type": "service_account", … }'
+                hint="Se comprueba con Google al guardar: si la llave no sirve, te lo dice aquí mismo. No se vuelve a mostrar."
+              />
+            </ActionForm>
+          </details>
+        ) : null}
 
-        {google.configured ? <ActionForm action={clearGoogleAccountAction} submitLabel="Quitar la cuenta" pendingLabel="Quitando…" variant="ghost" /> : null}
+        {google.configured && google.source === "panel" ? <ActionForm action={clearGoogleAccountAction} submitLabel="Quitar la cuenta" pendingLabel="Quitando…" variant="ghost" /> : null}
       </Card>
 
       <Card title={`Proyectos (${overview.length})`} description="Estado de las conexiones de cada proyecto. Entra en uno para conectarlo.">
