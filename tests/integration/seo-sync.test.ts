@@ -263,7 +263,10 @@ describe.skipIf(!(dbUrl && redisUrl))("descarga de datos de Search Console y GA4
     it("sin cuenta de servicio de Google lo dice en cada conexión y no descarga nada", async () => {
       const { project } = await setup();
       const r = await syncProjectSeoData(project.id, db, deps({ googleEnv: null }));
-      expect(r.results.every((x) => !x.ok && /Falta la cuenta de servicio de Google/.test(x.detail))).toBe(true);
+      expect(r.results.every((x) => !x.ok && /Falta la cuenta de servicio de Google en el worker/.test(x.detail))).toBe(true);
+      // Dice dónde falta y qué definir, sin mandar a una pantalla que ya está configurada en el web.
+      expect(r.results[0]!.detail).toContain("GOOGLE_SERVICE_ACCOUNT_JSON");
+      expect(r.results[0]!.detail).toContain("AUTH_ENCRYPTION_KEY");
       expect(fake.calls).toHaveLength(0);
     });
 

@@ -20,6 +20,13 @@ import { assertUuid } from "./shared";
 const ENQUEUE_TIMEOUT_MS = 8_000;
 
 /**
+ * La descarga corre en el worker, que es otro servicio que el web: no comparten variables de entorno. Si el panel dice
+ * «Conectado» pero la descarga falla por esto, la cuenta está en el web y falta en el worker.
+ */
+export const WORKER_NO_ACCOUNT =
+  "Falta la cuenta de servicio de Google en el worker (el web y el worker no comparten variables). Define GOOGLE_SERVICE_ACCOUNT_JSON también en el servicio del worker y redespliégalo. Si la guardaste desde SEO → Cuenta de Google, el worker necesita la misma AUTH_ENCRYPTION_KEY que el web.";
+
+/**
  * Pide al worker descargar ahora los datos de Search Console y GA4 de un proyecto. Si ya hay una petición esperando
  * o en curso, no encola otra. Exige que el proyecto tenga alguna de las dos conexiones y un worker en línea.
  */
@@ -139,7 +146,7 @@ export async function syncProjectSeoData(projectId: string, db: Database = getDb
     const kind = row.kind as SyncKind;
     let result: KindSyncResult;
     try {
-      if (!account) throw new DomainError("INVALID", accountError ?? "Falta la cuenta de servicio de Google. Configúrala en SEO → Cuenta de Google.");
+      if (!account) throw new DomainError("INVALID", accountError ?? WORKER_NO_ACCOUNT);
       result = kind === "gsc" ? await syncGsc(row, account, db, deps, now) : await syncGa4(row, account, db, deps, now);
     } catch (err) {
       let detail = "No se pudieron descargar los datos. Se reintentará en la próxima descarga.";
