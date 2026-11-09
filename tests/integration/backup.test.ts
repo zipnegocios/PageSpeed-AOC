@@ -57,6 +57,18 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     const home = await routes.addRoute(project.id, { path: "/" }, db);
     await db.insert(s.seoIntegrations).values({ projectId: project.id, kind: "cloudflare", externalId: "a".repeat(32), credentialEnc: Buffer.from([9, 8, 7, 250]), status: "ok", detail: "Acceso correcto", lastCheckedAt: new Date("2026-10-30T09:00:00.123Z"), lastOkAt: new Date("2026-10-30T09:00:00.123Z") });
     await db.insert(s.seoMarkets).values([{ projectId: project.id, lang: "es", prefix: "/" }, { projectId: project.id, lang: "en", prefix: "/en" }]);
+    const [crawl] = await db
+      .insert(s.seoCrawlRuns)
+      .values({ projectId: project.id, status: "succeeded", trigger: "manual", queuedAt: new Date("2026-10-30T04:00:00.123Z"), startedAt: new Date("2026-10-30T04:00:01.000Z"), finishedAt: new Date("2026-10-30T04:05:00.456Z"), outcome: "complete", pagesCrawled: 2, pagesDiscovered: 2, requests: 9, limits: { maxPages: 300, pauseMs: 400 }, errors: 1, warnings: 1 })
+      .returning();
+    await db.insert(s.seoCrawlPages).values([
+      { runId: crawl!.id, path: "/", status: 200, inSitemap: true, lang: "es", title: "Título con ñ y «comillas»", descriptionLength: 120, h1Count: 1, canonical: "/", htmlLang: "es", robots: ["noarchive"], hreflang: [{ lang: "es", path: "/" }, { lang: "en", path: "/en" }], jsonLdTypes: ["Organization"], inlinks: 3, contentType: "text/html; charset=utf-8" },
+      { runId: crawl!.id, path: "/rota", status: 404 },
+    ]);
+    await db.insert(s.seoCrawlIssues).values([
+      { runId: crawl!.id, page: "/rota", code: "status_error", severity: "error", lang: "es", evidence: { status: 404, inSitemap: true, from: ["/", "/a"] } },
+      { runId: crawl!.id, page: "", code: "robots_missing", severity: "warning" },
+    ]);
     await db.insert(s.seoSearchDaily).values({ projectId: project.id, date: "2026-10-29", page: "/", country: "col", device: "MOBILE", clicks: 7, impressions: 120, positionSum: 543.25 });
     await db.insert(s.seoTrafficDaily).values({ projectId: project.id, date: "2026-10-29", page: "/", country: "Colombia", channel: "Organic Search", sessions: 5, users: 4 });
     await db.insert(s.seoAiReferralsDaily).values({ projectId: project.id, date: "2026-10-29", source: "chatgpt.com", page: "/", sessions: 2, users: 2 });

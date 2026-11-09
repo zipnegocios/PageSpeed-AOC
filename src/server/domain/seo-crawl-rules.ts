@@ -133,6 +133,28 @@ const REQUIRED_PROPS: Record<string, string[]> = {
 
 const typeName = (t: string) => t.replace(/^https?:\/\/schema\.org\//i, "");
 
+/** Páginas rastreadas que enlazan a cada ruta del sitio, sin contar los enlaces a sí misma ni a otros hosts. */
+export function internalInlinks(pages: CrawledPage[], siteHosts: string[]): Map<string, Set<string>> {
+  const hosts = new Set(siteHosts.map(bare));
+  const inlinks = new Map<string, Set<string>>();
+  for (const p of pages) {
+    if (!auditable(p)) continue;
+    for (const link of p.facts.links) {
+      let host: string;
+      try {
+        host = bare(new URL(link).hostname);
+      } catch {
+        continue;
+      }
+      if (!hosts.has(host)) continue;
+      const target = pagePath(link);
+      if (target === p.path) continue;
+      (inlinks.get(target) ?? inlinks.set(target, new Set()).get(target)!).add(p.path);
+    }
+  }
+  return inlinks;
+}
+
 // ------------------------------------------------------------------ evaluación
 
 /** Todos los hallazgos de un rastreo, ordenados por gravedad, código y página: el resultado es determinista. */
@@ -146,22 +168,7 @@ export function evaluate(input: RulesInput): Issue[] {
 
   siteRules(site, add);
 
-  const inlinks = new Map<string, Set<string>>();
-  for (const p of pages) {
-    if (!auditable(p)) continue;
-    for (const link of p.facts.links) {
-      let host: string;
-      try {
-        host = bare(new URL(link).hostname);
-      } catch {
-        continue;
-      }
-      if (!site.hosts.map(bare).includes(host)) continue;
-      const target = pagePath(link);
-      if (target === p.path) continue;
-      (inlinks.get(target) ?? inlinks.set(target, new Set()).get(target)!).add(p.path);
-    }
-  }
+  const inlinks = internalInlinks(pages, site.hosts);
 
   for (const p of pages) pageStatusRules(p, add);
 

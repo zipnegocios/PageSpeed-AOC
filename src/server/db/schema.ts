@@ -56,6 +56,9 @@ export const auditStatus = pgEnum("audit_status", ["queued", "running", "succeed
 export const alertKind = pgEnum("alert_kind", ["threshold", "audit_failure"]);
 export const seoIntegrationKind = pgEnum("seo_integration_kind", ["gsc", "ga4", "cloudflare"]);
 export const seoIntegrationStatus = pgEnum("seo_integration_status", ["pending", "ok", "error"]);
+export const seoCrawlStatus = pgEnum("seo_crawl_status", ["queued", "running", "succeeded", "partial", "failed"]);
+export const seoCrawlTrigger = pgEnum("seo_crawl_trigger", ["manual", "scheduled"]);
+export const seoIssueSeverity = pgEnum("seo_issue_severity", ["error", "warning", "info"]);
 export const alertStateStatus = pgEnum("alert_state_status", ["open", "resolved", "suppressed"]);
 export const notificationType = pgEnum("notification_type", [
   "initial",
@@ -570,3 +573,93 @@ export const settings = pgTable("settings", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+// ------------------------------------------------------- seo_crawl_runs
+// Un rastreo técnico del sitio. `succeeded` = recorrió todo lo que encontró; `partial` = se cortó por páginas o tiempo;
+// `failed` = no se pudo (sitio bloqueado, pide sesión, no responde, error). Solo los dos primeros tienen páginas y hallazgos.
+export const seoCrawlRuns = pgTable(
+  "seo_crawl_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    status: seoCrawlStatus("status").notNull().default("queued"),
+    trigger: seoCrawlTrigger("trigger").notNull(),
+    queuedAt: timestamp("queued_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    // Resultado del rastreador (complete, partial, site_blocked, blocked_by_site, login_required, unreachable) y su explicación legible.
+    outcome: text("outcome"),
+    detail: text("detail"),
+    pagesCrawled: integer("pages_crawled").notNull().default(0),
+    pagesDiscovered: integer("pages_discovered").notNull().default(0),
+    requests: integer("requests").notNull().default(0),
+    // `pages` o `time` cuando el rastreo se cortó.
+    truncatedBy: text("truncated_by"),
+    // Límites aplicados en este rastreo (páginas, profundidad, pausa…).
+    limits: jsonb("limits").$type<Record<string, number>>(),
+    errors: integer("errors").notNull().default(0),
+    warnings: integer("warnings").notNull().default(0),
+    infos: integer("infos").notNull().default(0),
+  },
+  (t) => [
+    index("seo_crawl_runs_project_queued_idx").on(t.projectId, t.queuedAt.desc()),
+    // Un solo rastreo en cola o en curso por proyecto.
+    uniqueIndex("seo_crawl_runs_active_unique")
+      .on(t.projectId)
+      .where(sql`${t.status} in ('queued', 'running')`),
+  ],
+);
+
+// ------------------------------------------------------ seo_crawl_pages
+// Hechos técnicos de cada página rastreada. Nunca el HTML ni el texto: solo metadatos públicos y conteos. `path` es la
+// ruta normalizada (sin host ni parámetros).
+export const seoCrawlPages = pgTable(
+  "seo_crawl_pages",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => seoCrawlRuns.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    // Estado final tras seguir redirecciones; 0 = no respondió.
+    status: integer("status").notNull(),
+    finalPath: text("final_path"),
+    hops: integer("hops").notNull().default(0),
+    loop: boolean("loop").notNull().default(false),
+    contentType: text("content_type"),
+    blockedByRobots: boolean("blocked_by_robots").notNull().default(false),
+    inSitemap: boolean("in_sitemap").notNull().default(false),
+    // Idioma según el prefijo de la ruta (null si el proyecto no declaró idiomas).
+    lang: text("lang"),
+    // Solo páginas HTML correctas: título (recortado), longitud de la descripción, h1, canónica, lang, robots, hreflang y tipos JSON-LD.
+    title: text("title"),
+    descriptionLength: integer("description_length"),
+    h1Count: integer("h1_count"),
+    canonical: text("canonical"),
+    htmlLang: text("html_lang"),
+    robots: text("robots").array(),
+    hreflang: jsonb("hreflang").$type<Array<{ lang: string; path: string }>>(),
+    jsonLdTypes: text("jsonld_types").array(),
+    // Páginas rastreadas que enlazan a esta.
+    inlinks: integer("inlinks").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.path] })],
+);
+
+// ----------------------------------------------------- seo_crawl_issues
+// Hallazgos de un rastreo. `page` vacío = del sitio entero. `evidence` es un JSON corto: lo encontrado y lo esperado.
+export const seoCrawlIssues = pgTable(
+  "seo_crawl_issues",
+  {
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => seoCrawlRuns.id, { onDelete: "cascade" }),
+    page: text("page").notNull(),
+    code: text("code").notNull(),
+    severity: seoIssueSeverity("severity").notNull(),
+    lang: text("lang"),
+    evidence: jsonb("evidence").$type<Record<string, string | number | boolean | string[]>>().notNull().default(sql`'{}'::jsonb`),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.page, t.code] }), index("seo_crawl_issues_run_code_idx").on(t.runId, t.code)],
+);
