@@ -13,12 +13,25 @@ const OPTION = "flex min-h-11 cursor-pointer items-start gap-3 rounded-sm border
  * Los campos de una clave: nombre, permisos y alcance. Los comparten «Nueva clave» y «Editar». `prefix` hace únicos los
  * `id` cuando hay varios formularios en la página (cada fila de la lista tiene el suyo).
  */
-export function KeyFields({ prefix, presets, clients, initial }: { prefix: string; presets: PresetOption[]; clients: ScopeClient[]; initial?: KeyFieldValues }) {
+export function KeyFields({
+  prefix,
+  presets,
+  clients,
+  initial,
+  hideName = false,
+}: {
+  prefix: string;
+  presets: PresetOption[];
+  clients: ScopeClient[];
+  initial?: KeyFieldValues;
+  /** Sin el campo de nombre (la pantalla de autorización lo deriva de la aplicación). */
+  hideName?: boolean;
+}) {
   const [access, setAccess] = useState<"selected" | "all">(initial?.all ? "all" : "selected");
   const first = initial ? initial.preset : presets[0]?.id;
   return (
     <>
-      <Field label="Nombre del agente" id={`${prefix}-name`} name="name" defaultValue={initial?.name} required minLength={2} maxLength={60} autoComplete="off" hint="Para reconocerlo después, por ejemplo «Claude de Gustavo»." />
+      {hideName ? null : <Field label="Nombre del agente" id={`${prefix}-name`} name="name" defaultValue={initial?.name} required minLength={2} maxLength={60} autoComplete="off" hint="Para reconocerlo después, por ejemplo «Claude de Gustavo»." />}
       <fieldset className="flex flex-col gap-2">
         <legend className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">Permisos</legend>
         {presets.map((p) => (

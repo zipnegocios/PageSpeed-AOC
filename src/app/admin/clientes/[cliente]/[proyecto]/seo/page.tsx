@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: pageTitle("SEO del proyecto"), robots
 export const dynamic = "force-dynamic";
 
 export default async function ProjectSeoPage({ params }: { params: Promise<{ cliente: string; proyecto: string }> }) {
-  const session = await verifySession();
+  await verifySession();
   const { cliente, proyecto } = await params;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
@@ -26,7 +26,6 @@ export default async function ProjectSeoPage({ params }: { params: Promise<{ cli
 
   return (
     <AdminShell
-      email={session.email}
       title="SEO y visibilidad"
       subtitle={
         <span>

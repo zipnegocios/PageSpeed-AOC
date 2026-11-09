@@ -13,12 +13,12 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Archivados"), robots: { index: false, follow: false } };
 
 export default async function ArchivedPage() {
-  const session = await verifySession();
+  await verifySession();
   const [clients, projects] = await Promise.all([listArchivedClients(), listArchivedProjects()]);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   return (
-    <AdminShell email={session.email} title="Archivados" crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Archivados" crumbs={[{ label: "Panel", href: "/admin" }]}>
       <Card
         title="Clientes archivados"
         description="Fuera del panel y sin auditorías; su link del portal ya no funciona. Puedes restaurarlos o eliminarlos para siempre."

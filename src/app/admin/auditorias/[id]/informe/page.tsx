@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: pageTitle("Informe de Lighthouse"), r
 export const dynamic = "force-dynamic";
 
 export default async function AuditReportPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await verifySession();
+  await verifySession();
   const { id } = await params;
   const audit = await orNotFound(getAudit(id));
   const siblings = await getSiblingAudits(id);
@@ -24,7 +24,7 @@ export default async function AuditReportPage({ params }: { params: Promise<{ id
 
   return (
     <AdminShell
-      email={session.email}
+     
       title="Informe completo de Lighthouse"
       subtitle={`${audit.routePath} · ${PROFILE_LABEL[audit.profile]} · ${audit.projectName}`}
       crumbs={[

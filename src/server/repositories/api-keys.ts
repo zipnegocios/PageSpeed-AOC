@@ -6,7 +6,18 @@ export type ApiKeyRow = typeof mcpApiKeys.$inferSelect;
 
 export async function insertApiKey(
   db: Database,
-  values: { name: string; keyHash: string; scopes: string[]; allAccess: boolean; clientIds: string[]; projectIds: string[] },
+  values: {
+    name: string;
+    keyHash: string;
+    scopes: string[];
+    allAccess: boolean;
+    clientIds: string[];
+    projectIds: string[];
+    oauthClientId?: string;
+    expiresAt?: Date;
+    refreshHash?: string;
+    refreshExpiresAt?: Date;
+  },
 ): Promise<ApiKeyRow> {
   const [row] = await db.insert(mcpApiKeys).values(values).returning();
   if (!row) throw new Error("No se pudo crear la clave");
@@ -77,4 +88,37 @@ export async function deleteRevoked(db: Database, id: string): Promise<boolean> 
     .where(and(eq(mcpApiKeys.id, id), isNotNull(mcpApiKeys.revokedAt)))
     .returning({ id: mcpApiKeys.id });
   return rows.length > 0;
+}
+
+export async function findActiveByRefreshHash(db: Database, refreshHash: string): Promise<ApiKeyRow | undefined> {
+  const [row] = await db.select().from(mcpApiKeys).where(and(eq(mcpApiKeys.refreshHash, refreshHash), isNull(mcpApiKeys.revokedAt))).limit(1);
+  return row;
+}
+
+/** Una conexión cuyo refresco ya gastado se vuelve a presentar: señal de robo, se revoca toda la conexión. */
+export async function findByPrevRefreshHash(db: Database, prevHash: string): Promise<ApiKeyRow | undefined> {
+  const [row] = await db.select().from(mcpApiKeys).where(and(eq(mcpApiKeys.prevRefreshHash, prevHash), isNull(mcpApiKeys.revokedAt))).limit(1);
+  return row;
+}
+
+/** Renueva los tokens de una conexión OAuth. `where` incluye el refresco anterior para que dos refrescos a la vez no ganen los dos. */
+export async function rotateOauthTokens(
+  db: Database,
+  id: string,
+  oldRefreshHash: string,
+  values: { keyHash: string; refreshHash: string; expiresAt: Date; refreshExpiresAt: Date; at: Date },
+): Promise<ApiKeyRow | undefined> {
+  const [row] = await db
+    .update(mcpApiKeys)
+    .set({
+      keyHash: values.keyHash,
+      refreshHash: values.refreshHash,
+      prevRefreshHash: oldRefreshHash,
+      expiresAt: values.expiresAt,
+      refreshExpiresAt: values.refreshExpiresAt,
+      rotatedAt: values.at,
+    })
+    .where(and(eq(mcpApiKeys.id, id), eq(mcpApiKeys.refreshHash, oldRefreshHash), isNull(mcpApiKeys.revokedAt)))
+    .returning();
+  return row;
 }

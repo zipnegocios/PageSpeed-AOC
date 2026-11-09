@@ -68,8 +68,29 @@
     {
       "idx": 9,
       "version": "7",
-      "when": 1794204053981,
-      "tag": "0009_seo_conexiones",
+      "when": 1794188344280,
+      "tag": "0009_oauth",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794193575985,
+      "tag": "0010_perfil",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794194935496,
+      "tag": "0011_invitar_con_perfil",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794205072980,
+      "tag": "0012_seo_conexiones",
       "breakpoints": true
     }
   ]

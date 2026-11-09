@@ -30,7 +30,7 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Cliente"), robots: { index: false, follow: false } };
 
 export default async function ClientPage({ params }: { params: Promise<{ cliente: string }> }) {
-  const session = await verifySession();
+  await verifySession();
   const { cliente } = await params;
   const client = await orNotFound(getClientByRef(cliente));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
@@ -43,7 +43,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
 
   return (
     <AdminShell
-      email={session.email}
+     
       title={client.name}
       subtitle={<span className="font-mono text-[15px]">{client.slug}</span>}
       crumbs={[

@@ -32,6 +32,8 @@ function rowOf(k: ApiKeyView): KeyRowData {
     created: formatDate(k.createdAt),
     lastUsed: k.lastUsedAt ? formatDate(k.lastUsedAt) : null,
     rotated: k.rotatedAt ? formatDate(k.rotatedAt) : null,
+    oauth: k.oauth,
+    expires: k.expiresAt ? formatDate(k.expiresAt) : null,
     revoked: k.revokedAt ? formatDate(k.revokedAt) : null,
     values: {
       name: k.name,
@@ -44,7 +46,7 @@ function rowOf(k: ApiKeyView): KeyRowData {
 }
 
 export default async function AgentsPage() {
-  const session = await verifySession();
+  await verifySession();
   const [keys, clients, projects] = await Promise.all([listApiKeys(), listClients(), listAllProjects()]);
   const scopeClients = clients.map((c) => ({ id: c.id, name: c.name, projects: projects.filter((p) => p.clientId === c.id).map((p) => ({ id: p.id, name: p.name })) }));
   const endpoint = `${appUrl()}/api/mcp`;
@@ -53,7 +55,7 @@ export default async function AgentsPage() {
   const presets = PRESET_IDS.map((id) => ({ id, label: PRESETS[id].label, description: PRESETS[id].description }));
 
   return (
-    <AdminShell email={session.email} title="Agentes (MCP)" crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Agentes (MCP)" crumbs={[{ label: "Panel", href: "/admin" }]}>
       <Card title="Conexión" description="Un agente de IA se conecta a este servidor MCP con una clave. Sustituye TU_CLAVE por la que crees abajo.">
         <div className="flex flex-col gap-3">
           <p className="text-[13px] font-semibold tracking-[0.08em] text-ink-muted uppercase">Dirección</p>

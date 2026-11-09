@@ -31,13 +31,12 @@ const ext = (href: string, text: string) => (
 );
 
 export default async function SeoPage() {
-  const session = await verifySession();
+  await verifySession();
   const [google, overview] = await Promise.all([getGoogleAccount(), getSeoOverview()]);
   const keyStatus = authKeyStatus();
 
   return (
     <AdminShell
-      email={session.email}
       title="SEO y visibilidad"
       subtitle="Cómo se encuentra y se usa cada sitio: búsqueda, visitas y presencia en asistentes de IA."
       crumbs={[{ label: "Panel", href: "/admin" }]}

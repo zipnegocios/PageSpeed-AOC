@@ -6,6 +6,8 @@ import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
+import { Avatar, avatarUrl } from "@/lib/ui/components/avatar";
+import { displayName, initials } from "@/server/domain/profile";
 import { listTeam } from "@/server/services/team";
 import { AdminShell } from "../_components/admin-shell";
 import { resendInviteAction, revokeInviteAction, removeMemberAction, sendResetAction } from "./actions";
@@ -22,8 +24,8 @@ export default async function TeamPage() {
   const team = await listTeam(session);
 
   return (
-    <AdminShell email={session.email} title="Equipo" subtitle="Quién puede entrar al panel." crumbs={[{ label: "Panel", href: "/admin" }]}>
-      <Card title="Invitar a una persona" description="Todas las personas del equipo administran clientes, proyectos, agentes y cola. Solo tú agregas o quitas personas.">
+    <AdminShell title="Equipo" subtitle="Quién puede entrar al panel." crumbs={[{ label: "Panel", href: "/admin" }]}>
+      <Card title="Invitar a una persona" description="Prepara su perfil (nombre y foto, opcionales) y elige cómo entra. Todas las personas del equipo administran clientes, proyectos, agentes y cola; solo tú agregas o quitas personas.">
         <InviteForm />
       </Card>
 
@@ -32,9 +34,12 @@ export default async function TeamPage() {
           {team.members.map((m) => (
             <li key={m.id} className="flex flex-col gap-2 px-3 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold break-all text-ink">{m.email}</span>
+                <Avatar initials={initials(m)} src={avatarUrl(m.id, m.avatarKey)} />
+                <span className="font-semibold break-all text-ink">{displayName(m)}</span>
+                {displayName(m) !== m.email ? <span className="text-[15px] break-all text-ink-muted">{m.email}</span> : null}
                 <Badge tone={m.role === "owner" ? "primary" : "neutral"}>{m.role === "owner" ? "Propietario" : "Administrador"}</Badge>
                 {m.id === session.id ? <Badge>Tú</Badge> : null}
+                {m.provisionalPassword ? <Badge>Contraseña provisional</Badge> : null}
               </div>
               <p className="text-[15px] text-ink-muted">Desde {formatDate(m.createdAt)}</p>
               {m.role === "owner" ? null : (
@@ -56,7 +61,8 @@ export default async function TeamPage() {
             {team.invites.map((i) => (
               <li key={i.id} className="flex flex-col gap-2 px-3 py-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold break-all text-ink">{i.email}</span>
+                  <span className="font-semibold break-all text-ink">{displayName({ email: i.email, firstName: i.firstName, lastName: i.lastName })}</span>
+                  {i.firstName || i.lastName ? <span className="text-[15px] break-all text-ink-muted">{i.email}</span> : null}
                   <Badge>{i.kind === "reset" ? "Contraseña nueva" : "Invitación pendiente"} · vence el {formatDate(i.expiresAt)}</Badge>
                 </div>
                 <div className="flex flex-wrap items-start gap-3">

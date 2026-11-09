@@ -5,6 +5,7 @@ import { z } from "zod";
 import { clientIp } from "@/lib/auth/client-ip";
 import { createSession } from "@/lib/auth/session";
 import { loginLimiters } from "@/lib/auth/login-limiter";
+import { safeNext } from "@/lib/auth/safe-next";
 import { authenticate, normalizeEmail } from "@/server/services/admin-auth";
 
 // `email` se devuelve en los errores: React vacía el formulario tras cada envío y así el correo no se pierde.
@@ -39,5 +40,5 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
   perAccount.reset(accountKey);
   await createSession(result.admin);
-  redirect("/admin");
+  redirect(safeNext(String(formData.get("next") ?? "")) ?? "/admin");
 }

@@ -23,12 +23,12 @@ function PanelSkeleton({ span = 1, label }: { span?: 1 | 2 | 4; label: string })
 }
 
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ fase?: string }> }) {
-  const session = await verifySession();
+  await verifySession();
   const { fase } = await searchParams;
   const phase = (PHASES as string[]).includes(fase ?? "") ? (fase as PhaseFilter) : "todos";
 
   return (
-    <AdminShell email={session.email} title="Panel" subtitle="El estado de todos tus proyectos, de un vistazo.">
+    <AdminShell title="Panel" subtitle="El estado de todos tus proyectos, de un vistazo.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Suspense fallback={<PanelSkeleton span={4} label="la flota" />}>
           <FleetSection phase={phase} />

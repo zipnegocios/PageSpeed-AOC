@@ -5,6 +5,7 @@ import { pageTitle } from "@/lib/brand";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
+import { safeNext } from "@/lib/auth/safe-next";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -12,8 +13,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function LoginPage() {
-  if (await getSession()) redirect("/admin");
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const next = safeNext((await searchParams).next);
+  if (await getSession()) redirect(next ?? "/admin");
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 px-4 py-12">
       <header className="flex flex-col gap-4">
@@ -24,7 +26,7 @@ export default async function LoginPage() {
         <PageTitle>Iniciar sesión</PageTitle>
       </header>
       <section className="hud hud-brackets relative rounded-lg p-4 md:p-6">
-        <LoginForm />
+        <LoginForm next={next} />
       </section>
       <CopyrightLine />
     </main>

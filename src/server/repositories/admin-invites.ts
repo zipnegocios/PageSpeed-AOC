@@ -6,7 +6,17 @@ export type AdminInvite = typeof adminInvites.$inferSelect;
 
 export async function insertInvite(
   db: Database,
-  values: { email: string; kind: "invite" | "reset"; tokenHash: string; invitedBy: string; expiresAt: Date },
+  values: {
+    email: string;
+    kind: "invite" | "reset";
+    tokenHash: string;
+    invitedBy: string;
+    expiresAt: Date;
+    userId?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatarKey?: string | null;
+  },
 ): Promise<AdminInvite> {
   const [row] = await db.insert(adminInvites).values(values).returning();
   if (!row) throw new Error("No se pudo crear la invitación");
@@ -61,4 +71,12 @@ export async function markAccepted(db: Database, id: string, at: Date): Promise<
 
 export function listAll(db: Database): Promise<AdminInvite[]> {
   return db.select().from(adminInvites).orderBy(asc(adminInvites.createdAt));
+}
+
+/** Las invitaciones pendientes de un correo (para limpiar sus fotos al reemplazarlas). */
+export function listPendingForEmail(db: Database, email: string, now: Date): Promise<AdminInvite[]> {
+  return db
+    .select()
+    .from(adminInvites)
+    .where(and(eq(adminInvites.email, email), isNull(adminInvites.acceptedAt), isNull(adminInvites.revokedAt), gt(adminInvites.expiresAt, now)));
 }

@@ -6,10 +6,11 @@ import { Button } from "@/lib/ui/components/button";
 import { Field } from "@/lib/ui/components/field";
 import { loginAction, type LoginState } from "./actions";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string | null }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(loginAction, {});
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field
         label="Correo"
         id="email"

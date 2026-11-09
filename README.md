@@ -209,6 +209,15 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   herramienta lo comprueba antes de leer o cambiar (`src/mcp/access.ts`, reglas en `server/domain/mcp-access.ts`);
   lo que queda fuera responde «no encontrado», como si no existiera. Al crear la clave hay que elegir una de las dos
   cosas.
+- **Conector de claude.ai (OAuth):** los conectores personalizados de claude.ai web no permiten poner una cabecera
+  `Authorization`, solo hablan OAuth. La app es su propio servidor de autorización mínimo: descubrimiento
+  (`/.well-known/oauth-protected-resource` y `/.well-known/oauth-authorization-server`), registro dinámico
+  (`/oauth/register`), pantalla de autorización con sesión de administrador (`/oauth/authorize`, donde se eligen permisos y
+  alcance como en «Nueva clave»), `/oauth/token` (código + PKCE S256, y refresco rotativo) y `/oauth/revoke`. Cada
+  conexión es una fila de `mcp_api_keys` (insignia «Conexión de claude.ai»): accesos de 1 hora, refrescos de 90 días,
+  reutilizar un refresco gastado la revoca, y se edita, revoca y elimina desde Panel → Agentes como cualquier clave.
+  Solo se aceptan direcciones de retorno de `claude.ai`/`claude.com` y de bucle local. Requiere `APP_URL` con la URL
+  pública https exacta. Las claves por cabecera (`Authorization: Bearer pagespeed_…`) siguen valiendo para Claude Code.
 - **Gestión de claves** (Panel → Agentes): cada clave se puede **editar** (nombre, permisos y alcance; vale desde la
   siguiente llamada del agente y la clave no cambia), **rotar** (genera un secreto nuevo, se muestra una sola vez, y el
   anterior deja de servir al instante), **revocar** (deja de servir al instante; sigue en la lista) y, ya revocada,
@@ -269,7 +278,24 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 
 - La cuenta **propietaria** se crea al primer arranque con `ADMIN_EMAIL` / `ADMIN_PASSWORD` (solo se leen cuando no existe ninguna; cambiarlas después no agrega ni cambia a nadie).
 - Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Todas administran clientes, proyectos, agentes y cola; solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Si el correo no sale, el enlace se copia desde la pantalla.
+- Al invitar se prepara **el perfil completo** de la persona: nombre, apellido y foto (todo opcional) y cómo entra: **enlace por
+  correo** (la cuenta nace con esos datos al aceptarlo) o **contraseña provisional** (la cuenta se crea en el acto, sin correo; la
+  contraseña se muestra una sola vez y la persona puede cambiarla en su perfil, con un aviso mientras siga siendo provisional).
+  La foto de una invitación se guarda en R2 bajo `_avatars/<id de la futura cuenta>/` y se borra si la invitación se revoca o se
+  reemplaza, y al quitar a la persona. Migración 0011.
 - Las invitaciones guardan solo el sha256 del token (`admin_invites`); el enlace `/invitacion/<token>` lleva `no-referrer`, `noindex` y `no-store`, y cada IP tiene un límite de intentos. Quitar a alguien o cambiar su contraseña cierra sus sesiones.
+
+## Perfil y barra superior
+
+- La barra superior lleva, a la derecha, el conmutador de proyectos, una **campana** de alertas (número de alertas abiertas
+  y, al abrirla, las 5 más recientes con «Ver todas las alertas») y el **avatar** de la persona, que abre su menú: Mi perfil,
+  Equipo (solo el propietario), Archivados y Salir. El menú es accesible (Esc, clic fuera, flechas, Inicio y Fin).
+- **Mi perfil** (`/admin/perfil`, cualquier administrador): foto, nombre y apellido (opcionales) y cambio de contraseña (pide
+  la actual, mínimo 12 caracteres, con límite de intentos); al cambiarla se cierran las demás sesiones y la actual se renueva.
+- La **foto** se recorta en cuadrado y se reduce a 256 px en el navegador, se valida en el servidor por firma (PNG, JPEG o
+  WebP, máximo 1 MB) y se guarda en R2 bajo `_avatars/<id>/…`; solo se sirve con sesión de administrador
+  (`/api/admin/avatar/<id>`). Reemplazarla o quitarla borra el objeto anterior. Migración 0010: `first_name`, `last_name`,
+  `avatar_key` en `admin_users`.
 
 ## Marca
 

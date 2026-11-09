@@ -86,8 +86,9 @@ Lo que se pierde: cambios hechos entre el último respaldo y la caída (hasta 24
 | Qué | Cómo se cambia | Efecto |
 |---|---|---|
 | Contraseña del propietario | En la consola de Postgres: `delete from admin_users where role = 'owner';` y reinicia el web con `ADMIN_EMAIL` y `ADMIN_PASSWORD` nuevos | Se crea la cuenta propietaria al arrancar; las demás personas siguen. Quita la contraseña de las variables después |
-| Agregar a una persona del equipo | Panel → Equipo → *Invitar a una persona* (solo el propietario) | Le llega un enlace de un solo uso (7 días) para crear su contraseña. Si el correo no sale, copia el enlace de la pantalla |
+| Agregar a una persona del equipo | Panel → Equipo → *Invitar a una persona* (solo el propietario): correo, nombre, apellido y foto opcionales, y *Enlace por correo* o *Contraseña provisional* | Con enlace: le llega un enlace de un solo uso (7 días); si el correo no sale, copia el enlace de la pantalla. Con contraseña provisional: la cuenta se crea ya y se le pasa la contraseña (se muestra una vez); aparece «Contraseña provisional» hasta que la cambie en su perfil |
 | Contraseña olvidada de otra persona del equipo | Panel → Equipo → *Enviar enlace de contraseña nueva* | Crea una contraseña nueva y cierra sus sesiones anteriores |
+| Foto de perfil de una persona | Panel → avatar → Mi perfil. Se guarda en R2 bajo `_avatars/<id>/` (no pongas reglas de caducidad a ese prefijo); solo la ven los administradores con sesión | Quitar la foto borra el objeto |
 | Quitar a una persona del equipo | Panel → Equipo → *Quitar* | Deja de poder entrar y su sesión se cierra en su siguiente petición |
 | `SESSION_SECRET` | Cambiar la variable y reiniciar el web | Cierra todas las sesiones |
 | Link de un cliente filtrado | Ficha del cliente → *Generar link nuevo* | El anterior deja de funcionar al instante. También sirve *Suspender* |
@@ -141,6 +142,7 @@ Una semana en producción sin degradar los sitios alojados.
 ## 9. Lista de puesta en marcha
 
 - [ ] Variables de la sección 1 en web y worker; `APP_URL` con `https://`.
+- [ ] Para conectar claude.ai: `APP_URL` igual a la URL pública exacta (p. ej. `https://pagespeed.zipnegocios.com`) y el proxy debe dejar pasar `/.well-known/*` y `/oauth/*` sin pedir otra autenticación. Prueba: `curl https://<dominio>/.well-known/oauth-protected-resource` devuelve JSON con `resource`.
 - [ ] Redis con `noeviction` y AOF.
 - [ ] Token de R2 acotado al bucket; versionado del bucket activado.
 - [ ] Panel → *Estado del sistema* todo en verde.

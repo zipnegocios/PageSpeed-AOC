@@ -9,11 +9,11 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Alertas"), robots: { index: false, follow: false } };
 
 export default async function AlertsPage() {
-  const session = await verifySession();
+  await verifySession();
   const [alerts, notifications] = await Promise.all([listOpenAlerts(), listRecentNotifications(30)]);
 
   return (
-    <AdminShell email={session.email} title="Alertas" crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Alertas" crumbs={[{ label: "Panel", href: "/admin" }]}>
       <Card
         title={`Alertas abiertas (${alerts.length})`}
         description="Solo proyectos en producción. Se avisa por correo una vez y se recuerda cada 7 días mientras sigan abiertas; al recuperarse se cierran solas."

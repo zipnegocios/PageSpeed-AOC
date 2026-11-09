@@ -47,7 +47,8 @@ export async function handleMcpRequest(req: Request, deps: McpDeps): Promise<Res
   if (!auth) {
     deps.limits.badAuthPerIp.recordFailure(deps.ip);
     return rpcError(401, -32001, "Falta una clave de API válida (Authorization: Bearer ...).", {
-      "WWW-Authenticate": 'Bearer realm="pagespeed"',
+      // `resource_metadata` (RFC 9728) es lo que permite a claude.ai descubrir el inicio de sesión OAuth.
+      "WWW-Authenticate": `Bearer realm="pagespeed", resource_metadata="${deps.appOrigin}/.well-known/oauth-protected-resource"`,
     });
   }
 

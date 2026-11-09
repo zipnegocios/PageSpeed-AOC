@@ -14,11 +14,11 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Clientes"), robots: { index: false, follow: false } };
 
 export default async function ClientsPage() {
-  const session = await verifySession();
+  await verifySession();
   const clients = await listClients();
 
   return (
-    <AdminShell email={session.email} title="Clientes" crumbs={[{ label: "Panel", href: "/admin" }]}>
+    <AdminShell title="Clientes" crumbs={[{ label: "Panel", href: "/admin" }]}>
       <Card title="Tus clientes" description="Cada cliente agrupa sus proyectos y tiene un link propio de solo lectura.">
         {clients.length === 0 ? (
           <p className="text-ink-muted">Todavía no hay clientes. Crea el primero con el formulario de abajo.</p>
