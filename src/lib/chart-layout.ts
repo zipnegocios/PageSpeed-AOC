@@ -13,7 +13,7 @@ export type ChartLayout = {
 };
 
 /** Paso "bonito" (1, 2, 2,5 o 5 por potencia de diez) para que `max` quepa en ~`count` marcas. */
-function niceStep(max: number, count: number): number {
+export function niceStep(max: number, count: number): number {
   const raw = max / count;
   const pow = 10 ** Math.floor(Math.log10(raw));
   const f = raw / pow;
