@@ -272,6 +272,12 @@ el documento de diseño del módulo; lo que existe hoy es la **primera pieza: la
   que ni caiga a cero al final ni se compare contra menos días. No se muestran «usuarios»: GA4 los entrega por día, página, país y canal, y
   sumarlos cuenta varias veces a la misma persona. Código: `domain/seo-data.ts` (puro), `services/seo-data.ts`
   (`getSeoDashboard`, solo agregaciones SQL) y `app/admin/seo/_components/`.
+- **Visitas desde IA (fase 3, alcance reducido):** la cifra «Visitas desde IA» y la sección «Visitas desde asistentes de IA» de
+  «Tráfico y búsqueda» (también en el portal del cliente, si se activó) se presentan siempre como **mínimo observado**: son las
+  sesiones que GA4 atribuye a ChatGPT, Perplexity, Claude, Gemini o Copilot por su sitio de referencia, y parte de las visitas desde
+  un chat llega sin referido y GA4 la cuenta como tráfico directo. La cifra muestra además su peso en las sesiones; sirve para
+  ver la tendencia, no como total. Se decidió **no construir** por ahora la lectura de bots de IA de Cloudflare, la importación de
+  CSV ni el sondeo a las APIs de los asistentes (plan de la fase 3, diferido).
 - **Idiomas del sitio (fase 1b):** la tarjeta «Idiomas del sitio» (pestaña SEO del proyecto) declara los idiomas por **prefijo de ruta**
   (`/es`, `/en`…), no por país: el idioma por defecto usa `/` y las páginas fuera de todo prefijo declarado quedan en «Sin idioma». Un
   prefijo por idioma, códigos de 2 o 3 letras; la tarjeta sugiere los prefijos que ya aparecen en los datos descargados. Con idiomas

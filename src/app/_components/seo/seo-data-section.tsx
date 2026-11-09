@@ -58,12 +58,16 @@ function SourceStatus({ name, sync }: { name: string; sync: SeoSyncInfo }) {
   );
 }
 
-function Group({ title, period, children }: { title: string; period?: string; children: ReactNode }) {
+function Group({ title, period, badge, note, children }: { title: string; period?: string; /** Etiqueta de certeza junto al título. */ badge?: string; note?: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h3 className="text-[19px] leading-6 font-semibold text-ink">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[19px] leading-6 font-semibold text-ink">{title}</h3>
+          {badge ? <Badge tone="neutral">{badge}</Badge> : null}
+        </div>
         {period ? <p className="text-[15px] leading-5 text-ink-muted">{period}</p> : null}
+        {note ? <p className="text-[15px] leading-5 text-ink-muted">{note}</p> : null}
       </div>
       {children}
     </section>
@@ -71,6 +75,10 @@ function Group({ title, period, children }: { title: string; period?: string; ch
 }
 
 const NO_BASE = "Sin datos del periodo anterior para comparar";
+
+/** Lo que significa la cifra de visitas desde IA: lo que GA4 alcanza a atribuir, nunca el total. */
+export const AI_VISITS_NOTE =
+  "Son las sesiones que Google Analytics 4 atribuyó a ChatGPT, Perplexity, Claude, Gemini o Copilot por el sitio desde el que llegaron. Es un mínimo: parte de las visitas desde un chat llega sin referido y GA4 la cuenta como tráfico directo. Sirve para ver la tendencia, no como total.";
 
 /** «Del 12 oct al 8 nov (28 días) · comparado con el periodo anterior: del … al …». Cada fuente tiene su propio final. */
 const periodText = (r: { from: string; to: string }, p: { from: string; to: string }, days: number) =>
@@ -195,7 +203,7 @@ function Dashboard({
       <Group title="En el sitio (GA4)" period={t ? periodText(t.range, t.previous, days) : undefined}>
         <div className="grid grid-cols-2 gap-x-4 gap-y-5">
           <KpiTile label="Sesiones" value={t ? formatCount(t.totals.sessions) : null} delta={t ? percentDelta(t.totals.sessions, t.previousTotals.sessions) : null} hint={t && t.previousTotals.sessions === 0 ? NO_BASE : undefined} />
-          <KpiTile label="Visitas desde IA" value={ai ? formatCount(ai.totals.sessions) : t ? "0" : null} delta={ai ? percentDelta(ai.totals.sessions, ai.previousTotals.sessions) : null} hint={ai && ai.previousTotals.sessions === 0 ? NO_BASE : "Desde asistentes como ChatGPT o Perplexity"} />
+          <KpiTile label="Visitas desde IA" value={ai ? formatCount(ai.totals.sessions) : t ? "0" : null} delta={ai ? percentDelta(ai.totals.sessions, ai.previousTotals.sessions) : null} hint={[ai && ai.previousTotals.sessions === 0 ? NO_BASE : null, `Mínimo observado${ai && t && t.totals.sessions > 0 ? ` · ${share(ai.totals.sessions, t.totals.sessions)} de las sesiones` : ""}`].filter(Boolean).join(" · ")} />
         </div>
         {!t ? <p className="text-[15px] leading-5 text-ink-muted">{noGa4}</p> : null}
       </Group>
@@ -300,7 +308,7 @@ function Dashboard({
         </div>
       </Group>
 
-      <Group title="Visitas desde asistentes de IA">
+      <Group title="Visitas desde asistentes de IA" badge="Mínimo observado" period={ai ? periodText(ai.range, ai.previous, days) : t ? periodText(t.range, t.previous, days) : undefined} note={AI_VISITS_NOTE}>
         <div className="grid gap-6 lg:grid-cols-2">
           <DataTable
             title="Por fuente"
