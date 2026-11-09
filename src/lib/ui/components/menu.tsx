@@ -17,6 +17,7 @@ export function Menu({
   trigger,
   children,
   active = false,
+  shape = "square",
   triggerClassName,
   panelClassName,
 }: {
@@ -26,6 +27,8 @@ export function Menu({
   children: ReactNode;
   /** Marca el botón como la sección actual (anillo lima). */
   active?: boolean;
+  /** `circle`: botón redondo con un anillo de 1 px cuando es la sección actual (el avatar); `square`: anillo de 2 px (la campana). */
+  shape?: "square" | "circle";
   triggerClassName?: string;
   panelClassName?: string;
 }) {
@@ -112,8 +115,9 @@ export function Menu({
           onClick={() => setOpen((v) => !v)}
           onKeyDown={onTriggerKey}
           className={cx(
-            "press inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md text-ink-muted hover:bg-surface-300 hover:text-ink",
-            active && "text-ink ring-2 ring-primary",
+            "press inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center text-ink-muted hover:bg-surface-300 hover:text-ink",
+            shape === "circle" ? "rounded-full" : "rounded-md",
+            active && (shape === "circle" ? "text-ink ring-1 ring-primary" : "text-ink ring-2 ring-primary"),
             triggerClassName,
           )}
         >

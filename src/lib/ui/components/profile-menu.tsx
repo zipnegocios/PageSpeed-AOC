@@ -25,7 +25,7 @@ export function ProfileMenu({
   const pathname = usePathname();
   const active = OWN_PAGES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
-    <Menu label={`Menú de ${name}`} active={active} triggerClassName="rounded-full p-0" panelClassName="w-72" trigger={<Avatar initials={initials} src={avatarSrc} />}>
+    <Menu label={`Menú de ${name}`} active={active} shape="circle" triggerClassName="p-0" panelClassName="w-72" trigger={<Avatar initials={initials} src={avatarSrc} />}>
       <div className="flex items-center gap-3 px-4 pt-2 pb-3">
         <Avatar initials={initials} src={avatarSrc} size="lg" />
         <div className="flex min-w-0 flex-col gap-1">
