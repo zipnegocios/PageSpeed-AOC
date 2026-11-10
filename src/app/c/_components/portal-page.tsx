@@ -1,9 +1,22 @@
 import type { ReactNode } from "react";
 
 /** Cabecera de una pantalla del portal: título grande, como las apps de iOS, y su contenido debajo. */
-export function PortalPage({ title, subtitle, actions, children }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode }) {
+export function PortalPage({
+  title,
+  subtitle,
+  actions,
+  width = "full",
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  /** «contained»: en escritorio el contenido se centra con un ancho máximo (las pantallas de lectura, para que no se estiren a 1900 px). */
+  width?: "full" | "contained";
+  children: ReactNode;
+}) {
   return (
-    <>
+    <div className={width === "contained" ? "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5" : "contents"}>
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-[32px] leading-9 font-bold tracking-[-0.022em] text-ink md:text-[40px] md:leading-[44px]">{title}</h1>
@@ -12,6 +25,6 @@ export function PortalPage({ title, subtitle, actions, children }: { title: stri
         {actions}
       </div>
       {children}
-    </>
+    </div>
   );
 }

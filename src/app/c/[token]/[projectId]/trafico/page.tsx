@@ -25,7 +25,7 @@ export default async function PortalTraffic({ params, searchParams }: { params: 
   const available: TrafficSection[] = data ? [...(data.dashboard ? (["visitas", "google"] as const) : []), ...(data.health ? (["salud"] as const) : [])] : [];
   const section = wanted && available.includes(wanted) ? wanted : (available[0] ?? "visitas");
   return (
-    <PortalPage title="Tráfico y búsqueda" subtitle="Cómo te encuentran y cuánta gente llega a tu sitio.">
+    <PortalPage width="contained" title="Tráfico y búsqueda" subtitle="Cómo te encuentran y cuánta gente llega a tu sitio.">
       {data ? (
         <PortalTrafficView data={data} section={section} basePath={`${base}/trafico`} />
       ) : (

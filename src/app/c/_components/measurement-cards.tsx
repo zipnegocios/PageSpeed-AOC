@@ -110,9 +110,9 @@ export function MeasurementCards({ m, base }: { m: PortalMeasurements; base: str
   const off = (["search", "traffic", "sources", "ai", "health"] as const).filter((id) => m.states[id] === "off");
   const pending = (["search", "traffic", "sources", "ai", "health"] as const).filter((id) => m.states[id] === "pending");
   return (
-    <section aria-label="Resumen de mediciones" className="flex flex-col gap-3">
+    <section aria-label="Resumen de mediciones" className="flex min-w-0 flex-col gap-3">
       <h2 className="text-[20px] leading-7 font-bold tracking-[-0.01em] text-ink">Tu sitio en Google y en el mundo real</h2>
-      {cards.length > 0 ? <ul className="grid grid-cols-2 gap-3 xl:grid-cols-3">{cards}</ul> : null}
+      {cards.length > 0 ? <ul className="grid grid-cols-2 gap-3 lg:grid-cols-3">{cards}</ul> : null}
       {!m.seoAccess ? (
         <p className="rounded-lg bg-surface-200 p-3 text-[14px] leading-5 text-ink-muted">No activado para tu sitio: {off.map((id) => MEASUREMENT_BY_ID[id].title.toLowerCase()).join(", ")}.</p>
       ) : pending.length > 0 ? (

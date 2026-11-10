@@ -34,6 +34,9 @@ const GROUP_TITLE: Record<SourceGroup, string> = {
 const DIRECT_NOTE =
   "«Directo o sin identificar» incluye a quien escribe tu dirección, usa un marcador o llega desde aplicaciones que no informan de dónde vienen (por ejemplo, mensajes privados). Para saber más, comparte tus enlaces con parámetros UTM.";
 
+/** Las tarjetas desplegables: una columna en el teléfono y dos en escritorio, cada una a su altura (`items-start`). */
+const FOLDS = "grid grid-cols-1 items-start gap-3 lg:grid-cols-2";
+
 const share = (value: number, total: number) => (total > 0 ? formatPercent(value / total) : "—");
 
 /** Control segmentado al estilo de iOS: opciones de igual ancho, la elegida resaltada. Son enlaces: la elección vive en la dirección. */
@@ -138,6 +141,7 @@ function Visits({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
   return (
     <>
       {tr ? <SeoChart title="Sesiones por día" unit="sesiones" series={tr.daily.map((p) => ({ date: p.date, value: p.sessions }))} tone={2} /> : null}
+      <div className={FOLDS}>
       {src ? (
         <>
           <Fold title="De dónde llegan" headline={headlineOf(groupRows, src.totals.sessions, "visitas")} open>
@@ -197,6 +201,7 @@ function Visits({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
           <Bars rows={sources} total={aiTotal} unit="sesiones" />
         </Fold>
       ) : null}
+      </div>
     </>
   );
 }
@@ -213,11 +218,12 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
   const queries: Row[] = (s.topQueries ?? []).map((x) => ({ key: x.query, label: x.query, value: x.clicks }));
   return (
     <>
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-2 gap-3 lg:max-w-xl">
         <Kpi label="CTR" value={formatPercent(s.totals.ctr)} hint="Clics por cada impresión" />
         <Kpi label="Posición media" value={formatPosition(s.totals.position)} delta={positionDelta(s.totals.position, p.position)} hint="Menos es mejor" />
       </ul>
       <SeoChart title="Clics por día" unit="clics" series={s.daily.map((x) => ({ date: x.date, value: x.clicks }))} tone={1} />
+      <div className={FOLDS}>
       {queries.length > 0 ? (
         <Fold title="Con qué buscan" headline={`«${queries[0]!.label}» · ${formatCount(queries[0]!.value)} clics`} open>
           <p className="text-[14px] leading-5 text-ink-muted">Las búsquedas en Google que más visitas te trajeron en este periodo. Google no entrega todas: las poco frecuentes se ocultan por privacidad.</p>
@@ -244,6 +250,7 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
           <Bars rows={languages} total={languages.reduce((a, l) => a + l.value, 0)} unit="clics" />
         </Fold>
       ) : null}
+      </div>
     </>
   );
 }
@@ -319,7 +326,11 @@ function Health({ health }: { health: NonNullable<PortalTraffic["health"]> }) {
       {health.groups.length === 0 ? (
         <p className="rounded-lg bg-surface-200 p-4 text-ink">Todo en orden: no encontramos errores ni avisos en esta revisión.</p>
       ) : (
-        health.groups.map((g, i) => <HealthGroup key={g.group} g={g} open={i === 0} />)
+        <div className={FOLDS}>
+          {health.groups.map((g, i) => (
+            <HealthGroup key={g.group} g={g} open={i === 0} />
+          ))}
+        </div>
       )}
     </>
   );
@@ -344,11 +355,13 @@ export function PortalTrafficView({ data, section, basePath }: { data: PortalTra
     <>
       {d ? (
         <>
+          <div className="md:max-w-sm">
           <Segment label="Periodo" items={SEO_PERIODS.map((p) => ({ label: SEO_PERIOD_LABEL[p], href: href({ periodo: p }), current: p === data.days }))} />
+          </div>
           <p className="text-[13px] leading-5 text-ink-muted">
             {[d.sync.gsc?.syncedThrough ? `Google hasta el ${formatDayMedium(d.sync.gsc.syncedThrough)}` : null, d.sync.ga4?.syncedThrough ? `visitas hasta el ${formatDayMedium(d.sync.ga4.syncedThrough)}` : null].filter(Boolean).join(" · ")} · se actualiza cada día
           </p>
-          <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi label="Clics en Google" value={s ? formatCount(s.totals.clicks) : null} delta={s ? percentDelta(s.totals.clicks, s.previousTotals.clicks) : null} />
             <Kpi label="Impresiones" value={s ? formatCount(s.totals.impressions) : null} delta={s ? percentDelta(s.totals.impressions, s.previousTotals.impressions) : null} />
             <Kpi label="Sesiones" value={tr ? formatCount(tr.totals.sessions) : null} delta={tr ? percentDelta(tr.totals.sessions, tr.previousTotals.sessions) : null} />
@@ -356,7 +369,11 @@ export function PortalTrafficView({ data, section, basePath }: { data: PortalTra
           </ul>
         </>
       ) : null}
-      {items.length > 1 ? <Segment label="Sección" items={items.map((i) => ({ label: i.label, href: href({ seccion: i.id }), current: i.id === section }))} /> : null}
+      {items.length > 1 ? (
+        <div className="md:max-w-md">
+          <Segment label="Sección" items={items.map((i) => ({ label: i.label, href: href({ seccion: i.id }), current: i.id === section }))} />
+        </div>
+      ) : null}
       {section === "salud" && data.health ? <Health health={data.health} /> : null}
       {section === "visitas" && d ? <Visits t={data} d={d} /> : null}
       {section === "google" && d ? <Google t={data} d={d} /> : null}

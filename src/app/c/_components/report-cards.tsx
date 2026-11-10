@@ -80,7 +80,7 @@ function ReportCard({ kind, base, days, states }: { kind: ReportKind; base: stri
           ))}
         </ol>
       </details>
-      <DownloadButton href={`${base}/informe?tipo=${reportKindParam(kind)}&dias=${days}`} label={copy.button} />
+      <DownloadButton href={`${base}/informe?tipo=${reportKindParam(kind)}&dias=${days}`} label={copy.button} className="lg:self-start" />
     </section>
   );
 }
@@ -106,7 +106,7 @@ export function ReportPeriodSwitch({ base, days }: { base: string; days: ReportP
 
 export function ReportCards({ base, days, states }: { base: string; days: ReportPeriodChoice; states: States }) {
   return (
-    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
       <ReportCard kind="summary" base={base} days={days} states={states} />
       <ReportCard kind="engineering" base={base} days={days} states={states} />
     </div>

@@ -43,11 +43,11 @@ export default async function PortalSummary({ params, searchParams }: { params: 
   const measurements = await getPortalMeasurements(client.id, project, { days: 28, hasLighthouse: project.latest.length > 0 });
 
   return (
-    <PortalPage title="Resumen" subtitle={<span className="font-mono break-all text-[14px]">{project.baseUrl}</span>}>
+    <PortalPage width="contained" title="Resumen" subtitle={<span className="font-mono break-all text-[14px]">{project.baseUrl}</span>}>
       {project.latest.length === 0 ? (
         <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {client.logo ? (
             <li className="hud flex min-h-36 items-center justify-center overflow-hidden rounded-lg p-4" style={client.logo.bg ? { background: client.logo.bg } : undefined}>
               {/* eslint-disable-next-line @next/next/no-img-element -- logotipo privado ya reducido, servido por la ruta del portal. */}
@@ -74,8 +74,12 @@ export default async function PortalSummary({ params, searchParams }: { params: 
         </ul>
       )}
 
+      {/* En escritorio, dos columnas: las mediciones a la izquierda y los atajos a la derecha; en el teléfono, una sola columna. */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <MeasurementCards m={measurements} base={base} />
 
+      <section className="flex min-w-0 flex-col gap-3">
+      <h2 className="hidden text-[20px] leading-7 font-bold tracking-[-0.01em] text-ink lg:block">Atajos</h2>
       <ul className="hud divide-y divide-border overflow-hidden rounded-lg">
         {[
           { href: `${base}/mejoras`, label: "Puntos por mejorar", value: open === 0 ? "Todo dentro de la meta" : `${open} ${open === 1 ? "pendiente" : "pendientes"}`, tone: open === 0 ? "text-ok" : "text-danger" },
@@ -91,7 +95,11 @@ export default async function PortalSummary({ params, searchParams }: { params: 
           </li>
         ))}
       </ul>
+      </section>
+      </div>
 
+      {/* Evolución y datos reales, lado a lado en escritorio. */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
       <details name="resumen" className="group flex flex-col gap-3" open={[search.ruta, search.perfil, search.m, search.dias].some((v) => v !== undefined)}>
         <summary className="press hud flex min-h-14 items-center gap-3 rounded-lg px-4 py-2">
           <span className="flex-1 text-[17px] font-semibold text-ink">Evolución de las puntuaciones</span>
@@ -101,9 +109,10 @@ export default async function PortalSummary({ params, searchParams }: { params: 
           <HistoryPanel projectId={project.id} basePath={base} search={search} description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo." />
         </div>
       </details>
-      <section id="experiencia-real" className="scroll-mt-20">
+      <section id="experiencia-real" className="min-w-0 scroll-mt-20">
         <FieldDataCard projectId={project.id} basePath={base} search={search} audience="client" />
       </section>
+      </div>
     </PortalPage>
   );
 }
