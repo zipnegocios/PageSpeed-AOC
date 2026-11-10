@@ -52,6 +52,16 @@ Redacción de cada pieza, sin jerga de una plataforma:
 - «Actualicé **[componente]**» en lugar de «actualicé el plugin»: el componente puede ser plugin, módulo, tema, extensión, librería o dependencia.
 - «Tu **[sitio / tienda / aplicación]**» según el tipo de proyecto.
 
+## Cambios de la revisión integral (todas las mediciones en todas las superficies)
+
+Los correos, el portal y los dos PDF nombran **las mismas mediciones** (lista única en `domain/measurements.ts`): velocidad y calidad de cada página (Lighthouse), puntos por mejorar, experiencia real de los visitantes (Chrome UX Report), búsqueda en Google (Search Console), visitas (GA4), de dónde llegan (reparto completo por origen, redes por nombre), visitas desde asistentes de IA y salud SEO.
+
+- **Bienvenida:** «Qué cuidamos» enumera esas mediciones, la tabla de lo que recibirá nombra las redes y «con qué palabras te buscaron», y se avisa de los dos PDF del portal.
+- **Semanal:** los orígenes salen del reparto completo (`seo_source_daily`: las filas suman las visitas); cada red social va por su nombre; se añade «Con qué palabras te buscaron» (las 3 consultas con más clics) y, si hay «Directo o sin identificar», la nota de por qué (N10). Si el reparto aún no cubre las visitas (antes de la primera descarga completa) se usan los canales de GA4 como antes.
+- **Mensual:** nuevos bloques **«Experiencia real de tus visitantes»** (veredicto de Core Web Vitals y LCP/INP/CLS), **«Visitas del mes»** (con sus orígenes) y **«Visibilidad en Google»** (clics, impresiones, posición y búsquedas principales). Los de tráfico y Google solo salen si el administrador activó el tráfico para el cliente y el mes está completo; botones a los dos PDF.
+- **Informe a mano:** ahora lo envía la misma plantilla que los demás correos (se retiró `notify/report-email.ts`): lleva **los dos PDF**, el índice real de cada uno (de `report-outline.ts`) y tres cifras (velocidad, visitas, Google) leídas de los mismos datos que el portal. Asunto: «Informes técnicos web · [sitio] · [periodo]».
+- **Sin envío automático nuevo:** el semanal y el mensual siguen con su agendador y su interruptor por cliente; el administrador puede enviarse una prueba desde la ficha del proyecto.
+
 ## 0. Bienvenida (al crear el acceso)
 
 Se envía cuando generas el PIN y eliges «enviar al correo». Un solo correo para todo el equipo (destinatario principal + CC). Sustituye al correo actual del PIN en la primera vez; el PIN nuevo posterior sigue siendo el correo corto de hoy, también con copia a todos.
@@ -201,10 +211,9 @@ Se envía cuando generas el PIN y eliges «enviar al correo». Un solo correo pa
 
 ## 3. Informe enviado a mano («Enviar a …»)
 
-Es el correo que ya existe, con el PDF adjunto. Cambia el tono, la firma y los destinatarios (principal + CC).
+Lleva adjuntos los dos PDF (resumen e ingeniería). Cambia el tono, la firma y los destinatarios (principal + CC).
 
-**Asunto actual:** `Informe de [proyecto]`
-**Asunto propuesto:** Informe de [proyecto] · [últimos 30 días]
+**Asunto:** Informes técnicos web · [sitio] · [últimos 30 días]
 
 > Hola [Ana, Luis y María],
 >
@@ -220,7 +229,7 @@ Es el correo que ya existe, con el PDF adjunto. Cambia el tono, la firma y los d
 
 **Notas**
 - N17. Hoy dice «Te enviamos el informe…». Cambia a primera persona del singular, como el resto.
-- N18. Es el único correo con adjunto.
+- N18. Es el único correo con adjuntos (los dos PDF).
 - N19. Sigue con su bloqueo de 5 minutos entre envíos.
 
 ## 4. Destinatarios: uno principal y el resto en copia

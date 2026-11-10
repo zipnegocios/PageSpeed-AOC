@@ -18,6 +18,8 @@ export type AdminSummary = {
   role: "owner" | "admin";
   firstName: string | null;
   lastName: string | null;
+  /** WhatsApp que firma los correos de sus clientes. */
+  phone: string | null;
   /** Clave de la foto en R2 (null si no hay); solo sirve para saber si hay foto y para cambiar la URL al cambiarla. */
   avatarKey: string | null;
   /** La contraseña la puso el propietario al crear la cuenta y la persona aún no la cambió. */
@@ -36,6 +38,7 @@ export function summarize(admin: AdminUser): AdminSummary {
     role: admin.role === "owner" ? "owner" : "admin",
     firstName: admin.firstName,
     lastName: admin.lastName,
+    phone: admin.phone,
     avatarKey: admin.avatarKey,
     provisionalPassword: admin.provisionalPassword,
   };

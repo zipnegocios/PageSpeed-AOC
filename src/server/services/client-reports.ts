@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
+import { senderMailFields, type ClientSender } from "@/server/domain/client-sender";
 import { ccAddresses, greetingNames, siteLabel } from "@/server/domain/client-welcome";
 import {
   buildPartitionRows,
@@ -38,6 +39,7 @@ import * as seoData from "@/server/repositories/seo-data";
 import * as seoIntegrations from "@/server/repositories/seo-integrations";
 import { portalProjectPath } from "@/lib/urls";
 import { findFieldData } from "./crux";
+import { resolveSender } from "./client-sender";
 import { assertUuid } from "./shared";
 
 export type ReportDeps = {
@@ -53,7 +55,7 @@ const pageLabel = (page: string) => (page === "/" ? "Inicio" : page);
 
 type Ctx = { project: Project; client: Client; now: Date; base: string; emailBase: ClientEmailBase };
 
-function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps): Ctx {
+function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps, sender: ClientSender): Ctx {
   const base = (deps.appUrl ?? process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
   return {
     project,
@@ -65,8 +67,20 @@ function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps
       clientName: client.name,
       site: siteLabel(project.baseUrl),
         portalUrl: `${base}${portalProjectPath(client.slug, project.slug)}`,
+      sender,
+      appUrl: base,
     },
   };
+}
+
+/**
+ * Los orígenes de las visitas de un periodo: el reparto completo (`seo_source_daily`) si cubre las visitas del periodo; si no
+ * (antes de la primera descarga completa), los canales de GA4 con las redes por separado.
+ */
+async function sourceRowsFor(db: Database, projectId: string, cur: { from: string; to: string }, prev: { from: string; to: string }, sessions: number): Promise<SourceRow[]> {
+  const [items, prevItems] = await Promise.all([seoData.sourceTop(db, projectId, cur, TOP_SOURCES), seoData.sourceTop(db, projectId, prev, TOP_SOURCES)]);
+  const covered = items.reduce((n, r) => n + r.sessions, 0);
+  return items.length > 0 && covered >= sessions * 0.95 ? buildPartitionRows(items, prevItems) : legacyRows(db, projectId, cur, prev);
 }
 
 /** Los orígenes a partir de los canales de GA4 y las redes (solo mientras no exista el reparto completo). */
@@ -99,9 +113,8 @@ export async function prepareWeekly(c: Ctx, week: WeekPeriod, db: Database): Pro
   const [now, before] = await Promise.all([seoData.trafficTotals(db, c.project.id, cur), seoData.trafficTotals(db, c.project.id, prev)]);
   if (now.rows === 0) return { ok: false, reason: "No hay datos de tráfico de esa semana." };
 
-  const [items, prevItems, pages, search, prevSearch, ai, prevAi, queries] = await Promise.all([
-    seoData.sourceTop(db, c.project.id, cur, TOP_SOURCES),
-    seoData.sourceTop(db, c.project.id, prev, TOP_SOURCES),
+  const [rows, pages, search, prevSearch, ai, prevAi, queries] = await Promise.all([
+    sourceRowsFor(db, c.project.id, cur, prev, now.sessions),
     seoData.trafficBy(db, c.project.id, cur, "page", 3),
     seoData.searchTotals(db, c.project.id, cur),
     seoData.searchTotals(db, c.project.id, prev),
@@ -109,8 +122,6 @@ export async function prepareWeekly(c: Ctx, week: WeekPeriod, db: Database): Pro
     seoData.aiTotals(db, c.project.id, prev),
     seoData.queryTop(db, c.project.id, cur, 3),
   ]);
-  // Con el reparto completo las filas suman las visitas; si todavía no se descargó (antes de la primera descarga), se usan los canales de GA4.
-  const rows = items.length > 0 ? buildPartitionRows(items, prevItems) : await legacyRows(db, c.project.id, cur, prev);
   const visitsDeltaPct = percentChange(now.sessions, before.sessions);
   return {
     ok: true,
@@ -142,8 +153,7 @@ async function monthlyTraffic(c: Ctx, month: MonthPeriod, db: Database): Promise
   const prev = { from: month.prevFrom, to: month.prevTo };
   const [now, before] = await Promise.all([seoData.trafficTotals(db, c.project.id, cur), seoData.trafficTotals(db, c.project.id, prev)]);
   if (now.rows === 0) return null;
-  const [items, prevItems] = await Promise.all([seoData.sourceTop(db, c.project.id, cur, TOP_SOURCES), seoData.sourceTop(db, c.project.id, prev, TOP_SOURCES)]);
-  const rows = items.length > 0 ? buildPartitionRows(items, prevItems) : await legacyRows(db, c.project.id, cur, prev);
+  const rows = await sourceRowsFor(db, c.project.id, cur, prev, now.sessions);
   return { visits: now.sessions, deltaPct: percentChange(now.sessions, before.sessions), sources: rows.slice(0, 5) };
 }
 
@@ -269,7 +279,8 @@ export async function sendClientReport(kind: ReportKind, projectId: string, opts
   if (project.phase !== "production") throw new DomainError("INVALID", "El proyecto debe estar en producción.");
 
   const period = periodOf(kind, now);
-  const ctx = contextOf(project, client, now, deps);
+  const sender = await resolveSender(db, client);
+  const ctx = contextOf(project, client, now, deps, sender);
   const skip = async (reason: string): Promise<SendOutcome> => {
     if (test) throw new DomainError("INVALID", reason);
     await repo.recordSend(db, { projectId, kind, periodKey: period.key, status: "skipped", detail: reason, at: now });
@@ -291,7 +302,7 @@ export async function sendClientReport(kind: ReportKind, projectId: string, opts
   const cc = test ? [] : ccAddresses(client.ccContacts, primary);
   const subject = test ? `[PRUEBA] ${mail.subject}` : mail.subject;
   try {
-    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail, subject });
+    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail, subject, ...senderMailFields(sender) });
   } catch (err) {
     if (!test) {
       const e = err as { code?: unknown; message?: unknown };

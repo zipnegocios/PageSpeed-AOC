@@ -189,6 +189,7 @@ export async function sweepNotifications(config: SweepConfig): Promise<SweepResu
     repo.projectsWithRecentFailedNotification(db, ids, new Date(now.getTime() - (config.retryAfterMs ?? 3_600_000))),
   ]);
 
+  const owners = await repo.ownerAlertRecipients(db, ids);
   const base = config.appUrl.replace(/\/+$/, "");
   for (const [projectId, group] of byProject) {
     if (busy.has(projectId)) {
@@ -222,15 +223,17 @@ export async function sweepNotifications(config: SweepConfig): Promise<SweepResu
       now,
     });
     const stateIds = group.map((r) => r.state.id);
+    // A los clientes de otro responsable les avisa quien los atiende; el resto, el destinatario general.
+    const to = owners.get(projectId) ?? config.recipient;
     try {
-      await config.mailer.send({ to: config.recipient, subject: mail.subject, text: mail.text, html: mail.html });
+      await config.mailer.send({ to, subject: mail.subject, text: mail.text, html: mail.html });
     } catch (err) {
       result.failed += group.length;
       await repo.insertNotification(db, {
         projectId,
         clientId: first.clientId,
         type: mail.type,
-        recipient: config.recipient,
+        recipient: to,
         subject: mail.subject,
         alertStateIds: stateIds,
         status: "failed",
@@ -245,7 +248,7 @@ export async function sweepNotifications(config: SweepConfig): Promise<SweepResu
         projectId,
         clientId: first.clientId,
         type: mail.type,
-        recipient: config.recipient,
+        recipient: to,
         subject: mail.subject,
         alertStateIds: stateIds,
         status: "sent",

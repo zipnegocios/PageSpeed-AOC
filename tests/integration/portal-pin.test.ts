@@ -28,7 +28,7 @@ describe.skipIf(!dbUrl)("PIN del portal", () => {
   beforeAll(async () => { await runMigrations(dbUrl!, "./drizzle"); });
   afterAll(() => pool.end());
   beforeEach(async () => {
-    await db.execute(sql`truncate clients, settings restart identity cascade`);
+    await db.execute(sql`truncate clients, settings, admin_users restart identity cascade`);
     sent = [];
     failMail = false;
     clock = new Date("2026-11-03T12:00:00Z");

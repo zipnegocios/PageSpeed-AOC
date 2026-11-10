@@ -10,6 +10,7 @@ import { isLogoKind } from "@/server/domain/client-logo";
 import * as clientLogo from "@/server/services/client-logo";
 import * as clients from "@/server/services/clients";
 import { addProjectAction, confirmServerCheck, removeProjectAction, sendClientReport, setReportPreferences } from "@/server/services/client-reports";
+import { assignClientOwner } from "@/server/services/client-sender";
 import { sendClientWelcome } from "@/server/services/client-welcome";
 import { generateClientPin } from "@/server/services/portal-pin";
 import * as projects from "@/server/services/projects";
@@ -26,9 +27,10 @@ const contact = (fd: FormData) => ({
 });
 
 export async function createClientAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
+  const session = await verifySession();
   return guarded(async () => {
-    const client = await clients.createClient({ ...contact(fd), slug: field(fd, "slug") });
+    // Quien crea el cliente queda como su responsable: firma sus correos, recibe sus alertas y es el contacto de su portal.
+    const client = await clients.createClient({ ...contact(fd), slug: field(fd, "slug") }, undefined, { ownerId: session.id });
     revalidatePath("/admin/clientes");
     redirect(clientPath(client.slug));
   });
@@ -151,6 +153,15 @@ export async function sendReportTestAction(kind: "weekly" | "monthly", projectId
   return guarded(async () => {
     const r = await sendClientReport(kind, projectId, { testTo: session.email });
     return { ok: `Prueba enviada a ${r.status === "sent" ? r.to : session.email}, con los datos reales del último ${kind === "weekly" ? "periodo semanal" : "mes completo"}. No se envió al cliente.` };
+  });
+}
+
+export async function assignClientOwnerAction(clientId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await assignClientOwner(clientId, field(fd, "ownerId"));
+    revalidateAdmin();
+    return { ok: "Responsable cambiado. Desde ahora firma los correos de este cliente y recibe sus alertas." };
   });
 }
 

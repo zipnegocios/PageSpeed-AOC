@@ -28,7 +28,7 @@ describe.skipIf(!dbUrl)("correos automáticos al cliente", () => {
   beforeAll(async () => { await runMigrations(dbUrl!, "./drizzle"); });
   afterAll(() => pool.end());
   beforeEach(async () => {
-    await db.execute(sql`truncate clients, settings restart identity cascade`);
+    await db.execute(sql`truncate clients, settings, admin_users restart identity cascade`);
     sent = [];
     failMail = false;
     clock = new Date("2026-11-10T13:00:00Z");
@@ -125,6 +125,30 @@ describe.skipIf(!dbUrl)("correos automáticos al cliente", () => {
       expect(m.text).toContain("2. /servicios: 420");
       expect(m.text).toContain("Datos hasta el 8 de nov");
       expect(m.text).toContain("https://app.test/c/");
+    });
+
+    it("con el reparto completo de fuentes: las filas suman las visitas, las redes van por nombre y salen las consultas de búsqueda", async () => {
+      const { project } = await setup();
+      await seedTraffic(project.id);
+      // Reparto completo de la semana (1 240 visitas) y de la anterior.
+      const row = (date: string, grp: string, source: string, sessions: number) => ({ projectId: project.id, date, grp, source, page: "/", sessions, users: sessions });
+      await db.delete(s.seoSourceDaily).where(eq(s.seoSourceDaily.projectId, project.id));
+      await db.insert(s.seoSourceDaily).values([
+        row("2026-11-03", "search", "google", 610),
+        row("2026-11-04", "direct", "(direct)", 210),
+        row("2026-11-05", "referral", "elcolombiano.com", 90),
+        row("2026-11-05", "social", "instagram", 200),
+        row("2026-11-05", "social", "whatsapp", 130),
+        row("2026-10-28", "search", "google", 550),
+        row("2026-10-29", "social", "instagram", 150),
+      ]);
+      await db.insert(s.seoQueryDaily).values([
+        { projectId: project.id, date: "2026-11-04", query: "café de origen", clicks: 40, impressions: 800, positionSum: 3200 },
+        { projectId: project.id, date: "2026-11-05", query: "café de origen", clicks: 22, impressions: 500, positionSum: 2000 },
+      ]);
+      expect((await sendClientReport("weekly", project.id, {}, db, deps())).status).toBe("sent");
+      const m = sent[0]!;
+      for (const t of ["Instagram: 200", "WhatsApp: 130", "Directo o sin identificar: 210", "Otros sitios: 90", "«café de origen» (62 clics)", "mensajes privados"]) expect(m.text).toContain(t);
     });
 
     it("dos personas con la misma dirección: un solo correo que las nombra a las dos", async () => {
@@ -253,6 +277,36 @@ describe.skipIf(!dbUrl)("correos automáticos al cliente", () => {
       expect(m.text).toContain("1 página nueva en octubre");
       expect(m.text).toContain("Hola Ana y Luis,");
       expect(m.text).toContain("/informe");
+    });
+
+    it("con tráfico, Search Console y experiencia real: suma las visitas del mes con sus orígenes, la visibilidad en Google y el veredicto, y enlaza los dos PDF", async () => {
+      const { project } = await setup({ weekly: false });
+      await seedAudits(project.id);
+      await db.insert(s.seoIntegrations).values({ projectId: project.id, kind: "gsc", externalId: "sc", syncStatus: "ok", syncedThrough: "2026-10-31" });
+      const p = project.id;
+      await db.insert(s.seoTrafficDaily).values([
+        { projectId: p, date: "2026-10-10", page: "/", country: "col", channel: "Organic Search", sessions: 600, users: 500 },
+        { projectId: p, date: "2026-10-11", page: "/", country: "col", channel: "Organic Social", sessions: 400, users: 300 },
+        { projectId: p, date: "2026-09-10", page: "/", country: "col", channel: "Organic Search", sessions: 500, users: 400 },
+      ]);
+      await db.insert(s.seoSourceDaily).values([
+        { projectId: p, date: "2026-10-10", grp: "search", source: "google", page: "/", sessions: 600, users: 500 },
+        { projectId: p, date: "2026-10-11", grp: "social", source: "instagram", page: "/", sessions: 400, users: 300 },
+      ]);
+      await db.insert(s.seoSearchDaily).values({ projectId: p, date: "2026-10-12", page: "/", country: "col", device: "MOBILE", clicks: 90, impressions: 3000, positionSum: 21000 });
+      await db.insert(s.seoQueryDaily).values({ projectId: p, date: "2026-10-12", query: "café de origen", clicks: 55, impressions: 900, positionSum: 4500 });
+      await db.insert(s.fieldData).values({ projectId: p, target: "origin", formFactor: "mobile", status: "ok", metrics: { lcp: { p75: 2000, good: 80, needsImprovement: 15, poor: 5 }, inp: { p75: 150, good: 85, needsImprovement: 10, poor: 5 }, cls: { p75: 0.05, good: 90, needsImprovement: 8, poor: 2 } } });
+      await sendClientReport("monthly", p, {}, db, deps());
+      const m = sent[0]!;
+      for (const t of ["VISITAS DEL MES", "1.000", "Instagram: 400", "Buscadores (Google y otros): 600", "VISIBILIDAD EN GOOGLE", "Clics desde Google: 90", "Posición media: 7", "«café de origen» (55 clics)", "EXPERIENCIA REAL DE TUS VISITANTES", "aprobada", "informe?tipo=resumen", "informe?tipo=ingenieria"]) expect(m.text).toContain(t);
+    });
+
+    it("con el tráfico oculto al cliente, el correo del mes no lleva visitas ni Google", async () => {
+      const { project } = await setup({ weekly: false, visible: false });
+      await seedAudits(project.id);
+      await db.insert(s.seoTrafficDaily).values({ projectId: project.id, date: "2026-10-10", page: "/", country: "col", channel: "Organic Search", sessions: 600, users: 500 });
+      await sendClientReport("monthly", project.id, {}, db, deps());
+      expect(sent[0]!.text).not.toContain("VISITAS DEL MES");
     });
 
     it("no afirma que el servidor está bien si no lo confirmaste", async () => {

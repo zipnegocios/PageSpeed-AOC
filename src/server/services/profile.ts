@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDb, type Database } from "@/server/db/client";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
 import { AttemptLimiter } from "@/server/auth/rate-limit";
+import { normalizePhone, PhoneError } from "@/server/domain/client-sender";
 import { DomainError } from "@/server/domain/errors";
 import { AVATAR_PREFIX, NAME_MAX, assertAvatar, detectImage } from "@/server/domain/profile";
 import * as admins from "@/server/repositories/admin-users";
@@ -22,12 +23,19 @@ export const profileName = z
   .refine((v) => !/[\r\n]/.test(v), "Sin saltos de línea.")
   .transform((v) => v.trim());
 
-const profileInput = z.object({ firstName: profileName, lastName: profileName });
+const profileInput = z.object({ firstName: profileName, lastName: profileName, phone: z.string().max(40, "Hasta 40 caracteres.").optional().default("") });
 
-/** Guarda nombre y apellido (ambos opcionales). */
+/** Guarda nombre, apellido y WhatsApp (todos opcionales). El WhatsApp firma los correos de los clientes de esta cuenta. */
 export async function updateProfile(admin: AdminSummary, raw: unknown, db: Database = getDb()): Promise<AdminSummary> {
   const input = parseInput(profileInput, raw);
-  const row = await admins.updateProfile(db, admin.id, { firstName: input.firstName || null, lastName: input.lastName || null });
+  let phone: string | null;
+  try {
+    phone = normalizePhone(input.phone);
+  } catch (err) {
+    if (err instanceof PhoneError) throw new DomainError("INVALID", err.message);
+    throw err;
+  }
+  const row = await admins.updateProfile(db, admin.id, { firstName: input.firstName || null, lastName: input.lastName || null, phone });
   if (!row) throw new DomainError("NOT_FOUND", "Usuario no encontrado.");
   return summarize(row);
 }

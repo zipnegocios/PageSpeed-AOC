@@ -1,7 +1,8 @@
 import { lightToken } from "@/lib/tokens";
 import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
 import { scoreBand } from "@/server/domain/score-band";
-import { CLIENT_SENDER, clientEmailBand, clientEmailFooter, clientTextSignature, EMAIL, emailButton } from "./email-theme";
+import { DEFAULT_SENDER, SENDER_BRAND_NAME, SENDER_SERVICE_NAME, type ClientSender } from "@/server/domain/client-sender";
+import { clientEmailBand, clientEmailFooter, clientTextSignature, EMAIL, emailButton } from "./email-theme";
 
 /**
  * Correos del servicio de seguimiento técnico al cliente (bienvenida, estado mensual, semana en la web e informe
@@ -11,9 +12,10 @@ import { CLIENT_SENDER, clientEmailBand, clientEmailFooter, clientTextSignature,
  * de «ustedes», y el saludo nombra a todas. Los textos no dependen de la tecnología del cliente.
  */
 
-export const SENDER_BRAND = CLIENT_SENDER.brand;
-export const SERVICE_NAME = CLIENT_SENDER.service;
+export const SENDER_BRAND = SENDER_BRAND_NAME;
+export const SERVICE_NAME = SENDER_SERVICE_NAME;
 
+export { DEFAULT_SENDER };
 export type ClientEmail = { subject: string; text: string; html: string };
 
 export type ClientEmailBase = {
@@ -24,6 +26,10 @@ export type ClientEmailBase = {
   /** Sitio o dominio que se muestra, por ejemplo «cafeaurora.com». */
   site: string;
   portalUrl: string;
+  /** Quien firma: el responsable del cliente. */
+  sender: ClientSender;
+  /** Dirección pública de la app: de ahí sale el logo de la banda. */
+  appUrl: string;
 };
 
 export type ProjectKind = "sitio" | "tienda" | "aplicación";
@@ -218,7 +224,7 @@ function blockText(b: Block): string[] {
   }
 }
 
-export type ComposeInput = { subject: string; preview: string; names: string[]; clientName: string; blocks: Block[]; footerNote?: string };
+export type ComposeInput = { subject: string; preview: string; names: string[]; clientName: string; sender: ClientSender; appUrl: string; blocks: Block[]; footerNote?: string };
 export type { Block as EmailBlock };
 
 /** Arma el correo completo: banda con tu nombre, saludo, bloques, firma y pie. Lo comparten todos los correos al cliente. */
@@ -227,14 +233,14 @@ export function composeClientEmail(input: ComposeInput): ClientEmail {
   const html =
     `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(input.preview)}</div>` +
     `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${EMAIL.ink};max-width:600px;background:#FFFFFF">` +
-    clientEmailBand() +
+    clientEmailBand(input.sender, input.appUrl) +
     `<div style="padding:20px;border:1px solid ${C.line};border-top:0">` +
     `<p style="margin:0 0 14px">${esc(hello)}</p>` +
     input.blocks.map(blockHtml).join("") +
-    `<p style="margin:0 0 14px"><b>${esc(CLIENT_SENDER.name)}</b><br>${esc(CLIENT_SENDER.brand)}</p>` +
-    clientEmailFooter(input.footerNote) +
+    `<p style="margin:0 0 14px"><b>${esc(input.sender.name)}</b><br>${esc(input.sender.brand)}</p>` +
+    clientEmailFooter(input.sender, input.footerNote) +
     `</div></div>`;
-  const text = [hello, "", ...input.blocks.flatMap(blockText), ...clientTextSignature(input.footerNote)].join("\n");
+  const text = [hello, "", ...input.blocks.flatMap(blockText), ...clientTextSignature(input.sender, input.footerNote)].join("\n");
   return { subject: input.subject, text, html };
 }
 
@@ -267,8 +273,8 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
     {
       k: "p",
       t: T(
-        `Soy **${CLIENT_SENDER.name}** (${CLIENT_SENDER.brand}), quien se encarga de tu ${i.kind}. Te escribo desde esta dirección nueva para enviarte los informes: si no la reconoces, es normal, soy yo.`,
-        `Soy **${CLIENT_SENDER.name}** (${CLIENT_SENDER.brand}), quien se encarga de su ${i.kind}. Les escribo desde esta dirección nueva para enviarles los informes: si no la reconocen, es normal, soy yo.`,
+        `Soy **${i.sender.name}** (${i.sender.brand}), quien se encarga de tu ${i.kind}. Te escribo desde esta dirección nueva para enviarte los informes: si no la reconoces, es normal, soy yo.`,
+        `Soy **${i.sender.name}** (${i.sender.brand}), quien se encarga de su ${i.kind}. Les escribo desde esta dirección nueva para enviarles los informes: si no la reconocen, es normal, soy yo.`,
       ),
     },
     {
@@ -318,10 +324,15 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
     { k: "fine", t: `Fuentes: Deloitte y 55 para Google (web.dev), Verizon DBIR 2026${i.eolNote ? ", endoflife.date" : ""}.` },
     {
       k: "p",
-      t: T(
-        "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndeme este correo o escríbeme por WhatsApp.",
-        "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndanme este correo o escríbanme por WhatsApp.",
-      ),
+      t: i.sender.whatsapp
+        ? T(
+            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndeme este correo o escríbeme por WhatsApp.",
+            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndanme este correo o escríbanme por WhatsApp.",
+          )
+        : T(
+            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndeme este correo.",
+            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndanme este correo.",
+          ),
     },
   ];
   return composeClientEmail({
@@ -329,6 +340,8 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
     preview: T("Qué vas a recibir, cuándo y cómo verlo cuando quieras. No tienes que hacer nada.", "Qué van a recibir, cuándo y cómo verlo cuando quieran. No tienen que hacer nada."),
     names: i.names,
     clientName: i.clientName,
+    sender: i.sender,
+    appUrl: i.appUrl,
     blocks,
   });
 }
@@ -420,6 +433,8 @@ export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
     preview: "Lo que revisamos, lo que atendimos y lo que viene.",
     names: i.names,
     clientName: i.clientName,
+    sender: i.sender,
+    appUrl: i.appUrl,
     blocks,
     footerNote: "Para cambiar la frecuencia, respóndeme este correo.",
   });
@@ -488,6 +503,8 @@ export function buildWeeklyEmail(i: WeeklyInput): ClientEmail {
     preview: "De dónde llegaron y qué páginas funcionaron.",
     names: i.names,
     clientName: i.clientName,
+    sender: i.sender,
+    appUrl: i.appUrl,
     blocks,
     footerNote: `Datos hasta el ${i.dataThrough}. Para cambiar la frecuencia, respóndeme este correo.`,
   });
@@ -524,5 +541,5 @@ export function buildClientReportEmail(i: ManualReportInput): ClientEmail {
     { k: "p", t: `${T("Siempre puedes ver", "Siempre pueden ver")} el estado actualizado, y descargar los informes de nuevo, en ${T("tu", "su")} portal:` },
     { k: "buttons", items: [{ label: "Abrir el portal", url: i.portalUrl }] },
   ];
-  return composeClientEmail({ subject: `Informes técnicos web · ${i.site} · ${i.periodLabel}`, preview: `Los informes de ${i.site}, ${i.periodLabel}, en PDF.`, names: i.names, clientName: i.clientName, blocks });
+  return composeClientEmail({ subject: `Informes técnicos web · ${i.site} · ${i.periodLabel}`, preview: `Los informes de ${i.site}, ${i.periodLabel}, en PDF.`, names: i.names, clientName: i.clientName, sender: i.sender, appUrl: i.appUrl, blocks });
 }

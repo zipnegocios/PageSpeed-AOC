@@ -8,6 +8,7 @@
 //   --cc=a@x.com,b@y.com   copia a más personas (así se ve el CC real)
 //   --una-persona          saluda a una sola persona («tú») en lugar de a tres («ustedes»)
 //   --tech=wp|shopify|next tecnología del cliente de ejemplo (por defecto wp)
+//   --responsable=luis     firma como el segundo responsable (nombre y WhatsApp de ejemplo)
 //   --solo=bienvenida,mensual,semanal,manual   envía solo esos
 //   --dry-run=carpeta      no envía: escribe un .html y un .txt por correo en esa carpeta
 //
@@ -15,6 +16,7 @@
 // debe ser la dirección pública de la app).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_SENDER, senderMailFields, type ClientSender } from "../src/server/domain/client-sender";
 import { createMailer } from "../src/server/notify/mailer";
 import {
   buildClientReportEmail,
@@ -50,7 +52,11 @@ async function main(): Promise<void> {
   }
 
   const appUrl = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
-  const base: ClientEmailBase = {
+  // Quién firma: por defecto Gustavo; --responsable=luis prueba cómo ve el cliente a un segundo responsable.
+const sender: ClientSender = opt("responsable") === "luis" ? { ...DEFAULT_SENDER, name: "Luis Porteles", whatsapp: "+1 555 010 0000", email: "luis@example.com" } : DEFAULT_SENDER;
+const base: ClientEmailBase = {
+  sender,
+  appUrl,
     names: flag("una-persona") ? ["Ana"] : ["Ana", "Luis", "María"],
     clientName: "Café Aurora",
     site: "cafeaurora.com",
@@ -78,7 +84,21 @@ async function main(): Promise<void> {
       ],
       upcoming: "Revisión trimestral de tecnologías y versiones, en noviembre.",
       newPages: "2 páginas nuevas en octubre, ya en seguimiento automático.",
-      reportUrl: `${appUrl}/c/cafe-aurora/cafeaurora/informe`,
+      traffic: {
+        visits: 5380,
+        deltaPct: 7,
+        sources: [
+          { label: "Buscadores (Google y otros)", visits: 2410, deltaPct: 9 },
+          { label: "Instagram", visits: 620, deltaPct: 14 },
+          { label: "WhatsApp", visits: 410, deltaPct: 22 },
+          { label: "Directo o sin identificar", visits: 880, deltaPct: -3 },
+          { label: "Otros sitios", visits: 390, deltaPct: 5 },
+        ],
+      },
+      search: { clicks: 1390, clicksDeltaPct: 12, impressions: 41800, position: 7.2, queries: [{ query: "café de especialidad", clicks: 210 }, { query: "tostadores en bogotá", clicks: 140 }, { query: "café aurora", clicks: 120 }] },
+      field: { verdict: "passed", items: [{ label: "LCP", value: "2.1 s", word: "bueno" }, { label: "INP", value: "140 ms", word: "bueno" }, { label: "CLS", value: "0.020", word: "bueno" }] },
+      reportUrl: `${appUrl}/c/cafe-aurora/cafeaurora/informe?tipo=resumen&dias=30`,
+      engineeringUrl: `${appUrl}/c/cafe-aurora/cafeaurora/informe?tipo=ingenieria&dias=30`,
     }),
     semanal: buildWeeklyEmail({
       ...base,
@@ -88,8 +108,9 @@ async function main(): Promise<void> {
       visitsDeltaPct: 8,
       search: { clicks: 310, clicksDeltaPct: 12, impressions: 9800 },
       sources: [
-        { label: "Google (búsqueda)", visits: 610, deltaPct: 11 },
+        { label: "Buscadores (Google y otros)", visits: 610, deltaPct: 11 },
         { label: "Instagram", visits: 140, deltaPct: 9 },
+        { label: "WhatsApp", visits: 55, deltaPct: 18 },
         { label: "LinkedIn", visits: 85, deltaPct: 30 },
         { label: "TikTok", visits: 40, deltaPct: null },
         { label: "Facebook", visits: 25, deltaPct: -5 },
@@ -98,6 +119,7 @@ async function main(): Promise<void> {
         { label: "Otros sitios", visits: 90, deltaPct: 20 },
       ],
       ai: { visits: 30, deltaPct: null },
+      queries: [{ query: "café de especialidad", clicks: 64 }, { query: "tostadores en bogotá", clicks: 41 }, { query: "café aurora", clicks: 33 }],
       topPages: [
         { label: "Inicio", visits: 480 },
         { label: "Servicios", visits: 210 },
@@ -106,7 +128,7 @@ async function main(): Promise<void> {
       summaryLine: "Semana estable, con más llegada desde Google y LinkedIn.",
       dataThrough: "8 de nov",
     }),
-    manual: buildClientReportEmail({ ...base, periodLabel: "últimos 30 días", summaryLine: "Mejoró la velocidad en el móvil y no hay incidencias abiertas." }),
+    manual: buildClientReportEmail({ ...base, periodLabel: "últimos 30 días", summaryLine: "Mejoró la velocidad en el móvil y no hay incidencias abiertas.", facts: ["**Velocidad:** rendimiento medio de tus páginas, 84 sobre 100.", "**Visitas:** 5.380 (+7 %); el origen que más aporta: Google.", "**Google:** 1.390 clics y 41.800 veces que apareció tu sitio."] }),
   };
 
   const only = opt("solo")?.split(",").map((s) => s.trim());
@@ -137,7 +159,7 @@ async function main(): Promise<void> {
     const cc = opt("cc")?.split(",").map((s) => s.trim()).filter(Boolean);
     for (const n of names) {
       const mail = all[n]!;
-      await mailer.send({ to: to!, ...(cc && cc.length > 0 ? { cc } : {}), subject: `[PRUEBA] ${mail.subject}`, text: mail.text, html: mail.html });
+      await mailer.send({ to: to!, ...senderMailFields(sender), ...(cc && cc.length > 0 ? { cc } : {}), subject: `[PRUEBA] ${mail.subject}`, text: mail.text, html: mail.html });
       console.log(`Enviado: ${n} → ${to}`);
     }
   }

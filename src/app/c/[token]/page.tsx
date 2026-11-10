@@ -28,7 +28,7 @@ export default async function PortalHome({ params }: { params: Promise<{ token: 
   const { token } = await params;
   const access = await portalAccess(token);
   if (access.state === "blocked") return <BlockedNotice />;
-  if (access.state === "suspended") return <SuspendedNotice clientName={access.clientName} />;
+  if (access.state === "suspended") return <SuspendedNotice clientName={access.clientName} contact={access.contact} />;
   // Enlace antiguo con token: ya no da acceso, lleva al portal con PIN.
   if (access.state === "legacy") redirect(`/c/${access.slug}`);
   if (access.state === "pin") return <PinGateFor slug={token} />;

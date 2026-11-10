@@ -20,7 +20,7 @@ export type ProjectGate =
 export const loadProjectGate = cache(async (token: string, projectId: string): Promise<ProjectGate> => {
   const access = await portalAccess(token);
   if (access.state === "blocked") return { kind: "notice", element: <BlockedNotice /> };
-  if (access.state === "suspended") return { kind: "notice", element: <SuspendedNotice clientName={access.clientName} /> };
+  if (access.state === "suspended") return { kind: "notice", element: <SuspendedNotice clientName={access.clientName} contact={access.contact} /> };
   if (access.state === "legacy") notFound();
   if (access.state === "pin") return { kind: "notice", element: <PinGateFor slug={token} /> };
   const project = await getPortalProject(access.client.id, projectId);

@@ -26,7 +26,8 @@ export async function getClientByRef(ref: string, db: Database = getDb()) {
   return client;
 }
 
-export async function createClient(raw: unknown, db: Database = getDb()) {
+/** `opts.ownerId`: quien lo crea queda como su responsable (firma sus correos, recibe sus alertas). */
+export async function createClient(raw: unknown, db: Database = getDb(), opts: { ownerId?: string | null } = {}) {
   const input = parseInput(clientInput, raw);
   const slug = input.slug
     ? requireSlug(input.slug)
@@ -43,6 +44,7 @@ export async function createClient(raw: unknown, db: Database = getDb()) {
       contactPhone: input.contactPhone ?? null,
       notes: input.notes ?? null,
       magicToken: generateMagicToken(),
+      ownerId: opts.ownerId ?? null,
     });
   } catch (err) {
     if (isUniqueViolation(err)) throw new DomainError("CONFLICT", `Ya existe un cliente con el identificador "${slug}".`);

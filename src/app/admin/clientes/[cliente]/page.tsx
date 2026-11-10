@@ -12,6 +12,7 @@ import { CopyButton } from "@/lib/ui/components/copy-button";
 import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
+import { listResponsibles } from "@/server/services/client-sender";
 import { ClientLogoUploader } from "@/app/admin/_components/client-logo-uploader";
 import { logoInfo } from "@/server/domain/client-logo";
 import { PinForms } from "@/app/admin/_components/pin-forms";
@@ -22,6 +23,7 @@ import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
 import {
   archiveClientAction,
+  assignClientOwnerAction,
   createProjectAction,
   renameClientSlugAction,
   generateAndEmailPinAction,
@@ -43,6 +45,9 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   if (cliente !== client.slug) redirect(clientPath(client.slug));
   const id = client.id;
   const projects = await listProjects(id);
+  const responsibles = await listResponsibles();
+  // Sin responsable (clientes anteriores) firma la cuenta propietaria.
+  const responsible = responsibles.find((r) => r.id === client.ownerId) ?? responsibles.find((r) => r.role === "owner") ?? responsibles[0] ?? null;
   const fixedUrl = `${appUrl()}/c/${client.slug}`;
   const currentPin = readStoredPin(client);
   const active = client.status === "active";
@@ -102,6 +107,33 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
 
       <Card title="Logotipo" description="Dos versiones del logotipo del cliente. Se ven en su portal, en el panel y en los informes en PDF.">
         <ClientLogoUploader clientId={id} name={client.name} icon={Boolean(logo?.icon)} full={Boolean(logo?.full)} bg={client.logoBg} v={logo?.v ?? 0} />
+      </Card>
+
+      <Card
+        title="Responsable"
+        description="Quien atiende a este cliente. Firma todos los correos que recibe, le llegan las alertas de sus proyectos y es el contacto de su portal. Quien crea el cliente queda como responsable."
+      >
+        <ActionForm action={assignClientOwnerAction.bind(null, id)} submitLabel="Cambiar responsable" pendingLabel="Guardando…" variant="secondary" className="max-w-xl">
+          <SelectField label="Responsable" id="ownerId" defaultValue={responsible?.id ?? ""}>
+            {responsibles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+                {r.name !== r.email ? ` · ${r.email}` : ""}
+                {r.role === "owner" ? " (propietario)" : ""}
+              </option>
+            ))}
+          </SelectField>
+        </ActionForm>
+        {responsible ? (
+          <div className="flex flex-col gap-2 text-[15px] leading-5 text-ink-muted">
+            <p>
+              Los correos al cliente salen como <strong className="text-ink">{responsible.name}</strong>
+              {responsible.phone || responsible.role === "owner" ? "" : ", sin teléfono en el pie"}; las respuestas llegan a {responsible.email}.
+            </p>
+            {!responsible.hasName ? <p className="text-ink">Esta persona no tiene nombre en su perfil: el correo saldría firmado con su dirección. Pídele que lo complete en «Mi perfil».</p> : null}
+            {!responsible.phone && responsible.role !== "owner" ? <p className="text-ink">Esta persona no tiene WhatsApp en su perfil: el pie del correo no mostrará teléfono. Se agrega en «Mi perfil».</p> : null}
+          </div>
+        ) : null}
       </Card>
 
       <Card

@@ -157,15 +157,22 @@ ficha del cliente, tarjeta **Bienvenida** (`services/client-welcome.ts`, plantil
   Con una persona habla de «tú»; con varias, de «ustedes». **Dos personas pueden compartir una dirección** (incluida la del
   contacto principal): se escriben en líneas aparte con la misma dirección, se nombran las dos y el correo llega una sola vez.
   Las direcciones en copia nunca se repiten.
-- **Quién firma:** los clientes reconocen a la persona (nombre y apellido) antes que a la marca, así que todos los correos que
-  ve el cliente (bienvenida, semanal, mensual, informes enviados a mano y PIN) llevan en la banda y en la firma «Gustavo
-  Amarista» primero y «zipnegocios · Informes técnicos web» debajo, con el WhatsApp. No muestran «PageSpeed», ni logo, ni ©
-  (`CLIENT_SENDER` en `notify/email-theme.ts`). La bienvenida se presenta («Soy Gustavo Amarista… te escribo desde esta
-  dirección nueva; si no la reconoces, es normal, soy yo»). Los correos al administrador (alertas, invitaciones) siguen con
-  la marca del producto.
-- **Remitente y respuestas:** `EMAIL_FROM` es lo que ve el cliente en su bandeja: pon tu nombre primero, por ejemplo
-  `Gustavo Amarista <correo@tudominio.com>`. `EMAIL_REPLY_TO` (opcional, web y worker) es adonde responde el cliente: tu correo
-  de siempre. El PIN nuevo también llega a todo el equipo (contacto principal y copia), y el informe enviado a mano igual.
+- **Quién firma: el responsable del cliente.** Los clientes reconocen a la persona (nombre y apellido) antes que a la marca. Cada
+  cliente tiene un **responsable** (`clients.owner_id`): quien lo crea queda como responsable y se puede reasignar en su ficha
+  (tarjeta «Responsable»). Todos los correos que ve el cliente (bienvenida, semanal, mensual, informes a mano y PIN) llevan en la
+  cabecera el logo de PageSpeed y, junto a él, el **nombre del responsable**; debajo «zipnegocios · Informes técnicos web»; y la
+  firma y el pie con su nombre y su **WhatsApp** (el teléfono se guarda en «Mi perfil», `admin_users.phone`; sin teléfono, el pie
+  no muestra WhatsApp; la cuenta propietaria conserva el de siempre mientras no ponga el suyo). Sin responsable (clientes
+  anteriores, o una cuenta que ya no existe) firma la cuenta propietaria (`services/client-sender.ts`, `resolveSender`). La
+  bienvenida se presenta («Soy Luis Porteles (zipnegocios)… te escribo desde esta dirección nueva; si no la reconoces, es
+  normal, soy yo»). Los correos al administrador (alertas, invitaciones) siguen con la marca del producto.
+- **Lo que cambia con el responsable:** el nombre visible del remitente (`fromName`; la dirección de envío es siempre la de
+  `EMAIL_FROM`, así que la entrega no cambia), el `Reply-To` (el correo del responsable: las respuestas le llegan a él), las
+  **alertas** de los proyectos (a los clientes de otra persona del equipo les avisa esa persona; a los de la cuenta propietaria
+  y a los sin responsable, `ALERT_EMAIL` o el administrador, como siempre) y el contacto del aviso de **servicio suspendido** del
+  portal (nombre y WhatsApp del responsable). Cada administrador sigue viendo todos los clientes.
+- **Remitente y respuestas:** `EMAIL_FROM` fija la dirección de envío (el nombre visible lo pone el responsable de cada cliente);
+  `EMAIL_REPLY_TO` (opcional, web y worker) es adonde responde el cliente cuando el responsable no tiene correo. El PIN nuevo también llega a todo el equipo (contacto principal y copia), y el informe enviado a mano igual.
 - **PIN:** si el cliente ya tiene un PIN que se puede mostrar, se reutiliza (no se cierran sesiones). Si no, se genera uno
   nuevo, y solo se activa si el correo salió. El portal sigue siendo un único acceso por cliente.
 - **Prueba:** la casilla «Enviarme solo una prueba» manda el mismo correo, con los mismos datos, al correo del administrador
@@ -409,6 +416,7 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 
 - La cuenta **propietaria** se crea al primer arranque con `ADMIN_EMAIL` / `ADMIN_PASSWORD` (solo se leen cuando no existe ninguna; cambiarlas después no agrega ni cambia a nadie).
 - Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Todas administran clientes, proyectos, agentes y cola; solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Si el correo no sale, el enlace se copia desde la pantalla.
+- **La invitación por correo** lista por secciones numeradas todo lo que se puede hacer en la plataforma (clientes y proyectos, auditorías y alertas, SEO, lo que recibe el cliente, lo que anota cada responsable, agentes MCP, lo que está en camino y lo exclusivo de la cuenta propietaria) y pide completar nombre, apellido y WhatsApp en «Mi perfil», que es lo que ven los clientes. El listado vive en `STAFF_GUIDE` (`notify/invite-email.ts`): se actualiza ahí cuando cambia lo que hace el panel.
 - Al invitar se prepara **el perfil completo** de la persona: nombre, apellido y foto (todo opcional) y cómo entra: **enlace por
   correo** (la cuenta nace con esos datos al aceptarlo) o **contraseña provisional** (la cuenta se crea en el acto, sin correo; la
   contraseña se muestra una sola vez y la persona puede cambiarla en su perfil, con un aviso mientras siga siendo provisional).
@@ -421,7 +429,7 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 - La barra superior lleva, a la derecha, el conmutador de proyectos, una **campana** de alertas (número de alertas abiertas
   y, al abrirla, las 5 más recientes con «Ver todas las alertas») y el **avatar** de la persona, que abre su menú: Mi perfil,
   Equipo (solo el propietario), Archivados y Salir. El menú es accesible (Esc, clic fuera, flechas, Inicio y Fin).
-- **Mi perfil** (`/admin/perfil`, cualquier administrador): foto, nombre y apellido (opcionales) y cambio de contraseña (pide
+- **Mi perfil** (`/admin/perfil`, cualquier administrador): foto, nombre, apellido y WhatsApp (opcionales; firman los correos de sus clientes) y cambio de contraseña (pide
   la actual, mínimo 12 caracteres, con límite de intentos); al cambiarla se cierran las demás sesiones y la actual se renueva.
 - La **foto** se recorta en cuadrado y se reduce a 256 px en el navegador, se valida en el servidor por firma (PNG, JPEG o
   WebP, máximo 1 MB) y se guarda en R2 bajo `_avatars/<id>/…`; solo se sirve con sesión de administrador

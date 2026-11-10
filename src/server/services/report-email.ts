@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@/server/db/client";
 import { env } from "@/server/config/env";
+import { senderMailFields } from "@/server/domain/client-sender";
 import { ccAddresses, greetingNames, siteLabel } from "@/server/domain/client-welcome";
 import { DomainError } from "@/server/domain/errors";
 import { PERIOD_LABEL, type Period } from "@/server/domain/history";
@@ -11,6 +12,7 @@ import { insertNotification, listRecentNotifications } from "@/server/repositori
 import { formatCount, formatPct } from "@/server/notify/client-emails";
 import { percentChange } from "@/server/domain/seo-data";
 import { listOpenAlerts } from "./alerts";
+import { resolveSender } from "./client-sender";
 import { getClient } from "./clients";
 import { averageScores, getLatestScores } from "./history";
 import { getPortalMeasurements } from "./project-measurements";
@@ -66,7 +68,10 @@ export async function sendProjectReport(
     facts.push(`**Visitas:** ${formatCount(d.traffic.totals.sessions)}${delta === null ? "" : ` (${formatPct(delta)})`}${top ? `; el origen que más aporta: ${top.label}` : ""}.`);
   }
   if (d?.search) facts.push(`**Google:** ${formatCount(d.search.totals.clicks)} clics y ${formatCount(d.search.totals.impressions)} veces que apareció tu sitio.`);
+  const sender = await resolveSender(db, client);
   const mail = buildClientReportEmail({
+    sender,
+    appUrl: base,
     names: greetingNames(client.contactName, client.ccContacts),
     clientName: client.name,
     site: siteLabel(project.baseUrl),
@@ -81,6 +86,7 @@ export async function sendProjectReport(
       to,
       ...(cc.length > 0 ? { cc } : {}),
       ...mail,
+      ...senderMailFields(sender),
       attachments: [summary, engineering].map((f) => ({ filename: f.filename, content: f.pdf, contentType: "application/pdf" })),
     });
   } catch (err) {
