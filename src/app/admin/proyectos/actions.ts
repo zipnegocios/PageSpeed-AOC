@@ -223,6 +223,16 @@ export async function toggleRouteAuthAction(projectId: string, routeId: string, 
   });
 }
 
+/** El nombre que verá el cliente en su portal para esta página (vacío = el título del rastreo o, a falta, la ruta). */
+export async function updateRouteLabelAction(projectId: string, routeId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await routes.updateRouteDetails(routeId, { label: field(fd, "label").slice(0, 120) });
+    refresh(projectId);
+    return { ok: "Nombre guardado." };
+  });
+}
+
 export async function saveFormAuthAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
   await verifySession();
   return guarded(async () => {

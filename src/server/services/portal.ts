@@ -2,13 +2,17 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
 import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
+import { pathTitle, resolveTitles } from "@/server/domain/page-title";
+import { buildRouteTree, countPages, type ProfileScores, type TreeNode, type TreePage } from "@/server/domain/route-tree";
 import { isValidSlug } from "@/server/domain/slug";
 import { findClientBySlug, findClientByToken } from "@/server/repositories/clients";
+import { latestCrawlTitles } from "@/server/repositories/seo-crawl";
 import { listOpenAlerts, type AlertView } from "./alerts";
 import { averageScores, getLatestScores, type LatestScores } from "./history";
 import { assertUuid } from "./shared";
 import { getAudit, getSiblingAudits, type AuditDetail, type SiblingAudits } from "./audits";
-import { getRoute } from "./routes";
+import { getRoute, listRoutes } from "./routes";
+import { getMarkets } from "./seo-markets";
 
 /** El token es de 32 bytes en base64url: 43 caracteres. Todo lo demás se descarta sin tocar la base de datos. */
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -142,4 +146,48 @@ export async function getPortalAudit(clientId: string, projectId: string, auditI
 export async function getPortalSiblings(clientId: string, projectId: string, auditId: string, db: Database = getDb()): Promise<SiblingAudits | null> {
   const found = await getPortalAudit(clientId, projectId, auditId, db);
   return found ? getSiblingAudits(auditId, db) : null;
+}
+
+/** Lo que el portal muestra de un perfil (móvil o escritorio) de una página: puntuaciones, métricas y la auditoría a la que enlaza. */
+export type PortalProfileView = ProfileScores & {
+  auditId: string;
+  finishedAt: Date;
+  metrics: LatestScores["metrics"];
+  changes: LatestScores["changes"];
+};
+export type PortalTreeNode = TreeNode<PortalProfileView>;
+export type PortalRouteTree = { nodes: PortalTreeNode[]; pages: number; improvements: number };
+
+/**
+ * El árbol de páginas de un proyecto para la pestaña «Rutas»: una entrada por ruta monitoreada con sus últimas auditorías,
+ * las mejoras abiertas por ruta (que suben a los padres) y el título que verá el cliente. Título: etiqueta del
+ * administrador → título del último rastreo (solo páginas que respondieron 200 sin redirección y no exigen sesión) → ruta.
+ */
+export async function getPortalRouteTree(project: PortalProject, db: Database = getDb()): Promise<PortalRouteTree> {
+  const [routes, crawl, markets] = await Promise.all([listRoutes(project.id, db), latestCrawlTitles(db, project.id), getMarkets(project.id, db)]);
+  const meta = new Map(routes.map((r) => [r.path, r]));
+  const crawlBy = new Map(crawl.map((c) => [c.path, c]));
+  const improvementsBy = new Map<string, number>();
+  for (const a of project.improvements) improvementsBy.set(a.routePath, (improvementsBy.get(a.routePath) ?? 0) + 1);
+
+  const byRoute = new Map<string, TreePage<PortalProfileView>>();
+  for (const l of project.latest) {
+    const page = byRoute.get(l.routeId) ?? { routeId: l.routeId, path: l.path, title: "", improvements: improvementsBy.get(l.path) ?? 0, profiles: {} };
+    page.profiles[l.profile] = { scores: l.scores, agentic: l.agentic, auditId: l.auditId, finishedAt: l.finishedAt, metrics: l.metrics, changes: l.changes };
+    byRoute.set(l.routeId, page);
+  }
+  const pages = [...byRoute.values()];
+  const titles = resolveTitles(
+    pages.map((p) => {
+      const c = crawlBy.get(p.path);
+      const trusted = c && c.status === 200 && (c.finalPath === null || c.finalPath === p.path) && !meta.get(p.path)?.requiresAuth;
+      return { path: p.path, label: meta.get(p.path)?.label ?? null, crawlTitle: trusted ? c.title : null };
+    }),
+    project.name,
+  );
+  for (const p of pages) p.title = titles.get(p.path) ?? pathTitle(p.path);
+
+  const marketTitle = new Map(markets.filter((m) => m.prefix).map((m) => [m.prefix, m.label]));
+  const nodes = buildRouteTree(pages, (path) => marketTitle.get(path) ?? pathTitle(path));
+  return { nodes, pages: countPages(nodes), improvements: project.improvements.length };
 }

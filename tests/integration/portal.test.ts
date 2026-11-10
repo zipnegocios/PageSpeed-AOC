@@ -240,5 +240,77 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
       expect(Object.keys(p.improvements[0]!).sort()).toEqual(["id", "kind", "openedAt", "profile", "routePath", "summary"]);
       expect(JSON.stringify(p)).not.toMatch(/allowedHosts|magicToken|contactEmail|clientId/);
     });
+
+    it("las métricas web esenciales de la última auditoría llegan al portal", async () => {
+      const a = await setup("Acme");
+      await audit(a.project.id, a.routes[0]!.id, "mobile", daysAgo(1), { lcp: 3100, tbt: 250, cls: "0.12" });
+      const p = (await portal.getPortalProject(a.client.id, a.project.id, db))!;
+      expect(p.latest[0]!.metrics).toEqual({ lcpMs: 3100, tbtMs: 250, cls: 0.12 });
+    });
+  });
+
+  describe("árbol de páginas del portal", () => {
+    const crawl = async (projectId: string, pages: Array<{ path: string; title: string | null; status?: number; finalPath?: string | null }>) => {
+      const [run] = await db.insert(s.seoCrawlRuns).values({ projectId, trigger: "manual", status: "succeeded", finishedAt: new Date() }).returning();
+      await db.insert(s.seoCrawlPages).values(pages.map((p) => ({ runId: run!.id, path: p.path, title: p.title, status: p.status ?? 200, finalPath: p.finalPath ?? null })));
+    };
+
+    it("arma el árbol con título, mejoras que suben al padre y métricas, y nada de datos internos", async () => {
+      const a = await setup("Acme", "production", ["/", "/servicios", "/servicios/consultoria-legal", "/productos/grua"]);
+      const [home, servicios, legal, grua] = a.routes;
+      await audit(a.project.id, home!.id, "mobile", daysAgo(1), { p: 95 });
+      await audit(a.project.id, servicios!.id, "mobile", daysAgo(1), { p: 90 });
+      await audit(a.project.id, legal!.id, "mobile", daysAgo(1), { p: 40 });
+      await audit(a.project.id, grua!.id, "desktop", daysAgo(1), { p: 80 });
+      await alerts.evaluateAudit((await audit(a.project.id, legal!.id, "mobile", daysAgo(0), { p: 40 })).id, { db });
+      await crawl(a.project.id, [
+        { path: "/servicios", title: "Servicios | Acme" },
+        { path: "/servicios/consultoria-legal", title: "Consultoría legal | Acme" },
+        { path: "/productos/grua", title: "Grúa torre GT-200 | Acme" },
+      ]);
+      const project = (await portal.getPortalProject(a.client.id, a.project.id, db))!;
+      const tree = await portal.getPortalRouteTree(project, db);
+
+      expect(tree.pages).toBe(4);
+      expect(tree.nodes.map((n) => n.title)).toEqual(["Inicio", "Productos", "Servicios"]);
+      const productos = tree.nodes.find((n) => n.path === "/productos")!;
+      expect(productos.page).toBeNull(); // padre virtual
+      expect(productos.children[0]!.title).toBe("Grúa torre GT-200"); // título del rastreo sin la marca
+      const serv = tree.nodes.find((n) => n.path === "/servicios")!;
+      expect(serv.title).toBe("Servicios");
+      expect(serv.ownImprovements).toBe(0);
+      expect(serv.totalImprovements).toBeGreaterThan(0); // la mejora de la hija sube al padre
+      expect(serv.children[0]!.title).toBe("Consultoría legal");
+      expect(serv.children[0]!.page!.profiles.mobile!.metrics.lcpMs).toBe(2000);
+      expect(JSON.stringify(tree)).not.toMatch(/allowedHosts|magicToken|contactEmail|r2Key/);
+    });
+
+    it("la etiqueta del administrador manda; el rastreo no vale si redirigió o si la ruta exige sesión", async () => {
+      const a = await setup("Acme", "production", ["/a", "/b", "/c", "/d"]);
+      for (const r of a.routes) await audit(a.project.id, r.id, "mobile", daysAgo(1));
+      await routes.updateRouteDetails(a.routes[0]!.id, { label: "Nuestra empresa" }, db);
+      await routes.updateRouteDetails(a.routes[3]!.id, { requiresAuth: true }, db);
+      await crawl(a.project.id, [
+        { path: "/a", title: "Título del rastreo" },
+        { path: "/b", title: "Pantalla de acceso", finalPath: "/login" },
+        { path: "/c", title: "Página con error", status: 500 },
+        { path: "/d", title: "Panel privado" },
+      ]);
+      const tree = await portal.getPortalRouteTree((await portal.getPortalProject(a.client.id, a.project.id, db))!, db);
+      const title = (path: string) => tree.nodes.find((n) => n.path === path)!.title;
+      expect(title("/a")).toBe("Nuestra empresa");
+      expect(title("/b")).toBe("B");
+      expect(title("/c")).toBe("C");
+      expect(title("/d")).toBe("D");
+    });
+
+    it("sin auditorías el árbol está vacío; un grupo por idioma usa el nombre del idioma", async () => {
+      const a = await setup("Acme", "production", ["/es/servicios", "/en/services"]);
+      expect((await portal.getPortalRouteTree((await portal.getPortalProject(a.client.id, a.project.id, db))!, db)).pages).toBe(0);
+      for (const r of a.routes) await audit(a.project.id, r.id, "mobile", daysAgo(1));
+      await db.insert(s.seoMarkets).values([{ projectId: a.project.id, lang: "es", prefix: "/es" }, { projectId: a.project.id, lang: "en", prefix: "/en" }]);
+      const tree = await portal.getPortalRouteTree((await portal.getPortalProject(a.client.id, a.project.id, db))!, db);
+      expect(tree.nodes.map((n) => n.title).sort()).toEqual(["Español", "Inglés"].sort());
+    });
   });
 });

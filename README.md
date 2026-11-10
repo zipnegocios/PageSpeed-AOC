@@ -371,6 +371,14 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   vuelve a validar por firma, peso (512 KB) y medidas (`domain/client-logo.ts`). Viven en R2 bajo `_logos/<cliente>/…` y se
   sirven solo con sesión de administrador (`/api/admin/client-logo/<id>`) o, en el portal, con el PIN ya validado
   (`/c/<enlace>/logo?k=icon|full`; nunca en la pantalla del PIN). Color de fondo opcional por cliente para logotipos blancos.
+- **Rutas del portal en árbol** (`/c/<enlace>/<proyecto>/rutas`): `domain/route-tree.ts` deriva la jerarquía de `routes.path`
+  (la tabla es plana): «/» es «Inicio», una página puede ser a la vez ruta y padre, un padre que solo existe porque tiene hijas
+  es un nodo **virtual** (con el promedio de lo que contiene) y las mejoras suben a los padres. Cada fila muestra el **título**
+  de la página (no la ruta), un globito con las mejoras y la cinta R · S · A · B · IA; al abrirla salen LCP, CLS, TBT, agentes,
+  el botón «Ver detalle de ingeniería» y las páginas que contiene. Título (`domain/page-title.ts`): **etiqueta del
+  administrador** (ficha del proyecto → Rutas → «Nombre que verá el cliente») → título del último rastreo sin la marca del
+  sitio (solo si la página respondió 200 sin redirección y no exige sesión) → último segmento de la ruta. Se abren solas las
+  ramas con mejoras dentro (hasta 12 páginas); las enormes se abren a mano. Con 109 rutas la pestaña tarda ~0,8 s en producción.
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el

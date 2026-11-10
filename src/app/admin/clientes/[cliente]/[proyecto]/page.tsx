@@ -39,6 +39,7 @@ import {
   saveCookieAuthAction,
   saveFormAuthAction,
   toggleRouteAuthAction,
+  updateRouteLabelAction,
   setPhaseAction,
   setThresholdsAction,
   toggleRouteAction,
@@ -198,10 +199,20 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <span className="flex min-w-0 flex-col">
                   <span className="font-mono text-[15px] break-all text-ink">{r.path}</span>
                   <span className="flex flex-wrap gap-2 text-[14px] text-ink-muted">
-                    {r.label ? <span>{r.label}</span> : null}
-                    <span>{r.source === "sitemap" ? "Desde sitemap" : "Manual"}</span>
+                                        <span>{r.source === "sitemap" ? "Desde sitemap" : "Manual"}</span>
                     {r.requiresAuth ? <Badge>Requiere sesión</Badge> : null}
                   </span>
+                  <ActionForm action={updateRouteLabelAction.bind(null, id, r.id)} submitLabel="Guardar nombre" variant="ghost" pendingLabel="…" className="mt-1 flex-row flex-wrap items-center gap-2">
+                    <input
+                      name="label"
+                      defaultValue={r.label ?? ""}
+                      maxLength={120}
+                      autoComplete="off"
+                      aria-label={`Nombre de ${r.path} para el cliente`}
+                      placeholder="Nombre que verá el cliente (opcional)"
+                      className="min-h-11 w-72 max-w-full rounded-sm border border-border-strong bg-surface-100 px-3 text-[15px] text-ink"
+                    />
+                  </ActionForm>
                 </span>
                 <span className="flex flex-wrap items-center gap-2">
                   <ActionForm action={requestAuditAction.bind(null, id, r.id)} submitLabel="Auditar" variant="secondary" pendingLabel="Encolando…" className="flex-row flex-wrap items-center gap-2">

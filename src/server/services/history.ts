@@ -54,6 +54,8 @@ export type LatestScores = {
   scores: Record<(typeof METRIC_KEYS)[number], number | null>;
   /** "Navegación con agentes": superadas / totales (null si esa auditoría no la midió). */
   agentic: { passed: number; total: number } | null;
+  /** Métricas web esenciales de esa auditoría: LCP y TBT en milisegundos, CLS sin unidad (null si no se midieron). */
+  metrics: { lcpMs: number | null; cls: number | null; tbtMs: number | null };
   /** Variación de cada puntuación respecto a la auditoría anterior (null si no hay anterior). */
   changes: Record<(typeof METRIC_KEYS)[number], Change | null>;
 };
@@ -76,6 +78,7 @@ function buildLatest(routes: repo.MonitoredRoute[], rows: repo.LatestRow[]): Lat
         finishedAt: latest.finishedAt,
         scores: Object.fromEntries(METRIC_KEYS.map((m) => [m, pick(m)])) as LatestScores["scores"],
         agentic: latest.agenticPassed !== null && latest.agenticTotal !== null ? { passed: latest.agenticPassed, total: latest.agenticTotal } : null,
+        metrics: { lcpMs: latest.lcpMs, cls: latest.cls === null ? null : Number(latest.cls), tbtMs: latest.tbtMs },
         changes: Object.fromEntries(
           METRIC_KEYS.map((m) => [m, prev ? computeChange(m, pick(m), metricValue(prev, m)) : null]),
         ) as LatestScores["changes"],
