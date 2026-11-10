@@ -179,11 +179,18 @@ html:has(.portal) {
   border-bottom: 0.5px solid rgba(17, 24, 39, 0.18);
 }
 .portal-main {
-  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1.5rem);
+  padding-bottom: 1.5rem;
+}
+/* El pie queda siempre abajo del todo (el marco es una columna a pantalla completa) y en el teléfono deja sitio a la barra de pestañas. */
+.portal-footer {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1rem);
 }
 @media (min-width: 768px) {
   .portal-main {
     padding-bottom: 2rem;
+  }
+  .portal-footer {
+    padding-bottom: 1rem;
   }
 }
 

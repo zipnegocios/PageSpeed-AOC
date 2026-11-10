@@ -2,12 +2,14 @@ import Link from "next/link";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { cx } from "@/lib/ui/cx";
 import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
-import { ProfileTabs, type ProfileTab } from "@/lib/ui/components/profile-tabs";
+import type { ProfileTab } from "@/lib/ui/components/profile-tabs";
 import { Score } from "@/lib/ui/components/score";
-import { countPages, type Profile, type ProfileScores } from "@/server/domain/route-tree";
+import { type Profile } from "@/server/domain/route-tree";
 import { formatVital, vitalTone, type VitalKind, type VitalTone } from "@/server/domain/vitals-band";
 import type { PortalProfileView, PortalTreeNode } from "@/server/services/portal";
+import { Hint } from "./hint";
 import { ChevronRight } from "./portal-icons";
+import { RouteProfileProvider, RouteProfileTabs, RouteStrip } from "./route-profile";
 
 const STRIP = [
   ["performance", "R", "Rendimiento"],
@@ -16,61 +18,34 @@ const STRIP = [
   ["best_practices", "B", "Buenas prácticas"],
 ] as const;
 
-/** Una rama se abre sola solo si contiene hasta tantas páginas. */
-const AUTO_OPEN_MAX_PAGES = 12;
-
 const TONE: Record<VitalTone, string> = { ok: "text-ok", warning: "text-warning", danger: "text-danger" };
 
-/** Leyenda de las cinco letras de la cinta de indicadores. */
+/** Leyenda de las cinco siglas: cada una es una pastilla que explica qué mide, con la misma burbuja que las celdas. */
 export function RouteLegend() {
   return (
-    <p className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] leading-5 text-ink-muted">
+    <p className="flex flex-wrap gap-1.5 text-[13px] leading-5 text-ink-muted">
       {STRIP.map(([, letter, name]) => (
-        <span key={letter}>
+        <Hint key={letter} k={letter} className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-surface-200 px-3 shadow-[0_0_0_1px_rgba(17,24,39,0.05)]">
           <b className="font-semibold text-ink">{letter}</b> {name}
-        </span>
+        </Hint>
       ))}
-      <span>
+      <Hint k="IA" className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-surface-200 px-3 shadow-[0_0_0_1px_rgba(17,24,39,0.05)]">
         <b className="font-semibold text-ink">IA</b> Navegación agéntica
-      </span>
+      </Hint>
     </p>
-  );
-}
-
-/** La cinta de cinco indicadores de una fila: R, S, A, B e IA, con su valor y su color por banda. */
-function Strip({ data, dashed }: { data: ProfileScores | null; dashed?: boolean }) {
-  return (
-    <div className={cx("grid grid-cols-5 gap-1 min-[360px]:gap-1.5", dashed && "opacity-90")}>
-      {STRIP.map(([key, letter, name]) => (
-        <div key={key} className={cx("flex min-w-0 flex-col items-center overflow-hidden rounded-md bg-surface-100 py-1", dashed && "border border-dashed border-border-strong bg-transparent")}>
-          <span aria-hidden className="text-[11px] leading-3 font-semibold text-ink-muted">
-            {letter}
-          </span>
-          <span className="sr-only">{name}</span>
-          <Score value={data?.scores[key] ?? null} className="text-[17px] leading-5" />
-        </div>
-      ))}
-      <div className={cx("flex min-w-0 flex-col items-center overflow-hidden rounded-md bg-surface-100 py-1", dashed && "border border-dashed border-border-strong bg-transparent")}>
-        <span aria-hidden className="text-[11px] leading-3 font-semibold text-ink-muted">
-          IA
-        </span>
-        <span className="sr-only">Navegación agéntica</span>
-        <AgenticFraction value={data?.agentic ?? null} className={cx("leading-5 tracking-tight whitespace-nowrap", (data?.agentic?.total ?? 0) > 99 ? "text-[11px]" : "text-[14px]")} />
-      </div>
-    </div>
   );
 }
 
 function Vital({ kind, label, value }: { kind: VitalKind; label: string; value: number | null }) {
   const tone = vitalTone(kind, value);
   return (
-    <div className="flex flex-col rounded-md bg-surface-100 px-3 py-2">
-      <dt className="text-[12px] leading-4 font-semibold text-ink-muted">{label}</dt>
-      <dd className={cx("text-[20px] leading-6 font-bold tabular-nums", tone ? TONE[tone] : "text-ink-muted")}>
+    <Hint k={kind === "lcp" ? "LCP" : kind === "cls" ? "CLS" : "TBT"} value={value} className="flex flex-col items-start rounded-md bg-surface-100 px-3 py-2 text-left">
+      <span className="text-[12px] leading-4 font-semibold text-ink-muted">{label}</span>
+      <span className={cx("text-[20px] leading-6 font-bold tabular-nums", tone ? TONE[tone] : "text-ink-muted")}>
         {formatVital(kind, value)}
         {tone ? <span className="sr-only"> ({tone === "ok" ? "bueno" : tone === "warning" ? "mejorable" : "deficiente"})</span> : null}
-      </dd>
-    </div>
+      </span>
+    </Hint>
   );
 }
 
@@ -78,17 +53,15 @@ function Vital({ kind, label, value }: { kind: VitalKind; label: string; value: 
 function ProfileDetail({ view, base }: { view: PortalProfileView; base: string }) {
   return (
     <div className="flex flex-col gap-3">
-      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Vital kind="lcp" label="LCP · carga principal" value={view.metrics.lcpMs} />
         <Vital kind="cls" label="CLS · estabilidad" value={view.metrics.cls} />
         <Vital kind="tbt" label="TBT · respuesta" value={view.metrics.tbtMs} />
-        <div className="flex flex-col rounded-md bg-surface-100 px-3 py-2">
-          <dt className="text-[12px] leading-4 font-semibold text-ink-muted">Agentes</dt>
-          <dd>
-            <AgenticFraction value={view.agentic} className="text-[20px] leading-6" />
-          </dd>
-        </div>
-      </dl>
+        <Hint k="AG" value={view.agentic && view.agentic.total > 0 ? `${view.agentic.passed}/${view.agentic.total}` : null} className="flex flex-col items-start rounded-md bg-surface-100 px-3 py-2 text-left">
+          <span className="text-[12px] leading-4 font-semibold text-ink-muted">Agentes</span>
+          <AgenticFraction value={view.agentic} className="text-[20px] leading-6" />
+        </Hint>
+      </div>
       <p className="text-[13px] leading-5 text-ink-muted">Última auditoría: {formatDate(view.finishedAt)}</p>
       <Link
         href={`${base}/detalle/${view.auditId}`}
@@ -111,19 +84,20 @@ function PageDetail({ node, base }: { node: PortalTreeNode; base: string }) {
     content: <ProfileDetail view={view} base={base} />,
   }));
   const first: Profile = node.page?.profiles.mobile ? "mobile" : "desktop";
-  return <ProfileTabs label={`Dispositivo de ${node.title}`} defaultProfile={first} tabs={tabs} />;
+  return <RouteProfileTabs label={`Dispositivo de ${node.title}`} defaultProfile={first} tabs={tabs} />;
 }
 
 /** Una fila del árbol: título, globito de mejoras y cinta de indicadores; se abre para ver sus métricas y las páginas que contiene. */
-function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; depth: number }) {
-  const strip: ProfileScores | null = node.page ? (node.page.profiles.mobile ?? node.page.profiles.desktop ?? null) : (node.group.mobile ?? node.group.desktop ?? null);
-  // Se abren solas las ramas con mejoras dentro (el detalle de una página con mejoras propias queda plegado), salvo las
-  // enormes (un catálogo de cientos de fichas): esas se abren a mano y el globito ya dice cuántas mejoras tienen dentro.
-  const open = node.totalImprovements - node.ownImprovements > 0 && countPages(node.children) <= AUTO_OPEN_MAX_PAGES;
+function RouteNode({ node, base, depth, group }: { node: PortalTreeNode; base: string; depth: number; group: string }) {
+  const scores = node.page ? node.page.profiles : node.group;
+  const first: Profile = scores.mobile ? "mobile" : "desktop";
+  // Todo parte contraído y los hermanos de un mismo nivel forman un acordeón exclusivo (`name`): abrir uno cierra el otro. El globito rojo
+  // ya dice cuántas mejoras hay dentro de cada fila.
   const virtual = node.page === null;
   return (
     <li className="min-w-0">
-      <details open={open} className={cx("group min-w-0 rounded-lg", depth === 0 ? "hud" : "border border-border bg-surface-200")}>
+      <RouteProfileProvider initial={first}>
+      <details name={group} className={cx("group min-w-0 rounded-lg", depth === 0 ? "hud" : "border border-border bg-surface-200")}>
         <summary className="press flex min-h-14 flex-col gap-2 rounded-lg px-3 py-2.5 focus-visible:outline-2">
           <span className="flex items-center gap-2">
             <span className="min-w-0 flex-1 text-[17px] leading-6 font-semibold break-words text-ink [overflow-wrap:anywhere] line-clamp-2">{node.title}</span>
@@ -136,7 +110,7 @@ function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; 
             ) : null}
             <ChevronRight className="chev shrink-0 text-ink-muted" />
           </span>
-          <Strip data={strip} dashed={virtual} />
+          <RouteStrip mobile={scores.mobile ?? null} desktop={scores.desktop ?? null} dashed={virtual} />
         </summary>
         <div className="flex min-w-0 flex-col gap-4 px-3 pb-4">
           {node.page ? (
@@ -152,13 +126,14 @@ function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; 
               <h3 className="text-[13px] font-semibold tracking-[0.04em] text-ink-muted">Páginas dentro de «{node.title}»</h3>
               <ul className={cx("flex min-w-0 flex-col gap-2", depth < 2 && "border-l-2 border-border pl-2 min-[400px]:pl-2.5")}>
                 {node.children.map((c) => (
-                  <RouteNode key={c.path} node={c} base={base} depth={depth + 1} />
+                  <RouteNode key={c.path} node={c} base={base} depth={depth + 1} group={`rutas-${node.path}`} />
                 ))}
               </ul>
             </section>
           ) : null}
         </div>
       </details>
+      </RouteProfileProvider>
     </li>
   );
 }
@@ -169,7 +144,7 @@ export function PortalRouteTree({ nodes, base }: { nodes: PortalTreeNode[]; base
     // `grid-cols-1` es `minmax(0, 1fr)`: sin él la columna implícita es `auto` y un título largo la ensancha más que la pantalla.
     <ul className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
       {nodes.map((n) => (
-        <RouteNode key={n.path} node={n} base={base} depth={0} />
+        <RouteNode key={n.path} node={n} base={base} depth={0} group="rutas-raiz" />
       ))}
     </ul>
   );

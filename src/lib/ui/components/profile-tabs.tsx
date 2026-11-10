@@ -16,9 +16,27 @@ export type ProfileTab = {
  * Las dos pestañas de una página: Móvil y Escritorio. Los dos paneles llegan ya renderizados y solo se alterna cuál se ve,
  * así que cambiar no pide nada al servidor. Ratón, tacto o teclado: flechas para alternar, Inicio y Fin para los extremos.
  */
-export function ProfileTabs({ tabs, defaultProfile, label }: { tabs: ProfileTab[]; defaultProfile: "mobile" | "desktop"; label: string }) {
+export function ProfileTabs({
+  tabs,
+  defaultProfile,
+  label,
+  value,
+  onChange,
+}: {
+  tabs: ProfileTab[];
+  defaultProfile: "mobile" | "desktop";
+  label: string;
+  /** Con `value`, el perfil lo decide quien llama (otra parte de la pantalla lo comparte); sin él, el componente lleva su propio estado. */
+  value?: "mobile" | "desktop";
+  onChange?: (profile: "mobile" | "desktop") => void;
+}) {
   const base = useId();
-  const [active, setActive] = useState<"mobile" | "desktop">(tabs.some((t) => t.profile === defaultProfile) ? defaultProfile : tabs[0]!.profile);
+  const [own, setOwn] = useState<"mobile" | "desktop">(tabs.some((t) => t.profile === defaultProfile) ? defaultProfile : tabs[0]!.profile);
+  const active = value && tabs.some((t) => t.profile === value) ? value : own;
+  const setActive = (p: "mobile" | "desktop") => {
+    setOwn(p);
+    onChange?.(p);
+  };
   const refs = useRef<Partial<Record<"mobile" | "desktop", HTMLButtonElement | null>>>({});
   const tabId = (p: string) => `${base}-tab-${p}`;
   const panelId = (p: string) => `${base}-panel-${p}`;

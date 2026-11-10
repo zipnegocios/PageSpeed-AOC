@@ -3,7 +3,7 @@ import { cx } from "@/lib/ui/cx";
 import type { MeasurementId, MeasurementState } from "@/server/domain/measurements";
 import { REPORT_SECTIONS, REPORT_TITLE, reportKindParam, sectionState, type ReportKind } from "@/server/domain/report-outline";
 import { DownloadButton } from "./download-button";
-import { ChevronRight, TabIcons } from "./portal-icons";
+import { ChevronRight, TabIcon } from "./portal-icons";
 
 export const REPORT_PERIODS = [7, 30, 90] as const;
 export type ReportPeriodChoice = (typeof REPORT_PERIODS)[number];
@@ -41,14 +41,14 @@ function ReportCard({ kind, base, days, states }: { kind: ReportKind; base: stri
   return (
     <section aria-label={REPORT_TITLE[kind]} className="hud flex min-w-0 flex-col gap-3 rounded-lg p-4">
       <div className="flex items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-subtle text-on-primary-subtle">{TabIcons.informes}</span>
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-subtle text-on-primary-subtle"><TabIcon id="informes" active /></span>
         <div className="flex min-w-0 flex-col">
           <h2 className="text-[20px] leading-6 font-semibold text-ink">{REPORT_TITLE[kind]}</h2>
           <span className="text-[13px] leading-5 text-ink-muted">{copy.pages}</span>
         </div>
       </div>
       <p className="text-[15px] leading-6 text-ink">{copy.description}</p>
-      <details className="rounded-lg bg-surface-100">
+      <details name="informes-contenido" className="rounded-lg bg-surface-100">
         <summary className="press flex min-h-12 items-center gap-2 rounded-lg px-3 text-[16px] font-semibold text-ink">
           <span className="flex-1">Qué {kind === "engineering" ? "vas a encontrar" : "contiene"}</span>
           <span className="text-[13px] font-normal text-ink-muted">{sections.length} apartados</span>
@@ -57,7 +57,7 @@ function ReportCard({ kind, base, days, states }: { kind: ReportKind; base: stri
         <ol className="flex flex-col gap-1 px-3 pb-3">
           {sections.map((s, i) => (
             <li key={s.id}>
-              <details className="rounded-md bg-surface-200">
+              <details name={`informes-${kind}`} className="rounded-md bg-surface-200">
                 <summary className="press flex min-h-11 items-center gap-2 rounded-md px-3 text-[15px] font-semibold text-ink">
                   <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-300 text-[13px] text-ink-muted tabular-nums">
                     {i + 1}

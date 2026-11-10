@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
 import { cx } from "@/lib/ui/cx";
-import { TabIcons } from "./portal-icons";
+import { TabIcon } from "./portal-icons";
 
 export const PORTAL_TABS = [
   { id: "resumen", segment: null, label: "Resumen" },
@@ -44,7 +44,7 @@ export function PortalTabs({ base, variant, badges = {} }: { base: string; varia
                   className={cx("press relative flex h-[var(--tabbar-h)] flex-col items-center justify-center gap-0.5 text-[10.5px] leading-3 font-medium", on ? "text-primary" : "text-ink-muted")}
                 >
                   <span className="relative">
-                    {TabIcons[t.id]}
+                    <TabIcon id={t.id} active={on} />
                     {badge ? (
                       <span className="absolute -top-1 -right-2.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] leading-4 font-semibold text-white tabular-nums">{badge}</span>
                     ) : null}
@@ -69,8 +69,9 @@ export function PortalTabs({ base, variant, badges = {} }: { base: string; varia
               <Link
                 href={t.segment ? `${base}/${t.segment}` : base}
                 aria-current={on ? "page" : undefined}
-                className={cx("press inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-[15px] font-semibold", on ? "bg-primary-subtle text-on-primary-subtle" : "text-ink-muted hover:bg-surface-300")}
+                className={cx("press inline-flex min-h-10 items-center gap-2 rounded-full py-0 pr-4 pl-3 text-[15px] font-semibold", on ? "bg-primary-subtle text-on-primary-subtle" : "text-ink-muted hover:bg-surface-300")}
               >
+                <TabIcon id={t.id} active={on} size={20} />
                 {t.label}
                 {badge ? <span className="min-w-5 rounded-full bg-danger px-1.5 text-center text-[12px] leading-5 font-semibold text-white tabular-nums">{badge}</span> : null}
               </Link>

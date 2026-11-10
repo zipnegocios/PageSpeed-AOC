@@ -94,9 +94,13 @@ function Bars({ rows, total, unit }: { rows: Row[]; total: number; unit: string 
 }
 
 /** Tarjeta que se abre: cerrada muestra su dato principal; abierta, el desglose. */
-function Fold({ title, headline, children, open = false }: { title: string; headline?: string; children: ReactNode; open?: boolean }) {
+/**
+ * `name` agrupa las tarjetas en un acordeón exclusivo (atributo nativo de `<details>`): abrir una cierra la otra. Solo una puede venir
+ * abierta de entrada.
+ */
+function Fold({ title, headline, children, open = false, name = "trafico" }: { title: string; headline?: string; children: ReactNode; open?: boolean; name?: string }) {
   return (
-    <details open={open} className="hud rounded-lg">
+    <details open={open} name={name} className="hud rounded-lg">
       <summary className="press flex min-h-14 items-center gap-3 rounded-lg px-3 py-2.5">
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-[17px] leading-6 font-semibold text-ink">{title}</span>
@@ -158,7 +162,7 @@ function Visits({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
           <Bars rows={channels} total={total} unit="sesiones" />
         </Fold>
       ) : null}
-      <Fold title="Redes sociales" headline={networks[0] ? `${networks[0].label} ${share(networks[0].value, socialTotal)} · ${formatCount(socialTotal)} sesiones` : "Sin visitas en este periodo"} open={networks.length > 0}>
+      <Fold title="Redes sociales" headline={networks[0] ? `${networks[0].label} ${share(networks[0].value, socialTotal)} · ${formatCount(socialTotal)} sesiones` : "Sin visitas en este periodo"}>
         {networks.length === 0 ? (
           <p className="text-[14px] leading-5 text-ink-muted">Todavía no hay visitas desde redes sociales en este periodo. Cuando lleguen de Facebook, Instagram, LinkedIn, TikTok, WhatsApp u otras, aparecerán aquí con su red.</p>
         ) : (
@@ -221,7 +225,7 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
         </Fold>
       ) : null}
       {pages.length > 0 ? (
-        <Fold title="Páginas con más clics" headline={`${pages[0]!.label} · ${formatCount(pages[0]!.value)} clics`} open>
+        <Fold title="Páginas con más clics" headline={`${pages[0]!.label} · ${formatCount(pages[0]!.value)} clics`}>
           <Bars rows={pages} total={total} unit="clics" />
         </Fold>
       ) : null}
@@ -244,10 +248,10 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
   );
 }
 
-function Issue({ issue }: { issue: PortalHealthIssue }) {
+function Issue({ issue, name }: { issue: PortalHealthIssue; name: string }) {
   return (
     <li>
-      <details className="rounded-lg bg-surface-100">
+      <details name={name} className="rounded-lg bg-surface-100">
         <summary className="press flex min-h-12 items-start gap-2 rounded-lg px-3 py-2">
           <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", issue.severity === "error" ? "bg-danger" : "bg-warning")} aria-hidden />
           <span className="min-w-0 flex-1 text-[15px] leading-5 text-ink">
@@ -283,7 +287,7 @@ function HealthGroup({ g, open }: { g: PortalHealthGroup; open: boolean }) {
       <p className="text-[14px] leading-5 text-ink-muted">{g.hint}</p>
       <ul className="flex flex-col gap-2">
         {g.issues.map((i) => (
-          <Issue key={i.code} issue={i} />
+          <Issue key={i.code} issue={i} name={`hallazgo-${g.group}`} />
         ))}
       </ul>
     </Fold>

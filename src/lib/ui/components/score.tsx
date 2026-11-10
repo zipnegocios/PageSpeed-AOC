@@ -23,7 +23,7 @@ export function Score({ value, className }: { value: number | null | undefined; 
   }
   const tone = scoreTone(value);
   return (
-    <span className={cx("relative font-bold tabular-nums", toneClass[tone], className)} title={toneWord[tone]}>
+    <span className={cx("relative font-bold tabular-nums", toneClass[tone], className)}>
       {value}
       <span className="sr-only"> ({toneWord[tone]})</span>
     </span>

@@ -78,7 +78,7 @@ function PageRow({ page, base, open }: { page: PortalImprovementPage; base: stri
   const href = primary ? detailHref(base, primary) : null;
   return (
     <li className="min-w-0">
-      <details open={open} className="hud min-w-0 rounded-lg">
+      <details open={open} name="mejoras" className="hud min-w-0 rounded-lg">
         <summary className="press flex min-h-14 flex-col gap-2 rounded-lg px-3 py-2.5">
           <span className="flex items-center gap-2">
             <span className="min-w-0 flex-1 text-[17px] leading-6 font-semibold break-words text-ink [overflow-wrap:anywhere] line-clamp-2">{page.title}</span>
@@ -111,13 +111,13 @@ function PageRow({ page, base, open }: { page: PortalImprovementPage; base: stri
   );
 }
 
-/** Las páginas con algo por mejorar: se abre la primera (la más urgente); cada una enumera sus causas por rubro. */
+/** Las páginas con algo por mejorar, todas contraídas de entrada y con una sola abierta a la vez; cada una enumera sus causas por rubro. */
 export function ImprovementList({ data, base }: { data: PortalImprovements; base: string }) {
   return (
     // `grid-cols-1`: ver route-tree.tsx (una columna `auto` crece con el título más largo).
     <ul className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
-      {data.pages.map((p, i) => (
-        <PageRow key={p.path} page={p} base={base} open={i === 0} />
+      {data.pages.map((p) => (
+        <PageRow key={p.path} page={p} base={base} open={false} />
       ))}
     </ul>
   );

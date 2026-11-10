@@ -92,7 +92,7 @@ export default async function PortalSummary({ params, searchParams }: { params: 
         ))}
       </ul>
 
-      <details className="group flex flex-col gap-3" open={[search.ruta, search.perfil, search.m, search.dias].some((v) => v !== undefined)}>
+      <details name="resumen" className="group flex flex-col gap-3" open={[search.ruta, search.perfil, search.m, search.dias].some((v) => v !== undefined)}>
         <summary className="press hud flex min-h-14 items-center gap-3 rounded-lg px-4 py-2">
           <span className="flex-1 text-[17px] font-semibold text-ink">Evolución de las puntuaciones</span>
           <ChevronRight className="chev shrink-0 text-ink-muted" />
