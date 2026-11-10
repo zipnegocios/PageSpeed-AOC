@@ -4,13 +4,13 @@ import { pageTitle } from "@/lib/brand";
 import { parseSeoPeriod } from "@/server/domain/seo-data";
 import { getPortalTraffic } from "@/server/services/portal-traffic";
 import { PortalPage } from "../../../_components/portal-page";
-import { PortalTrafficView, parseTrafficSection, type TrafficSection } from "../../../_components/traffic";
+import { PortalTrafficView, parseHealthFilter, parseTrafficSection, type TrafficSection } from "../../../_components/traffic";
 import { loadProjectGate } from "../../../_lib/project-gate";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: pageTitle("Tráfico y búsqueda"), robots: { index: false, follow: false } };
 
-export default async function PortalTraffic({ params, searchParams }: { params: Promise<{ token: string; projectId: string }>; searchParams: Promise<{ periodo?: string | string[]; seccion?: string | string[] }> }) {
+export default async function PortalTraffic({ params, searchParams }: { params: Promise<{ token: string; projectId: string }>; searchParams: Promise<{ periodo?: string | string[]; seccion?: string | string[]; gravedad?: string | string[] }> }) {
   const { token, projectId } = await params;
   const search = await searchParams;
   const gate = await loadProjectGate(token, projectId);
@@ -27,7 +27,7 @@ export default async function PortalTraffic({ params, searchParams }: { params: 
   return (
     <PortalPage width="contained" title="Tráfico y búsqueda" subtitle="Cómo te encuentran y cuánta gente llega a tu sitio.">
       {data ? (
-        <PortalTrafficView data={data} section={section} basePath={`${base}/trafico`} />
+        <PortalTrafficView data={data} section={section} basePath={`${base}/trafico`} healthFilter={parseHealthFilter(search.gravedad)} />
       ) : (
         <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Aún no hay datos de tráfico y búsqueda para este proyecto. Aparecerán aquí cuando se conecten.</p>
       )}

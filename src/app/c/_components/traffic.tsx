@@ -7,9 +7,11 @@ import { formatEvidence } from "@/lib/seo-crawl-format";
 import { formatCount, formatDayMedium, formatPercent, formatPosition, percentDelta, positionDelta } from "@/lib/seo-format";
 import { cx } from "@/lib/ui/cx";
 import { Delta } from "@/lib/ui/components/delta";
+import { SEO_CLIENT_EXPLAIN } from "@/server/domain/seo-client-glossary";
 import { channelLabel, SEO_PERIODS, SEO_PERIOD_LABEL } from "@/server/domain/seo-data";
 import { SOURCE_GROUPS, type SourceGroup } from "@/server/domain/seo-sources";
 import type { PortalHealthGroup, PortalHealthIssue, PortalTraffic } from "@/server/services/portal-traffic";
+import { ExpandableItems } from "./expandable-list";
 import { ChevronRight } from "./portal-icons";
 
 export type TrafficSection = "visitas" | "google" | "salud";
@@ -256,32 +258,43 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
 }
 
 function Issue({ issue, name }: { issue: PortalHealthIssue; name: string }) {
+  const explain = SEO_CLIENT_EXPLAIN[issue.code];
+  const isError = issue.severity === "error";
+  const items = issue.rows.map((r, i) => ({ id: `${r.page}#${i}`, text: r.title, impact: "", note: formatEvidence(issue.code, r.evidence) }));
   return (
     <li>
       <details name={name} className="rounded-lg bg-surface-100">
         <summary className="press flex min-h-12 items-start gap-2 rounded-lg px-3 py-2">
-          <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", issue.severity === "error" ? "bg-danger" : "bg-warning")} aria-hidden />
           <span className="min-w-0 flex-1 text-[15px] leading-5 text-ink">
+            <span className={cx("block text-[12px] leading-4 font-semibold", isError ? "text-danger" : "text-warning")}>{isError ? "Error" : "Aviso"}</span>
             {issue.text}
-            <span className="sr-only">{issue.severity === "error" ? " (error)" : " (aviso)"}</span>
           </span>
           <span className="shrink-0 text-[13px] leading-5 whitespace-nowrap text-ink-muted tabular-nums">
             {issue.pages} {issue.pages === 1 ? "página" : "páginas"}
             {issue.added > 0 ? <b className="ml-1 font-semibold text-danger">· {issue.added} {issue.added === 1 ? "nueva" : "nuevas"}</b> : null}
           </span>
         </summary>
-        <ul className="flex flex-col gap-2 px-3 pb-3">
-          {issue.rows.map((r) => {
-            const note = formatEvidence(issue.code, r.evidence);
-            return (
-              <li key={r.page + note} className="flex flex-col text-[14px] leading-5">
-                <span className="font-semibold text-ink">{r.title}</span>
-                {note ? <span className="text-ink-muted">{note}</span> : null}
-              </li>
-            );
-          })}
-          {issue.more > 0 ? <li className="text-[14px] text-ink-muted">y {issue.more} más</li> : null}
-        </ul>
+        <div className="flex flex-col gap-3 px-3 pb-3">
+          <dl className="flex flex-col gap-2 text-[14px] leading-5">
+            <div>
+              <dt className="font-semibold text-ink">Qué es</dt>
+              <dd className="text-ink-muted">{explain.what}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ink">Por qué importa</dt>
+              <dd className="text-ink-muted">{explain.why}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ink">Qué hacemos</dt>
+              <dd className="text-ink-muted">{explain.fix}</dd>
+            </div>
+          </dl>
+          <div>
+            <p className="text-[14px] leading-5 font-semibold text-ink">{issue.pages === 1 ? "Página afectada" : "Páginas afectadas"}</p>
+            <ExpandableItems items={items} footer={null} />
+            {issue.more > 0 ? <p className="text-[13px] leading-5 text-ink-muted">Hay {issue.more} {issue.more === 1 ? "página más" : "páginas más"} con este problema: las revisamos nosotros.</p> : null}
+          </div>
+        </div>
       </details>
     </li>
   );
@@ -301,7 +314,30 @@ function HealthGroup({ g, open }: { g: PortalHealthGroup; open: boolean }) {
   );
 }
 
-function Health({ health }: { health: NonNullable<PortalTraffic["health"]> }) {
+/** Lo que se enseña de la salud SEO: todo, solo los errores o solo los avisos. */
+export type HealthFilter = "error" | "warning" | null;
+export const parseHealthFilter = (raw: string | string[] | undefined): HealthFilter => {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v === "error" ? "error" : v === "aviso" ? "warning" : null;
+};
+const FILTER_PARAM: Record<NonNullable<HealthFilter>, string> = { error: "error", warning: "aviso" };
+
+/** Los grupos con solo los hallazgos de la gravedad pedida; los que quedan vacíos se quitan y sus cuentas se rehacen. */
+export function filterHealthGroups(groups: PortalHealthGroup[], filter: HealthFilter): PortalHealthGroup[] {
+  if (!filter) return groups;
+  return groups
+    .map((g) => {
+      const issues = g.issues.filter((i) => i.severity === filter);
+      return { ...g, issues, errors: filter === "error" ? issues.length : 0, warnings: filter === "warning" ? issues.length : 0 };
+    })
+    .filter((g) => g.issues.length > 0);
+}
+
+function Health({ health, filter, hrefFor }: { health: NonNullable<PortalTraffic["health"]>; filter: HealthFilter; hrefFor: (f: HealthFilter) => string }) {
+  // Un filtro sin hallazgos (dirección escrita a mano) no deja la pantalla vacía: se ve todo.
+  const active = filter === "error" && health.errors === 0 ? null : filter === "warning" && health.warnings === 0 ? null : filter;
+  const groups = filterHealthGroups(health.groups, active);
+  const kinds = health.groups.reduce((n, g) => n + g.issues.length, 0);
   return (
     <>
       <div className="hud flex flex-col gap-2 rounded-lg p-3">
@@ -317,17 +353,39 @@ function Health({ health }: { health: NonNullable<PortalTraffic["health"]> }) {
             {health.warnings} {health.warnings === 1 ? "aviso" : "avisos"}
           </span>
         </p>
+        {kinds > 0 ? (
+          <p className="text-[14px] leading-5 text-ink-muted">
+            Son {kinds} {kinds === 1 ? "tipo de problema" : "tipos de problema"}, repartidos por las páginas. Abre uno para ver qué significa, por qué importa y qué páginas afecta.
+          </p>
+        ) : null}
         {health.changes ? (
           <p className="text-[14px] leading-5 text-ink-muted">
             Frente a la revisión anterior: <b className="font-semibold text-ink">{health.changes.added}</b> {health.changes.added === 1 ? "nuevo" : "nuevos"} · <b className="font-semibold text-ink">{health.changes.resolved}</b> {health.changes.resolved === 1 ? "resuelto" : "resueltos"}
           </p>
         ) : null}
       </div>
-      {health.groups.length === 0 ? (
+      {health.errors > 0 && health.warnings > 0 ? (
+        <div className="md:max-w-md">
+          <Segment
+            label="Qué mostrar"
+            items={[
+              { label: "Todo", href: hrefFor(null), current: active === null },
+              { label: `Errores ${health.errors}`, href: hrefFor("error"), current: active === "error" },
+              { label: `Avisos ${health.warnings}`, href: hrefFor("warning"), current: active === "warning" },
+            ]}
+          />
+        </div>
+      ) : null}
+      {kinds > 0 ? (
+        <p className="text-[13px] leading-5 text-ink-muted">
+          <b className="font-semibold text-danger">Error:</b> afecta a que Google encuentre o muestre bien tu sitio. <b className="font-semibold text-warning">Aviso:</b> mejora recomendada, menos urgente.
+        </p>
+      ) : null}
+      {groups.length === 0 ? (
         <p className="rounded-lg bg-surface-200 p-4 text-ink">Todo en orden: no encontramos errores ni avisos en esta revisión.</p>
       ) : (
         <div className={FOLDS}>
-          {health.groups.map((g, i) => (
+          {groups.map((g, i) => (
             <HealthGroup key={g.group} g={g} open={i === 0} />
           ))}
         </div>
@@ -337,10 +395,11 @@ function Health({ health }: { health: NonNullable<PortalTraffic["health"]> }) {
 }
 
 /** La pestaña «Tráfico»: periodo, cifras clave y tres secciones (Visitas, Google, Salud SEO) con tarjetas que se abren. */
-export function PortalTrafficView({ data, section, basePath }: { data: PortalTraffic; section: TrafficSection; basePath: string }) {
+export function PortalTrafficView({ data, section, basePath, healthFilter = null }: { data: PortalTraffic; section: TrafficSection; basePath: string; healthFilter?: HealthFilter }) {
   const d = data.dashboard;
-  const href = (patch: { periodo?: number; seccion?: TrafficSection }) => {
+  const href = (patch: { periodo?: number; seccion?: TrafficSection; gravedad?: HealthFilter }) => {
     const q = new URLSearchParams({ periodo: String(patch.periodo ?? data.days), seccion: patch.seccion ?? section });
+    if (patch.gravedad) q.set("gravedad", FILTER_PARAM[patch.gravedad]);
     return `${basePath}?${q.toString()}`;
   };
   const s = d?.search;
@@ -374,7 +433,7 @@ export function PortalTrafficView({ data, section, basePath }: { data: PortalTra
           <Segment label="Sección" items={items.map((i) => ({ label: i.label, href: href({ seccion: i.id }), current: i.id === section }))} />
         </div>
       ) : null}
-      {section === "salud" && data.health ? <Health health={data.health} /> : null}
+      {section === "salud" && data.health ? <Health health={data.health} filter={healthFilter} hrefFor={(f) => href({ seccion: "salud", gravedad: f })} /> : null}
       {section === "visitas" && d ? <Visits t={data} d={d} /> : null}
       {section === "google" && d ? <Google t={data} d={d} /> : null}
     </>

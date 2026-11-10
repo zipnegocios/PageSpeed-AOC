@@ -4,7 +4,7 @@ import { createDb } from "@/server/db/client";
 import { runMigrations } from "@/server/db/migrate";
 import * as s from "@/server/db/schema";
 import * as clients from "@/server/services/clients";
-import { getPortalTraffic } from "@/server/services/portal-traffic";
+import { ROWS_PER_ISSUE, getPortalTraffic } from "@/server/services/portal-traffic";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 
@@ -92,6 +92,16 @@ describe.skipIf(!url)("portal: pestaña Tráfico", () => {
     const robots = h.groups[1]!.issues[0]!;
     expect(robots.rows[0]!.title).toBe("Todo el sitio");
     expect(JSON.stringify(h)).not.toContain("client_rendered");
+  });
+
+  it("una misma incidencia en muchas páginas enseña hasta 50 y dice cuántas faltan", async () => {
+    const a = await setup();
+    await crawlRun(a.project.id, Array.from({ length: 60 }, (_, i) => ({ page: `/p${i}`, code: "title_missing", severity: "error" as const })));
+    const h = (await getPortalTraffic(a.client.id, a.project, { days: 28 }, db))!.health!;
+    const issue = h.groups[0]!.issues[0]!;
+    expect(issue.pages).toBe(60);
+    expect(issue.rows).toHaveLength(ROWS_PER_ISSUE);
+    expect(issue.more).toBe(60 - ROWS_PER_ISSUE);
   });
 
   it("las visitas y la búsqueda salen si hay Google conectado, con el título de cada página", async () => {

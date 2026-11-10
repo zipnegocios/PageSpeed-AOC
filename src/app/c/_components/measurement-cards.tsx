@@ -42,7 +42,7 @@ function Card({ href, id, title, value, delta, tone, children }: { href: string;
 export function MeasurementCards({ m, base }: { m: PortalMeasurements; base: string }) {
   const d = m.traffic?.dashboard ?? null;
   const health = m.traffic?.health ?? null;
-  const to = (seccion: "visitas" | "google" | "salud") => `${base}/trafico?periodo=${m.days}&seccion=${seccion}`;
+  const to = (seccion: "visitas" | "google" | "salud", extra = "") => `${base}/trafico?periodo=${m.days}&seccion=${seccion}${extra}`;
   const cards: ReactNode[] = [];
 
   const s = d?.search;
@@ -91,9 +91,11 @@ export function MeasurementCards({ m, base }: { m: PortalMeasurements; base: str
   }
 
   if (health) {
+    const principal = health.groups[0]?.issues[0]?.text;
     cards.push(
-      <Card key="health" id="health" href={to("salud")} value={`${health.errors} ${health.errors === 1 ? "error" : "errores"}`} tone={health.errors > 0 ? "text-danger" : "text-ok"}>
+      <Card key="health" id="health" href={to("salud", health.errors > 0 && health.warnings > 0 ? "&gravedad=error" : "")} value={`${health.errors} ${health.errors === 1 ? "error" : "errores"}`} tone={health.errors > 0 ? "text-danger" : "text-ok"}>
         {health.warnings} {health.warnings === 1 ? "aviso" : "avisos"} · {health.pagesCrawled} {health.pagesCrawled === 1 ? "página revisada" : "páginas revisadas"}
+        {principal ? ` · Principal: ${principal}` : ""}
       </Card>,
     );
   }

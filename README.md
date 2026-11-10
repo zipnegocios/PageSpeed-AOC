@@ -526,7 +526,9 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   **Visitas** (canales, páginas con su título, países, asistentes de IA), **Google** (CTR, posición, clics, países, dispositivos,
   idiomas) y **Salud SEO**: el último rastreo técnico en frases llanas (`domain/seo-client-glossary.ts`), solo errores y avisos
   (la información no se muestra), agrupado por tema (acceso, indexación, direcciones principales, contenido, idiomas, datos
-  estructurados), con nuevos y resueltos frente a la revisión anterior y las páginas afectadas. Mismo interruptor que antes
+  estructurados), con nuevos y resueltos frente a la revisión anterior y las páginas afectadas (hasta 50 por problema). Cada problema se
+  explica al abrirlo (**qué es, por qué importa, qué hacemos**: `SEO_CLIENT_EXPLAIN`, un texto por código del catálogo) y las cifras de
+  «errores» y «avisos» filtran la lista (`?seccion=salud&gravedad=error|aviso`). Mismo interruptor que antes
   («Visible para el cliente», `seo_client_visible`), en producción o en desarrollo; la salud SEO no exige tener Google conectado.
 - **Informes en PDF: resumen e ingeniería** (`/c/<enlace>/<proyecto>/informes`, `.../informe?tipo=resumen|ingenieria&dias=7|30|90`).
   Dos documentos con el **logotipo del cliente y el de la aplicación**: el **resumen** (5 apartados, normalmente 2 a 4 páginas, en

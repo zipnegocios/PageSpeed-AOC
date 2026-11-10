@@ -7,8 +7,8 @@ import { portalPageTitles } from "./portal";
 import { getSeoDashboard, type SeoDashboard } from "./seo-data";
 import { assertUuid } from "./shared";
 
-/** Cuántas páginas afectadas se enseñan por hallazgo; el resto se resume con «y N más». */
-const ROWS_PER_ISSUE = 8;
+/** Cuántas páginas afectadas se enseñan por hallazgo; si hay más, se dice cuántas faltan. */
+export const ROWS_PER_ISSUE = 50;
 
 export type PortalHealthRow = { page: string; title: string; evidence: Evidence };
 export type PortalHealthIssue = {
