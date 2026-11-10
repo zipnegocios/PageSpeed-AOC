@@ -1,6 +1,6 @@
 # Borradores de correos al cliente
 
-Estado: **borrador v2 para aprobación**. No hay código escrito. Todo lo que va entre `[corchetes]` es un dato que pone el sistema; las cifras y nombres de los ejemplos son inventados.
+Estado: **borrador v2, decisiones de forma cerradas**; falta aprobar los textos finales. No hay código escrito. Todo lo que va entre `[corchetes]` es un dato que pone el sistema; las cifras y nombres de los ejemplos son inventados.
 
 Tono: de «tú», cálido y breve (igual que los correos actuales). Firma: **zipnegocios** (siempre en minúsculas y sin espacios).
 
@@ -16,7 +16,7 @@ Tono: de «tú», cálido y breve (igual que los correos actuales). Firma: **zip
 
 | # | Tema | Propuesta |
 |---|---|---|
-| M1 | Nombre del servicio que ve el cliente | «Informes técnicos web» (ya es el nombre de la app instalable) bajo la firma «zipnegocios». «PageSpeed» queda como nombre interno. *(Pendiente de tu confirmación.)* |
+| M1 | Nombre del servicio que ve el cliente | «Informes técnicos web» (ya es el nombre de la app instalable) bajo la firma «zipnegocios». «PageSpeed» queda como nombre interno. *(Confirmado.)* |
 | M2 | Firma | Banda superior con el logo de zipnegocios; pie «zipnegocios · Gustavo Amarista · WhatsApp [número]». Hoy los correos dicen «PageSpeed · © zipnegocios». |
 | M3 | Remitente | «Gustavo de zipnegocios» `<correo>`, no una dirección «no-reply». El cliente puede responder. |
 | M4 | Día y hora | Semanal: lunes por la mañana. Mensual: primer lunes del mes, con el mes anterior completo. |
@@ -244,8 +244,12 @@ Alternativa si prefieres un tono más formal: una línea de encabezado «Con ate
 
 Nada de esto toca lo ya construido: las auditorías, el portal y las alertas siguen como están.
 
-## Preguntas abiertas
+## Decisiones cerradas
 
-- M1: ¿«Informes técnicos web» como nombre del servicio, bajo «zipnegocios»?
-- El tratamiento de «ustedes» frente a «tú»: ¿«ustedes» cuando hay varias personas y «tú» cuando es una sola?
-- ¿Muestro el rol de cada persona del CC en el correo (por ejemplo «Luis, marketing») o solo los nombres?
+- **Nombre del servicio:** «Informes técnicos web», bajo la firma «zipnegocios».
+- **Trato:** «tú» cuando el destinatario es una sola persona y «ustedes» cuando hay varias.
+- **Lista de copia:** en el correo solo aparecen los nombres. El rol, si se anota, queda como nota interna en el panel.
+
+## Siguiente paso
+
+Rellenar el bloque «Por qué esto importa» con datos citados con fuente y verificar con datos reales de un cliente cómo llegan las redes sociales (nota N10). Después, la versión visual de los correos y el documento de estrategia.
