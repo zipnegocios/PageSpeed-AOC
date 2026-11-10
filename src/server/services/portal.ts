@@ -3,20 +3,18 @@ import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
 import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
 import { formatImpact, plainImprovement } from "@/server/domain/improvement-glossary";
-import { categoryOfMetric, extractImprovements, isAuditImprovements, type AuditImprovements, type ImprovementCategory } from "@/server/domain/improvements";
+import { categoryOfMetric, type ImprovementCategory } from "@/server/domain/improvements";
 import { pathTitle, resolveTitles } from "@/server/domain/page-title";
 import { buildRouteTree, countPages, type ProfileScores, type TreeNode, type TreePage } from "@/server/domain/route-tree";
 import { isValidSlug } from "@/server/domain/slug";
 import { findClientBySlug, findClientByToken } from "@/server/repositories/clients";
-import { listAuditImprovements, saveAuditImprovements } from "@/server/repositories/audits";
 import { latestCrawlTitles } from "@/server/repositories/seo-crawl";
-import { localizeLhr } from "@/server/report/lighthouse-report";
 import type { R2Store } from "@/server/storage/r2";
 import { listOpenAlertConditions, listOpenAlerts, type AlertView } from "./alerts";
 import { averageScores, getLatestScores, type LatestScores } from "./history";
 import { assertUuid } from "./shared";
 import { getAudit, getSiblingAudits, type AuditDetail, type SiblingAudits } from "./audits";
-import { loadAuditLhr } from "./audit-lhr";
+import { loadAuditImprovements } from "./audit-improvements";
 import { getRoute, listRoutes } from "./routes";
 import { getMarkets } from "./seo-markets";
 
@@ -227,8 +225,6 @@ export type PortalImprovementBlock = {
 export type PortalImprovementPage = { path: string; title: string; blocks: PortalImprovementBlock[] };
 export type PortalImprovements = { pages: PortalImprovementPage[]; total: number };
 
-/** Cuántas auditorías anteriores a la migración 0018 se leen de R2 en una sola petición (las demás salen en la siguiente). */
-const BACKFILL_PER_REQUEST = 12;
 const CATEGORY_ORDER: ImprovementCategory[] = ["performance", "accessibility", "seo", "best-practices"];
 
 /**
@@ -242,26 +238,7 @@ export async function getPortalImprovements(project: PortalProject, db: Database
   const latest = new Map(project.latest.map((l) => [`${l.path}|${l.profile}`, l]));
   const auditIds = [...new Set(conditions.flatMap((c) => (c.kind === "threshold" ? [latest.get(`${c.routePath}|${c.profile}`)?.auditId] : [])).filter((x): x is string => Boolean(x)))];
 
-  const rows = new Map((await listAuditImprovements(db, auditIds)).map((r) => [r.id, r]));
-  const byAudit = new Map<string, AuditImprovements>();
-  let backfilled = 0;
-  for (const id of auditIds) {
-    const row = rows.get(id);
-    if (row && isAuditImprovements(row.improvements)) {
-      byAudit.set(id, row.improvements);
-    } else if (row && backfilled < BACKFILL_PER_REQUEST) {
-      backfilled++;
-      const lhr = await loadAuditLhr(row, deps.r2);
-      if (!lhr) continue;
-      try {
-        const computed = extractImprovements(localizeLhr(lhr as never, "es"));
-        byAudit.set(id, computed);
-        await saveAuditImprovements(db, id, computed);
-      } catch {
-        /* un resultado ilegible: la página queda sin causas, no sin aviso */
-      }
-    }
-  }
+  const byAudit = await loadAuditImprovements(auditIds, db, deps);
 
   const titles = await portalPageTitles(project, [...new Set(conditions.map((c) => c.routePath))], db);
   const pages = new Map<string, PortalImprovementPage>();

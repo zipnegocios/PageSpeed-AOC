@@ -1,4 +1,5 @@
 import { parsePeriod } from "@/server/domain/history";
+import { parseReportKind } from "@/server/domain/report-outline";
 import { getProjectReportPdf } from "@/server/report";
 import { getPortalProject } from "@/server/services/portal";
 import { checkPortal } from "../../../_lib/access";
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
 const plain = (status: number, body: string) =>
   new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 
-/** Informe en PDF para el cliente. Misma autorización que el portal: token vigente, cliente activo y proyecto suyo. */
+/** Informes en PDF para el cliente (`?tipo=resumen|ingenieria`, `?dias=`). Misma autorización que el portal: token vigente, cliente activo y proyecto suyo. */
 export async function GET(req: Request, { params }: { params: Promise<{ token: string; projectId: string }> }) {
   const { token, projectId } = await params;
   const access = await checkPortal(token);
@@ -21,9 +22,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   const project = await getPortalProject(access.client.id, projectId);
   if (!project) return plain(404, "Enlace no válido");
 
-  const days = parsePeriod(new URL(req.url).searchParams.get("dias"));
+  const q = new URL(req.url).searchParams;
+  const days = parsePeriod(q.get("dias"));
+  const kind = parseReportKind(q.get("tipo"));
   try {
-    const { filename, pdf } = await getProjectReportPdf(project.id, days);
+    const { filename, pdf } = await getProjectReportPdf(project.id, days, kind);
     return new Response(new Uint8Array(pdf), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${filename}"`, "Cache-Control": "private, no-store" },
     });

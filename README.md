@@ -393,6 +393,17 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   (la información no se muestra), agrupado por tema (acceso, indexación, direcciones principales, contenido, idiomas, datos
   estructurados), con nuevos y resueltos frente a la revisión anterior y las páginas afectadas. Mismo interruptor que antes
   («Visible para el cliente», `seo_client_visible`) y solo proyectos en producción; la salud SEO no exige tener Google conectado.
+- **Informes en PDF: resumen e ingeniería** (`/c/<enlace>/<proyecto>/informes`, `.../informe?tipo=resumen|ingenieria&dias=7|30|90`).
+  Dos documentos con el **logotipo del cliente y el de la aplicación**: el **resumen** (5 apartados, normalmente 2 a 4 páginas, en
+  lenguaje claro) y el de **ingeniería** (portada con índice y 8 apartados: método, notas y métricas por página, rendimiento a fondo,
+  fallos por rubro, navegación agéntica, salud SEO del sitio, evolución y glosario; detalla las **30 páginas más débiles**). Los
+  apartados salen de **una sola lista** (`domain/report-outline.ts`) que usan la pestaña (con el índice desplegable), los títulos del
+  PDF y sus **marcadores** (el panel de navegación del lector); una prueba comprueba que cada PDF trae exactamente esos apartados. Todo
+  se lee de lo ya guardado (notas y métricas, mejoras por auditoría, salud SEO, logotipos): no se abre R2 por ruta salvo el relleno
+  acotado de auditorías anteriores a la migración 0018. Tráfico y salud SEO solo entran si el cliente puede verlos en su portal.
+  Generación en serie con caché de 2 minutos por proyecto, periodo y tipo; con 100 rutas el de ingeniería tarda ~3 s y añade ~130 MB.
+  Un enlace antiguo (`.../informe` sin `tipo`) sigue entregando el resumen. El **correo** (botón «Enviar los dos informes» del panel)
+  adjunta **ambos**: `resumen-…pdf` e `informe-ingenieria-…pdf`. Fuente de los PDF: Rajdhani, que no trae «•» ni «≈» (se usan «–» y «aprox.»).
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el

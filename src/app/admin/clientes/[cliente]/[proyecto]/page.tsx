@@ -366,21 +366,23 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         footer={<ActionForm action={refreshFieldDataAction.bind(null, id)} submitLabel="Actualizar datos reales" pendingLabel="Pidiendo…" variant="secondary" />}
       />
 
-      <Card title="Informe" description="Resumen en PDF con el estado actual, los puntos por mejorar y la evolución del rendimiento.">
+      <Card title="Informes" description="Dos PDF: el resumen (estado, mejoras, evolución, tráfico y salud SEO) y el de ingeniería (el detalle técnico de cada página). Es lo que recibe el cliente y lo que puede descargar en su portal.">
         <div className="flex flex-wrap gap-2">
-          {([30, 90] as const).map((d) => (
-            <a
-              key={d}
-              href={`/api/admin/projects/${id}/report?dias=${d}`}
-              download
-              className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
-            >
-              Descargar PDF · {d} días
-            </a>
-          ))}
+          {(["resumen", "ingenieria"] as const).flatMap((tipo) =>
+            ([30, 90] as const).map((d) => (
+              <a
+                key={`${tipo}-${d}`}
+                href={`/api/admin/projects/${id}/report?tipo=${tipo}&dias=${d}`}
+                download
+                className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
+              >
+                {tipo === "resumen" ? "Resumen" : "Ingeniería"} (PDF) · {d} días
+              </a>
+            )),
+          )}
         </div>
         {client.contactEmail ? (
-          <ActionForm action={sendReportAction.bind(null, id)} submitLabel={`Enviar a ${client.contactEmail}`} pendingLabel="Enviando…" variant="secondary" className="max-w-md">
+          <ActionForm action={sendReportAction.bind(null, id)} submitLabel={`Enviar los dos informes a ${client.contactEmail}`} pendingLabel="Enviando…" variant="secondary" className="max-w-md">
             <SelectField label="Periodo del informe" id="dias" defaultValue="30">
               <option value="30">Últimos 30 días</option>
               <option value="90">Últimos 90 días</option>

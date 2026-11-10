@@ -211,7 +211,7 @@ export async function sendReportAction(projectId: string, _prev: ActionState, fd
   return guarded(async () => {
     const { to } = await sendProjectReport(projectId, parsePeriod(field(fd, "dias")));
     refresh(projectId);
-    return { ok: `Informe enviado a ${to}.` };
+    return { ok: `Informes enviados (resumen e ingeniería) a ${to}.` };
   });
 }
 

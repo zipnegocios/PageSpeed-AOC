@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createSerialCache } from "@/server/report/cache";
 import { renderReportPdf } from "@/server/report/pdf";
 import { buildReportEmail } from "@/server/notify/report-email";
-import { computeChange } from "@/server/domain/history";
+import { reportData } from "../helpers/report-data";
+import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
 import { scoreBand } from "@/server/domain/score-band";
-import { reportFilename, type ReportData } from "@/server/services/report";
+import { reportFilename, seoDaysFor, worstFirst } from "@/server/services/report";
 import { lightToken } from "@/lib/tokens";
 
 describe("createSerialCache", () => {
@@ -62,25 +63,24 @@ describe("createSerialCache", () => {
   });
 });
 
-describe("informe", () => {
-  const now = new Date("2026-11-03T12:00:00Z");
-  const day = 86_400_000;
-  const pts = (n: number) => Array.from({ length: n }, (_, i) => ({ at: new Date(now.getTime() - (n - i) * day), value: 60 + i }));
-  const latest = (path: string, profile: "mobile" | "desktop", p: number) => ({
-    routeId: path + profile, path, profile, auditId: "a", finishedAt: now, agentic: null, metrics: { lcpMs: 2000, cls: 0.02, tbtMs: 100 },
-    scores: { performance: p, seo: 93, accessibility: 88, best_practices: 100 },
-    changes: { performance: computeChange("performance", p, p + 5), seo: computeChange("seo", 93, 93), accessibility: null, best_practices: null },
-  });
-  const base: ReportData = {
-    generatedAt: now, days: 30, from: new Date(now.getTime() - 30 * day), clientName: "Acme S.A.", contactName: "Ana", contactEmail: "ana@acme.test",
-    projectId: "p", projectName: "Tienda ñandú", baseUrl: "https://acme.test", performanceThreshold: 80,
-    latest: [latest("/", "mobile", 72), latest("/contacto", "desktop", 40)],
-    improvements: [{ routePath: "/", profile: "mobile", text: "Rendimiento 72 (mínimo 80)" }],
-    charts: [{ routePath: "/", profile: "mobile", points: pts(12), ranges: [{ metric: "seo", first: 90, last: 93, min: 90, max: 93 }] }],
-  };
+/** Los títulos de los marcadores (el índice que el lector de PDF muestra en su panel), en orden. */
+function outlineTitles(pdf: Buffer): string[] {
+  const text = pdf.toString("latin1");
+  const out: string[] = [];
+  for (const m of text.matchAll(/\/Title\s*\(((?:\\.|[^\\)])*)\)/g)) {
+    const raw = m[1]!.replace(/\\([()\\])/g, "$1");
+    out.push(raw.startsWith("\u00fe\u00ff") ? Buffer.from(raw.slice(2), "latin1").swap16().toString("utf16le") : raw);
+  }
+  return out;
+}
+const pageCount = (pdf: Buffer) => (pdf.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []).length;
 
-  it("genera un PDF A4 válido con título, fuentes incrustadas y sin Helvetica", async () => {
-    const pdf = await renderReportPdf(base);
+describe("informe", () => {
+  const summary = reportData("summary");
+  const engineering = reportData("engineering");
+
+  it.each([["summary", summary], ["engineering", engineering]] as const)("el %s es un PDF A4 válido, con las fuentes incrustadas y sin Helvetica", async (_kind, data) => {
+    const pdf = await renderReportPdf(data);
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(5_000);
     const text = pdf.toString("latin1");
@@ -89,29 +89,66 @@ describe("informe", () => {
     expect(text).toMatch(/MediaBox\s*\[\s*0\s+0\s+595\.2\d*\s+841\.8\d*/);
   });
 
-  it("aguanta informes vacíos y proyectos con muchas rutas (varias páginas)", async () => {
-    const empty = await renderReportPdf({ ...base, latest: [], improvements: [], charts: [] });
-    expect(empty.subarray(0, 5).toString()).toBe("%PDF-");
-    const many = await renderReportPdf({
-      ...base,
-      latest: Array.from({ length: 14 }, (_, i) => latest(`/pagina-${i}`, i % 2 ? "mobile" : "desktop", 50 + i)),
-      charts: Array.from({ length: 8 }, (_, i) => ({ routePath: `/pagina-${i}`, profile: "mobile" as const, points: pts(10 + i), ranges: [] })),
-    });
-    const pages = (many.toString("latin1").match(/\/Type\s*\/Page\b/g) ?? []).length;
-    expect(pages).toBeGreaterThanOrEqual(3);
+  it("el índice es un contrato: cada PDF trae exactamente sus apartados, en orden, con el mismo título que promete la pestaña", async () => {
+    const wanted = (list: readonly { title: string }[]) => list.map((sec, i) => `${i + 1}. ${sec.title}`);
+    const sum = outlineTitles(await renderReportPdf(summary)).filter((t) => /^\d+\. /.test(t));
+    const eng = outlineTitles(await renderReportPdf(engineering)).filter((t) => /^\d+\. /.test(t));
+    expect(sum).toEqual(wanted(SUMMARY_SECTIONS));
+    expect(eng).toEqual(wanted(ENGINEERING_SECTIONS));
+    expect(SUMMARY_SECTIONS).toHaveLength(5);
+    expect(ENGINEERING_SECTIONS).toHaveLength(8);
   });
 
-  it("el nombre de archivo es seguro y lleva la fecha", () => {
-    expect(reportFilename(base)).toBe("informe-Acme-S-A-Tienda-nandu-20261103.pdf");
-    expect(reportFilename({ ...base, clientName: "../../etc/passwd", projectName: "\"; rm -rf /" })).toMatch(/^informe-[A-Za-z0-9-]+-[A-Za-z0-9-]+-20261103\.pdf$/);
-    expect(reportFilename({ ...base, clientName: "ñ", projectName: "***" })).toBe("informe-n-informe-20261103.pdf");
+  it("el resumen es corto y el de ingeniería es más largo y tiene portada", async () => {
+    const small = await renderReportPdf({ ...summary });
+    const big = await renderReportPdf({ ...engineering });
+    expect(pageCount(small)).toBeLessThanOrEqual(3);
+    expect(pageCount(big)).toBeGreaterThan(pageCount(small));
+  });
+
+  it("sin acceso a tráfico ni salud SEO los apartados siguen en el índice, con su motivo", async () => {
+    for (const data of [{ ...summary, seo: null }, { ...engineering, seo: null }]) {
+      const pdf = await renderReportPdf(data);
+      const titles = outlineTitles(pdf);
+      expect(titles.some((t) => /Salud SEO/.test(t))).toBe(true);
+    }
+  });
+
+  it("aguanta informes vacíos, sin logotipo y proyectos con muchas rutas (con tope)", async () => {
+    for (const kind of ["summary", "engineering"] as const) {
+      const empty = await renderReportPdf({ ...reportData(kind), latest: [], improvements: [], charts: [], detail: [], daily: [], logo: null, seo: null, pageImprovements: { pages: [], total: 0 } });
+      expect(empty.subarray(0, 5).toString()).toBe("%PDF-");
+    }
+    const many = await renderReportPdf(reportData("engineering", { routes: 120 }));
+    expect(pageCount(many)).toBeGreaterThanOrEqual(5);
+    // El tope: no se detallan más de 30 páginas aunque haya 120 (el detalle viene ya recortado por el servicio).
+    expect(many.length).toBeLessThan(4_000_000);
+  });
+
+  it("el nombre de archivo es seguro, lleva el tipo y la fecha", () => {
+    expect(reportFilename(summary)).toBe("resumen-Acme-S-A-Tienda-nandu-20261103.pdf");
+    expect(reportFilename(engineering)).toBe("informe-ingenieria-Acme-S-A-Tienda-nandu-20261103.pdf");
+    expect(reportFilename({ ...summary, clientName: "../../etc/passwd", projectName: "\"; rm -rf /" })).toMatch(/^resumen-[A-Za-z0-9-]+-[A-Za-z0-9-]+-20261103\.pdf$/);
+    expect(reportFilename({ ...engineering, clientName: "ñ", projectName: "***" })).toBe("informe-ingenieria-n-informe-20261103.pdf");
+  });
+
+  it("el periodo del informe se traduce al de «Tráfico y búsqueda» (7, 28 o 90 días)", () => {
+    expect([7, 30, 90, 365].map((d) => seoDaysFor(d as never))).toEqual([7, 28, 90, 90]);
+  });
+
+  it("las rutas más débiles van primero", () => {
+    const rows = worstFirst(reportData("summary", { routes: 5 }).latest);
+    const perf = rows.map((r) => r.scores.performance!);
+    expect(perf).toEqual([...perf].sort((a, b) => a - b));
   });
 });
 
 describe("correo del informe", () => {
   it("saluda al contacto, nombra el periodo y enlaza el portal con el texto escapado", () => {
     const m = buildReportEmail({ contactName: "Ana", projectName: "Tienda <b>", days: 90, portalUrl: "https://app.test/c/tok/proj" });
-    expect(m.subject).toBe("Informe de Tienda <b>");
+    expect(m.subject).toBe("Informes técnicos web · Tienda <b>");
+    expect(m.text).toContain("Informe resumen");
+    expect(m.text).toContain("Informe de ingeniería");
     expect(m.text).toContain("Hola Ana,");
     expect(m.text).toContain("90 días");
     expect(m.text).toContain("https://app.test/c/tok/proj");
