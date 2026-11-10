@@ -75,9 +75,12 @@ export type TitleSource = {
   crawlTitle: string | null;
 };
 
-/** El título de cada página por su ruta. */
-export function resolveTitles(pages: TitleSource[], siteName?: string): Map<string, string> {
-  const suffix = brandSuffix(pages.flatMap((p) => (p.path !== "/" && p.crawlTitle ? [p.crawlTitle] : [])), siteName);
+/**
+ * El título de cada página por su ruta. `allCrawlTitles` son los títulos de todo el rastreo: con ellos se reconoce la marca
+ * repetida aunque aquí se pidan pocas páginas (con una sola no habría repetición que detectar).
+ */
+export function resolveTitles(pages: TitleSource[], siteName?: string, allCrawlTitles?: string[]): Map<string, string> {
+  const suffix = brandSuffix(allCrawlTitles ?? pages.flatMap((p) => (p.path !== "/" && p.crawlTitle ? [p.crawlTitle] : [])), siteName);
   const out = new Map<string, string>();
   for (const p of pages) {
     const label = p.label?.trim();

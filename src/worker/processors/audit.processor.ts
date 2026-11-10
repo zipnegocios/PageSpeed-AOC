@@ -7,7 +7,9 @@ import { resolveProjectAuth } from "@/server/services/project-auth";
 import { classifyError } from "@/server/domain/error-classifier";
 import { LighthouseRuntimeError } from "@/server/domain/audit-errors";
 import { buildAuditKey } from "@/server/domain/r2-key";
-import { extractResults } from "@/server/domain/score-extraction";
+import { extractImprovements } from "@/server/domain/improvements";
+import { extractResults, type LhrLike } from "@/server/domain/score-extraction";
+import { localizeLhr } from "@/server/report/lighthouse-report";
 import type { AuditJobData } from "@/server/queue/queues";
 import * as repo from "@/server/repositories/audits";
 import { evaluateAudit, evaluateFailure } from "@/server/services/alerts";
@@ -125,7 +127,15 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
         at: now(),
       });
       const { bytes } = await deps.r2.putAuditJson(key, lhr);
-      await repo.markSucceeded(deps.db, auditId, extracted.metrics, key);
+      // Lo que hay que mejorar, ya en español, para que el portal no abra el JSON completo en cada vista. Si falla, no es motivo
+      // para perder la auditoría: se calculará al pedirlo.
+      let improvements = null;
+      try {
+        improvements = extractImprovements(localizeLhr(lhr as LhrLike & Record<string, unknown>, "es"));
+      } catch (err) {
+        log.warn({ err: err instanceof Error ? err.message : String(err) }, "no se pudo extraer lo que hay que mejorar");
+      }
+      await repo.markSucceeded(deps.db, auditId, extracted.metrics, key, improvements);
       log.info(
         { key, bytes, performance: extracted.metrics.scorePerformance, seo: extracted.metrics.scoreSeo },
         "auditoría correcta",

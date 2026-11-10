@@ -2,15 +2,21 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
 import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
+import { formatImpact, plainImprovement } from "@/server/domain/improvement-glossary";
+import { categoryOfMetric, extractImprovements, isAuditImprovements, type AuditImprovements, type ImprovementCategory } from "@/server/domain/improvements";
 import { pathTitle, resolveTitles } from "@/server/domain/page-title";
 import { buildRouteTree, countPages, type ProfileScores, type TreeNode, type TreePage } from "@/server/domain/route-tree";
 import { isValidSlug } from "@/server/domain/slug";
 import { findClientBySlug, findClientByToken } from "@/server/repositories/clients";
+import { listAuditImprovements, saveAuditImprovements } from "@/server/repositories/audits";
 import { latestCrawlTitles } from "@/server/repositories/seo-crawl";
-import { listOpenAlerts, type AlertView } from "./alerts";
+import { localizeLhr } from "@/server/report/lighthouse-report";
+import type { R2Store } from "@/server/storage/r2";
+import { listOpenAlertConditions, listOpenAlerts, type AlertView } from "./alerts";
 import { averageScores, getLatestScores, type LatestScores } from "./history";
 import { assertUuid } from "./shared";
 import { getAudit, getSiblingAudits, type AuditDetail, type SiblingAudits } from "./audits";
+import { loadAuditLhr } from "./audit-lhr";
 import { getRoute, listRoutes } from "./routes";
 import { getMarkets } from "./seo-markets";
 
@@ -163,10 +169,27 @@ export type PortalRouteTree = { nodes: PortalTreeNode[]; pages: number; improvem
  * las mejoras abiertas por ruta (que suben a los padres) y el título que verá el cliente. Título: etiqueta del
  * administrador → título del último rastreo (solo páginas que respondieron 200 sin redirección y no exigen sesión) → ruta.
  */
-export async function getPortalRouteTree(project: PortalProject, db: Database = getDb()): Promise<PortalRouteTree> {
-  const [routes, crawl, markets] = await Promise.all([listRoutes(project.id, db), latestCrawlTitles(db, project.id), getMarkets(project.id, db)]);
+/**
+ * El título que verá el cliente para cada ruta pedida: etiqueta del administrador → título del último rastreo (solo si la
+ * página respondió 200 sin redirección y no exige sesión) → último segmento de la ruta.
+ */
+export async function portalPageTitles(project: { id: string; name: string }, paths: string[], db: Database): Promise<Map<string, string>> {
+  const [routes, crawl] = await Promise.all([listRoutes(project.id, db), latestCrawlTitles(db, project.id)]);
   const meta = new Map(routes.map((r) => [r.path, r]));
   const crawlBy = new Map(crawl.map((c) => [c.path, c]));
+  return resolveTitles(
+    paths.map((path) => {
+      const c = crawlBy.get(path);
+      const trusted = c && c.status === 200 && (c.finalPath === null || c.finalPath === path) && !meta.get(path)?.requiresAuth;
+      return { path, label: meta.get(path)?.label ?? null, crawlTitle: trusted ? c.title : null };
+    }),
+    project.name,
+    crawl.filter((c) => c.path !== "/").map((c) => c.title),
+  );
+}
+
+export async function getPortalRouteTree(project: PortalProject, db: Database = getDb()): Promise<PortalRouteTree> {
+  const markets = await getMarkets(project.id, db);
   const improvementsBy = new Map<string, number>();
   for (const a of project.improvements) improvementsBy.set(a.routePath, (improvementsBy.get(a.routePath) ?? 0) + 1);
 
@@ -177,17 +200,91 @@ export async function getPortalRouteTree(project: PortalProject, db: Database = 
     byRoute.set(l.routeId, page);
   }
   const pages = [...byRoute.values()];
-  const titles = resolveTitles(
-    pages.map((p) => {
-      const c = crawlBy.get(p.path);
-      const trusted = c && c.status === 200 && (c.finalPath === null || c.finalPath === p.path) && !meta.get(p.path)?.requiresAuth;
-      return { path: p.path, label: meta.get(p.path)?.label ?? null, crawlTitle: trusted ? c.title : null };
-    }),
-    project.name,
-  );
+  const titles = await portalPageTitles(project, pages.map((p) => p.path), db);
   for (const p of pages) p.title = titles.get(p.path) ?? pathTitle(p.path);
 
   const marketTitle = new Map(markets.filter((m) => m.prefix).map((m) => [m.prefix, m.label]));
   const nodes = buildRouteTree(pages, (path) => marketTitle.get(path) ?? pathTitle(path));
   return { nodes, pages: countPages(nodes), improvements: project.improvements.length };
+}
+
+// ----------------------------------------------------------------------------- mejoras
+
+export type PortalImprovementItem = { id: string; /** La frase llana (glosario) o, sin él, el título de Lighthouse. */ text: string; /** «≈ 1,9 s», «3 elementos»; vacío si no hay dato. */ impact: string };
+
+export type PortalImprovementBlock = {
+  profile: "mobile" | "desktop";
+  kind: "threshold" | "audit_failure";
+  category: ImprovementCategory | null;
+  /** Nota actual y meta acordada del rubro. */
+  value: number | null;
+  threshold: number | null;
+  /** La última auditoría de esa página y dispositivo, para enlazar al detalle de ingeniería. */
+  auditId: string | null;
+  items: PortalImprovementItem[];
+};
+
+export type PortalImprovementPage = { path: string; title: string; blocks: PortalImprovementBlock[] };
+export type PortalImprovements = { pages: PortalImprovementPage[]; total: number };
+
+/** Cuántas auditorías anteriores a la migración 0018 se leen de R2 en una sola petición (las demás salen en la siguiente). */
+const BACKFILL_PER_REQUEST = 12;
+const CATEGORY_ORDER: ImprovementCategory[] = ["performance", "accessibility", "seo", "best-practices"];
+
+/**
+ * Lo que hay que mejorar, página por página: cada alerta abierta (rubro por debajo de la meta, por dispositivo) con las causas
+ * concretas que Lighthouse encontró en la última auditoría de esa página, en frases llanas y con su impacto. Las causas salen
+ * de lo guardado al terminar cada auditoría; una auditoría anterior se lee de R2 una vez y queda guardada.
+ */
+export async function getPortalImprovements(project: PortalProject, db: Database = getDb(), deps: { r2?: Pick<R2Store, "getAuditJson"> } = {}): Promise<PortalImprovements> {
+  const conditions = await listOpenAlertConditions(project.id, db);
+  if (conditions.length === 0) return { pages: [], total: 0 };
+  const latest = new Map(project.latest.map((l) => [`${l.path}|${l.profile}`, l]));
+  const auditIds = [...new Set(conditions.flatMap((c) => (c.kind === "threshold" ? [latest.get(`${c.routePath}|${c.profile}`)?.auditId] : [])).filter((x): x is string => Boolean(x)))];
+
+  const rows = new Map((await listAuditImprovements(db, auditIds)).map((r) => [r.id, r]));
+  const byAudit = new Map<string, AuditImprovements>();
+  let backfilled = 0;
+  for (const id of auditIds) {
+    const row = rows.get(id);
+    if (row && isAuditImprovements(row.improvements)) {
+      byAudit.set(id, row.improvements);
+    } else if (row && backfilled < BACKFILL_PER_REQUEST) {
+      backfilled++;
+      const lhr = await loadAuditLhr(row, deps.r2);
+      if (!lhr) continue;
+      try {
+        const computed = extractImprovements(localizeLhr(lhr as never, "es"));
+        byAudit.set(id, computed);
+        await saveAuditImprovements(db, id, computed);
+      } catch {
+        /* un resultado ilegible: la página queda sin causas, no sin aviso */
+      }
+    }
+  }
+
+  const titles = await portalPageTitles(project, [...new Set(conditions.map((c) => c.routePath))], db);
+  const pages = new Map<string, PortalImprovementPage>();
+  for (const c of conditions) {
+    const page = pages.get(c.routePath) ?? { path: c.routePath, title: titles.get(c.routePath) ?? pathTitle(c.routePath), blocks: [] };
+    const auditId = latest.get(`${c.routePath}|${c.profile}`)?.auditId ?? null;
+    const category = c.metric ? categoryOfMetric(c.metric) : null;
+    const items = category && auditId ? (byAudit.get(auditId)?.categories[category] ?? []) : [];
+    page.blocks.push({
+      profile: c.profile,
+      kind: c.kind,
+      category,
+      value: c.value,
+      threshold: c.threshold,
+      auditId,
+      items: items.map((i) => ({ id: i.id, text: plainImprovement(i), impact: formatImpact(i.impact) })),
+    });
+    pages.set(c.routePath, page);
+  }
+  for (const page of pages.values()) {
+    page.blocks.sort((a, b) => CATEGORY_ORDER.indexOf(a.category ?? "performance") - CATEGORY_ORDER.indexOf(b.category ?? "performance") || a.profile.localeCompare(b.profile));
+  }
+  const worst = (p: PortalImprovementPage) => Math.min(...p.blocks.map((b) => (b.kind === "audit_failure" ? -1 : (b.value ?? 101))));
+  const sorted = [...pages.values()].sort((a, b) => b.blocks.length - a.blocks.length || worst(a) - worst(b) || a.title.localeCompare(b.title, "es"));
+  return { pages: sorted, total: conditions.length };
 }

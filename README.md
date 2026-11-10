@@ -379,6 +379,20 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   administrador** (ficha del proyecto → Rutas → «Nombre que verá el cliente») → título del último rastreo sin la marca del
   sitio (solo si la página respondió 200 sin redirección y no exige sesión) → último segmento de la ruta. Se abren solas las
   ramas con mejoras dentro (hasta 12 páginas); las enormes se abren a mano. Con 109 rutas la pestaña tarda ~0,8 s en producción.
+- **Mejoras del portal** (`/c/<enlace>/<proyecto>/mejoras`): cada alerta abierta (rubro por debajo de la meta, por dispositivo) se
+  muestra con las **causas concretas** que Lighthouse encontró en la última auditoría de esa página, en frases llanas
+  (`domain/improvement-glossary.ts`, con respaldo al título de Lighthouse en español) y con su impacto («≈ 1,9 s», «3 elementos»).
+  Las causas (`domain/improvements.ts`) se extraen **al terminar cada auditoría** y se guardan en `audit_logs.improvements`
+  (migración 0018): el portal no abre el JSON de R2 en cada vista. Las auditorías anteriores a la migración se leen de R2 una
+  sola vez (hasta 12 por petición) y quedan guardadas. Cada página lleva su botón «Ver detalle de ingeniería» (a la pestaña del
+  rubro afectado).
+- **Tráfico y búsqueda del portal** (`.../trafico?periodo=7|28|90&seccion=visitas|google|salud`): periodo, cuatro cifras con su
+  variación (clics, impresiones, sesiones y visitas desde IA como «mínimo observado») y tres secciones con tarjetas que se abren:
+  **Visitas** (canales, páginas con su título, países, asistentes de IA), **Google** (CTR, posición, clics, países, dispositivos,
+  idiomas) y **Salud SEO**: el último rastreo técnico en frases llanas (`domain/seo-client-glossary.ts`), solo errores y avisos
+  (la información no se muestra), agrupado por tema (acceso, indexación, direcciones principales, contenido, idiomas, datos
+  estructurados), con nuevos y resueltos frente a la revisión anterior y las páginas afectadas. Mismo interruptor que antes
+  («Visible para el cliente», `seo_client_visible`) y solo proyectos en producción; la salud SEO no exige tener Google conectado.
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el

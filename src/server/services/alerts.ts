@@ -325,6 +325,31 @@ export async function listOpenAlerts(projectId?: string, db: Database = getDb())
   return (await repo.listOpenAlerts(db, { projectId })).map(toView);
 }
 
+/** Lo que el portal necesita de cada alerta abierta: la condición exacta (rubro, valor y meta), sin datos internos. */
+export type AlertCondition = {
+  routePath: string;
+  profile: Profile;
+  kind: "threshold" | "audit_failure";
+  /** Rubro por debajo de la meta (null en un fallo de auditoría). */
+  metric: "performance" | "seo" | "accessibility" | "best_practices" | null;
+  value: number | null;
+  threshold: number | null;
+  openedAt: Date;
+};
+
+export async function listOpenAlertConditions(projectId: string, db: Database = getDb()): Promise<AlertCondition[]> {
+  assertUuid(projectId, "Proyecto");
+  return (await repo.listOpenAlerts(db, { projectId })).map((r) => ({
+    routePath: r.routePath,
+    profile: r.state.profile,
+    kind: r.state.kind,
+    metric: r.state.metric,
+    value: r.state.lastValue,
+    threshold: r.state.thresholdAtOpen,
+    openedAt: r.state.openedAt,
+  }));
+}
+
 export function listRecentNotifications(limit = 20, projectId?: string, db: Database = getDb()) {
   if (projectId) assertUuid(projectId, "Proyecto");
   return repo.listRecentNotifications(db, Math.min(Math.max(limit, 1), 100), projectId);
