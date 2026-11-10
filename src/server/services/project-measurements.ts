@@ -1,5 +1,5 @@
 import { getDb, type Database } from "@/server/db/client";
-import { FIELD_LABEL, assess, formatField, rate, type Assessment, type FieldMetric, type Rating } from "@/server/domain/field-data";
+import { FIELD_LABEL, FIELD_METRICS, assess, formatField, rate, type Assessment, type FieldMetric, type Rating } from "@/server/domain/field-data";
 import { measurementStates, type MeasurementId, type MeasurementState } from "@/server/domain/measurements";
 import * as seoPortal from "@/server/repositories/seo-portal";
 import { findFieldData } from "./crux";
@@ -10,8 +10,10 @@ import { assertUuid } from "./shared";
 export type PortalField = {
   assessment: Assessment;
   device: "mobile" | "desktop";
+  first: string | null;
   last: string | null;
-  metrics: Array<{ metric: FieldMetric; label: string; value: string; rating: Rating | null }>;
+  /** LCP, INP y CLS (`core`) siempre; FCP y TTFB solo si Google los entregó. `good`/`needsImprovement`/`poor`: % de visitas. */
+  metrics: Array<{ metric: FieldMetric; core: boolean; label: string; value: string; rating: Rating | null; good: number; needsImprovement: number; poor: number }>;
 };
 
 /**
@@ -24,26 +26,29 @@ export type PortalMeasurements = {
   seoAccess: boolean;
   traffic: PortalTraffic | null;
   field: PortalField | null;
+  /** Cada dispositivo con datos reales (móvil primero); `field` es el primero. */
+  fields: PortalField[];
   states: Record<MeasurementId, MeasurementState>;
 };
 
-async function loadField(projectId: string, db: Database): Promise<PortalField | null> {
-  // Se prefiere el móvil (es el que Google usa para posicionar); si no hay datos de móvil, el escritorio.
+const CORE: readonly FieldMetric[] = ["lcp", "inp", "cls"];
+
+async function loadFields(projectId: string, db: Database): Promise<PortalField[]> {
+  const out: PortalField[] = [];
+  // El móvil primero (es el que Google usa para posicionar); el escritorio, si tiene datos.
   for (const device of ["mobile", "desktop"] as const) {
     const view = await findFieldData(projectId, "origin", device, db);
     if (view?.status !== "ok" || !view.metrics) continue;
-    const result = assess(view.metrics);
-    return {
-      assessment: result,
-      device,
-      last: view.last,
-      metrics: (["lcp", "inp", "cls"] as const).map((metric) => {
-        const p75 = view.metrics?.[metric]?.p75 ?? null;
-        return { metric, label: FIELD_LABEL[metric], value: formatField(metric, p75), rating: rate(metric, p75) };
-      }),
-    };
+    const metrics = FIELD_METRICS.flatMap((metric) => {
+      const m = view.metrics?.[metric];
+      const core = CORE.includes(metric);
+      if (!m && !core) return [];
+      const p75 = m?.p75 ?? null;
+      return [{ metric, core, label: FIELD_LABEL[metric], value: formatField(metric, p75), rating: rate(metric, p75), good: m?.good ?? 0, needsImprovement: m?.needsImprovement ?? 0, poor: m?.poor ?? 0 }];
+    });
+    out.push({ assessment: assess(view.metrics), device, first: view.first, last: view.last, metrics });
   }
-  return null;
+  return out;
 }
 
 /** Las mediciones del proyecto para el cliente (`days`: 7, 28 o 90). `hasLighthouse`: ya hay auditorías, que se leen en el portal. */
@@ -56,7 +61,8 @@ export async function getPortalMeasurements(
   assertUuid(clientId, "Cliente");
   assertUuid(project.id, "Proyecto");
   const seoAccess = (await seoPortal.findPortalSeoProject(db, clientId, project.id)) !== null;
-  const [traffic, field] = await Promise.all([seoAccess ? getPortalTraffic(clientId, project, { days: opts.days }, db) : Promise.resolve(null), loadField(project.id, db)]);
+  const [traffic, fields] = await Promise.all([seoAccess ? getPortalTraffic(clientId, project, { days: opts.days }, db) : Promise.resolve(null), loadFields(project.id, db)]);
+  const field = fields[0] ?? null;
   const d = traffic?.dashboard ?? null;
   const states = measurementStates({
     seoAccess,
@@ -71,5 +77,5 @@ export async function getPortalMeasurements(
       health: traffic?.health != null,
     },
   });
-  return { days: opts.days, seoAccess, traffic, field, states };
+  return { days: opts.days, seoAccess, traffic, field, fields, states };
 }

@@ -10,6 +10,7 @@ import { ENGINEERING_SECTIONS, REPORT_TITLE } from "@/server/domain/report-outli
 import { formatVital, vitalTone } from "@/server/domain/vitals-band";
 import { worstFirst, type ReportData } from "@/server/services/report";
 import { C, Chart, pdfImpact, Note, PROFILE, ReportFooter, ReportHeader, Row, ScoreText, SectionTitle, dateFmt, s, type Col } from "./pdf-common";
+import { FieldBlock, Reason, SearchBlock, TrafficBlock } from "./pdf-measures";
 
 /** Cuántas páginas (las más débiles) se detallan en cada apartado; el resto se resume. */
 export const ENGINEERING_MAX_PAGES = 30;
@@ -55,6 +56,9 @@ function Metodo({ data }: { data: ReportData }) {
         {data.thresholds.length > 0
           ? `Metas acordadas para este sitio: ${data.thresholds.map((t) => `${METRIC_LABEL[t.metric] ?? t.metric} ${t.minScore}`).join(" · ")}. Un rubro por debajo de su meta aparece como punto por mejorar.`
           : "Todavía no hay metas acordadas para este sitio."}
+      </Text>
+      <Text style={s.bodyText}>
+        Las visitas y la búsqueda vienen de Google Analytics 4 y Google Search Console; la experiencia real de visitantes, del Chrome UX Report (Google); la salud SEO, de un rastreo técnico propio del sitio. Cada apartado indica si su fuente está activada para tu sitio.
       </Text>
       <Text style={s.bodyText}>
         Periodo del informe: {data.days === 365 ? "último año" : `últimos ${data.days} días`}. Páginas medidas: {routeIds(data).length}.
@@ -180,7 +184,7 @@ function Agentes({ data }: { data: ReportData }) {
 
 function SaludSeo({ data }: { data: ReportData }) {
   const h = data.seo?.health;
-  if (!h) return <Note>Este apartado se incluye cuando se activa la revisión técnica SEO de tu sitio. Si te interesa, pídelo a tu contacto.</Note>;
+  if (!h) return <Reason data={data} ids={["health"]} />;
   return (
     <View>
       <Text style={s.bodyText}>
@@ -255,8 +259,11 @@ const BODY: Record<string, (p: { data: ReportData }) => React.ReactElement> = {
   metodo: Metodo,
   notas: Notas,
   rendimiento: Rendimiento,
+  experiencia: ({ data }) => <FieldBlock data={data} detail />,
   fallos: Fallos,
   agentes: Agentes,
+  trafico: ({ data }) => <TrafficBlock data={data} detail />,
+  busqueda: ({ data }) => <SearchBlock data={data} detail />,
   "salud-seo": SaludSeo,
   evolucion: Evolucion,
   glosario: Glosario,

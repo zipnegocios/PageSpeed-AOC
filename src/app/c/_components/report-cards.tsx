@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cx } from "@/lib/ui/cx";
-import { REPORT_SECTIONS, REPORT_TITLE, reportKindParam, type ReportKind } from "@/server/domain/report-outline";
+import type { MeasurementId, MeasurementState } from "@/server/domain/measurements";
+import { REPORT_SECTIONS, REPORT_TITLE, reportKindParam, sectionState, type ReportKind } from "@/server/domain/report-outline";
 import { DownloadButton } from "./download-button";
 import { ChevronRight, TabIcons } from "./portal-icons";
 
@@ -15,19 +16,26 @@ export const parseReportPeriod = (raw: string | string[] | undefined): ReportPer
 const COPY: Record<ReportKind, { pages: string; description: string; button: string }> = {
   summary: {
     pages: "PDF · normalmente 2 a 4 páginas",
-    description: "El estado de tu sitio en pocas páginas y en lenguaje claro: cómo va cada página, qué hay que mejorar, cómo ha evolucionado y, si lo tienes activado, tu tráfico y la salud SEO.",
+    description: "Todo lo que medimos de tu sitio, en pocas páginas y en lenguaje claro: la velocidad de cada página, qué hay que mejorar, la experiencia de tus visitantes, de dónde llegan (buscadores, redes sociales, otros sitios), cómo te buscan en Google y la salud SEO.",
     button: "Descargar resumen",
   },
   engineering: {
     pages: "PDF · desde unas 10 páginas, según el tamaño del sitio",
     description:
-      "El detalle de ingeniería de cada página. Nuestros servidores abren tu sitio en un navegador real y lo miden con Lighthouse, la herramienta de Google; cada cifra se lee de esa medición guardada, no se estima ni se inventa. Aquí encuentras lo que mide, qué falla y cuánto afecta.",
+      "El detalle de ingeniería de cada página. Nuestros servidores abren tu sitio en un navegador real y lo miden con Lighthouse, la herramienta de Google; cada cifra se lee de esa medición guardada, no se estima ni se inventa. Incluye también la experiencia real de tus visitantes, el reparto completo de tus visitas por origen y el detalle de Search Console.",
     button: "Descargar informe de ingeniería",
   },
 };
 
 /** Una tarjeta de informe: descripción, «Qué contiene» (el índice del PDF, de `report-outline`) y su botón de descarga. */
-function ReportCard({ kind, base, days }: { kind: ReportKind; base: string; days: ReportPeriodChoice }) {
+type States = Record<MeasurementId, MeasurementState>;
+const STATE_MARK: Record<MeasurementState, { text: string; tone: string }> = {
+  included: { text: "Incluido", tone: "bg-primary-subtle text-on-primary-subtle" },
+  pending: { text: "Aún sin datos", tone: "bg-surface-300 text-ink-muted" },
+  off: { text: "No activado", tone: "bg-surface-300 text-ink-muted" },
+};
+
+function ReportCard({ kind, base, days, states }: { kind: ReportKind; base: string; days: ReportPeriodChoice; states: States }) {
   const copy = COPY[kind];
   const sections = REPORT_SECTIONS[kind];
   return (
@@ -54,7 +62,10 @@ function ReportCard({ kind, base, days }: { kind: ReportKind; base: string; days
                   <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-300 text-[13px] text-ink-muted tabular-nums">
                     {i + 1}
                   </span>
-                  <span className="flex-1">{s.title}</span>
+                  <span className="min-w-0 flex-1">{s.title}</span>
+                  {sectionState(s, states) ? (
+                    <span className={cx("shrink-0 rounded-full px-2 py-0.5 text-[12px] leading-4 font-semibold", STATE_MARK[sectionState(s, states)!].tone)}>{STATE_MARK[sectionState(s, states)!].text}</span>
+                  ) : null}
                   <ChevronRight className="chev text-ink-muted" />
                 </summary>
                 <ul className="px-3 pb-3 pl-11 text-[14px] leading-5 text-ink-muted">
@@ -93,11 +104,11 @@ export function ReportPeriodSwitch({ base, days }: { base: string; days: ReportP
   );
 }
 
-export function ReportCards({ base, days }: { base: string; days: ReportPeriodChoice }) {
+export function ReportCards({ base, days, states }: { base: string; days: ReportPeriodChoice; states: States }) {
   return (
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-      <ReportCard kind="summary" base={base} days={days} />
-      <ReportCard kind="engineering" base={base} days={days} />
+      <ReportCard kind="summary" base={base} days={days} states={states} />
+      <ReportCard kind="engineering" base={base} days={days} states={states} />
     </div>
   );
 }

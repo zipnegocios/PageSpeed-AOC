@@ -1,6 +1,7 @@
 import { getDb, type Database } from "@/server/db/client";
 import { metricValue, periodStart, type HistoryMetric, type Period } from "@/server/domain/history";
 import type { AuditImprovements } from "@/server/domain/improvements";
+import type { MeasurementId, MeasurementState } from "@/server/domain/measurements";
 import { REPORT_FILE_PREFIX, type ReportKind } from "@/server/domain/report-outline";
 import * as history from "@/server/repositories/history";
 import { listOpenAlerts } from "./alerts";
@@ -10,7 +11,8 @@ import { getClient } from "./clients";
 import { getLatestScores, type LatestScores } from "./history";
 import { loadAuditImprovements } from "./audit-improvements";
 import { getPortalImprovements, portalPageTitles, type PortalImprovements, type PortalProject } from "./portal";
-import { getPortalTraffic, type PortalTraffic } from "./portal-traffic";
+import type { PortalTraffic } from "./portal-traffic";
+import { getPortalMeasurements, type PortalField } from "./project-measurements";
 import { getProject } from "./projects";
 import { getThresholds } from "./thresholds";
 
@@ -56,6 +58,10 @@ export type ReportData = {
   pageImprovements: PortalImprovements;
   /** Tráfico, búsqueda y salud SEO: solo si el cliente puede verlos en su portal (si no, null). */
   seo: PortalTraffic | null;
+  /** Experiencia real de los visitantes (Chrome UX Report): un elemento por dispositivo con datos, móvil primero. Vacío si no hay. */
+  fields: PortalField[];
+  /** Qué mediciones están incluidas, sin datos aún o no activadas para el cliente: decide el motivo que lleva cada apartado. */
+  states: Record<MeasurementId, MeasurementState>;
   /** Rendimiento medio por día (UTC) del periodo, de más antiguo a más reciente. */
   daily: Array<{ day: string; value: number }>;
   /**
@@ -117,10 +123,10 @@ export async function buildProjectReport(
 
   // Lo que cuelga del portal (títulos, causas de las mejoras y tráfico/SEO) sale de los mismos servicios que la pantalla del cliente.
   const portalProject: PortalProject = { id: project.id, slug: project.slug, name: project.name, baseUrl: project.baseUrl, latest, improvements: [] };
-  const [titles, pageImprovements, seo, daily, logo, newest] = await Promise.all([
+  const [titles, pageImprovements, measurements, daily, logo, newest] = await Promise.all([
     portalPageTitles(portalProject, latest.map((l) => l.path), db),
     getPortalImprovements(portalProject, db),
-    getPortalTraffic(client.id, { id: project.id, name: project.name }, { days: seoDaysFor(days) }, db),
+    getPortalMeasurements(client.id, { id: project.id, name: project.name }, { days: seoDaysFor(days), hasLighthouse: latest.length > 0 }, db),
     history.listDailyPerformance(db, [project.id], from),
     readClientLogo(client.id, "full", db).then((l) => l ?? readClientLogo(client.id, "icon", db)).catch(() => null),
     latest[0] ? getAudit(latest[0].auditId, db).catch(() => null) : Promise.resolve(null),
@@ -157,7 +163,9 @@ export async function buildProjectReport(
     logo: logo ? { bytes: logo.bytes, bg: client.logoBg } : null,
     titles: Object.fromEntries(titles),
     pageImprovements,
-    seo,
+    seo: measurements.traffic,
+    fields: measurements.fields,
+    states: measurements.states,
     daily: daily.map((d) => ({ day: d.day, value: d.value })),
     detail,
     lighthouseVersion: newest?.lighthouseVersion ?? null,

@@ -4,6 +4,7 @@ import { renderReportPdf } from "@/server/report/pdf";
 import { buildReportEmail } from "@/server/notify/report-email";
 import { reportData } from "../helpers/report-data";
 import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
+import { MEASUREMENTS } from "@/server/domain/measurements";
 import { scoreBand } from "@/server/domain/score-band";
 import { reportFilename, seoDaysFor, worstFirst } from "@/server/services/report";
 import { lightToken } from "@/lib/tokens";
@@ -95,8 +96,32 @@ describe("informe", () => {
     const eng = outlineTitles(await renderReportPdf(engineering)).filter((t) => /^\d+\. /.test(t));
     expect(sum).toEqual(wanted(SUMMARY_SECTIONS));
     expect(eng).toEqual(wanted(ENGINEERING_SECTIONS));
-    expect(SUMMARY_SECTIONS).toHaveLength(5);
-    expect(ENGINEERING_SECTIONS).toHaveLength(8);
+    expect(SUMMARY_SECTIONS).toHaveLength(7);
+    expect(ENGINEERING_SECTIONS).toHaveLength(11);
+  });
+
+  it("cada medición aparece en algún apartado de los dos informes (excepto los de texto fijo)", () => {
+    for (const list of [SUMMARY_SECTIONS, ENGINEERING_SECTIONS]) {
+      const covered = new Set(list.flatMap((sec) => sec.measures));
+      for (const m of MEASUREMENTS) expect(covered.has(m.id), `${m.id} sin apartado`).toBe(true);
+    }
+  });
+
+  it("los apartados nuevos traen las cifras reales: fuentes, redes por nombre, consultas y experiencia real", async () => {
+    const text = (pdf: Buffer) => outlineTitles(pdf).join("|");
+    for (const data of [summary, engineering]) {
+      const pdf = await renderReportPdf(data);
+      const titles = text(pdf);
+      expect(titles).toMatch(/Experiencia real de los visitantes/);
+      expect(titles).toMatch(/Búsqueda en Google|Search Console en detalle/);
+    }
+  });
+
+  it("sin datos de una medición, el apartado sigue y dice por qué (activada sin datos o no activada)", async () => {
+    for (const states of [{ ...summary.states, search: "pending" as const }, { ...summary.states, search: "off" as const }]) {
+      const pdf = await renderReportPdf({ ...summary, states, seo: { ...summary.seo!, dashboard: { ...summary.seo!.dashboard!, search: null } } });
+      expect(outlineTitles(pdf).some((t) => /Búsqueda en Google/.test(t))).toBe(true);
+    }
   });
 
   it("el resumen es corto y el de ingeniería es más largo y tiene portada", async () => {

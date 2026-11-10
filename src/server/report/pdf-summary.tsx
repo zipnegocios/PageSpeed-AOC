@@ -1,10 +1,10 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import { Fragment } from "react";
 import { BRAND_NAME } from "@/lib/brand";
-import { formatCount, formatPercent, percentDelta } from "@/lib/seo-format";
 import { SUMMARY_SECTIONS, REPORT_TITLE } from "@/server/domain/report-outline";
 import { worstFirst, type ReportChart, type ReportData } from "@/server/services/report";
 import { C, Chart, pdfImpact, Note, PROFILE, ReportFooter, ReportHeader, Row, ScoreText, SectionTitle, changeText, s, type Col } from "./pdf-common";
+import { FieldBlock, Reason, SearchBlock, TrafficBlock } from "./pdf-measures";
 
 const MAX_PAGES = 30;
 const MAX_IMPROVEMENT_PAGES = 12;
@@ -104,52 +104,21 @@ function Evolucion({ data }: { data: ReportData }) {
   );
 }
 
-const Kpi = ({ label, value, delta }: { label: string; value: string; delta: ReturnType<typeof percentDelta> }) => {
-  const c = changeText(delta);
-  return (
-    <View style={{ flex: 1 }}>
-      <Text style={s.label}>{label}</Text>
-      <Text style={{ fontSize: 18, fontWeight: 700 }}>{value}</Text>
-      {c ? <Text style={[s.small, { color: c.color }]}>{c.text}</Text> : null}
-    </View>
-  );
-};
+function Experiencia({ data }: { data: ReportData }) {
+  return <FieldBlock data={data} detail={false} />;
+}
 
 function Trafico({ data }: { data: ReportData }) {
-  const d = data.seo?.dashboard;
-  if (!d) return <Note>Este apartado se incluye cuando se activa el seguimiento de tráfico y búsqueda de tu sitio. Si te interesa, pídelo a tu contacto.</Note>;
-  const { search, traffic, ai } = d;
-  const titles = data.seo!.titles;
-  return (
-    <View>
-      <View style={[s.grid, { marginBottom: 8 }]}>
-        <Kpi label="Clics en Google" value={search ? formatCount(search.totals.clicks) : "—"} delta={search ? percentDelta(search.totals.clicks, search.previousTotals.clicks) : null} />
-        <Kpi label="Impresiones" value={search ? formatCount(search.totals.impressions) : "—"} delta={search ? percentDelta(search.totals.impressions, search.previousTotals.impressions) : null} />
-        <Kpi label="Sesiones" value={traffic ? formatCount(traffic.totals.sessions) : "—"} delta={traffic ? percentDelta(traffic.totals.sessions, traffic.previousTotals.sessions) : null} />
-        <Kpi label="Visitas desde IA (mínimo)" value={ai ? formatCount(ai.totals.sessions) : "—"} delta={ai ? percentDelta(ai.totals.sessions, ai.previousTotals.sessions) : null} />
-      </View>
-      {d.social && d.social.byNetwork.length > 0 ? (
-        <Text style={[s.small, { marginBottom: 6 }]}>
-          Visitas desde redes sociales: {d.social.byNetwork.slice(0, 3).map((n) => `${n.label} ${formatCount(n.sessions)}`).join(" · ")} ({formatCount(d.social.totals.sessions)} sesiones en total).
-        </Text>
-      ) : null}
-      {search && search.topPages.length > 0 ? (
-        <View>
-          <Text style={[s.label, { marginBottom: 3 }]}>Páginas con más clics</Text>
-          {search.topPages.slice(0, 5).map((p) => (
-            <Text key={p.page} style={{ fontSize: 9.5 }}>
-              – {titles[p.page] ?? p.page} — {formatCount(p.clicks)} clics ({formatPercent(search.totals.clicks > 0 ? p.clicks / search.totals.clicks : 0)})
-            </Text>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
+  return <TrafficBlock data={data} detail={false} />;
+}
+
+function Busqueda({ data }: { data: ReportData }) {
+  return <SearchBlock data={data} detail={false} />;
 }
 
 function SaludSeo({ data }: { data: ReportData }) {
   const h = data.seo?.health;
-  if (!h) return <Note>Este apartado se incluye cuando se activa la revisión técnica SEO de tu sitio. Si te interesa, pídelo a tu contacto.</Note>;
+  if (!h) return <Reason data={data} ids={["health"]} />;
   const top = h.groups.flatMap((g) => g.issues).sort((a, b) => Number(b.severity === "error") - Number(a.severity === "error") || b.pages - a.pages).slice(0, 5);
   return (
     <View>
@@ -169,7 +138,7 @@ function SaludSeo({ data }: { data: ReportData }) {
   );
 }
 
-const BODY: Record<string, (p: { data: ReportData }) => React.ReactElement> = { estado: Estado, mejoras: Mejoras, evolucion: Evolucion, trafico: Trafico, "salud-seo": SaludSeo };
+const BODY: Record<string, (p: { data: ReportData }) => React.ReactElement> = { estado: Estado, mejoras: Mejoras, experiencia: Experiencia, evolucion: Evolucion, trafico: Trafico, busqueda: Busqueda, "salud-seo": SaludSeo };
 
 /** El informe resumen: pocas páginas, en lenguaje claro, con los apartados de `SUMMARY_SECTIONS`. */
 export function SummaryDocument({ data }: { data: ReportData }) {

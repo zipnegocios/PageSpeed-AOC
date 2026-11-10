@@ -80,7 +80,7 @@ export function MeasurementCards({ m, base }: { m: PortalMeasurements; base: str
     const verdict = ASSESSMENT[f.assessment];
     cards.push(
       <Card key="field" id="field" href={`${base}#experiencia-real`} value={verdict.text} tone={verdict.tone}>
-        {f.metrics.map((x) => (
+        {f.metrics.filter((x) => x.core).map((x) => (
           <span key={x.metric} className="mr-2 inline-block">
             {x.metric.toUpperCase()} <b className={cx("font-semibold", x.rating ? RATING_TONE[x.rating] : "text-ink-muted")}>{x.value}</b>
             <span className="sr-only">{x.rating ? ` (${RATING_WORD[x.rating]})` : ""}</span>

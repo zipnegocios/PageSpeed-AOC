@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { ImprovementList } from "@/app/c/_components/improvement-list";
+import { MeasurementCards } from "@/app/c/_components/measurement-cards";
+import { reportData } from "../helpers/report-data";
 import { ReportCards } from "@/app/c/_components/report-cards";
 import { PortalRouteTree } from "@/app/c/_components/route-tree";
 import type { PortalImprovements, PortalTreeNode } from "@/server/services/portal";
@@ -56,6 +58,22 @@ describe("portal: guardas de maquetación móvil", () => {
     expect(improvements).toContain("grid-cols-1");
     expect(improvements).toMatch(/<li class="min-w-0">/);
     expect(improvements).not.toMatch(/truncate[^"]*">Consultoría/);
-    expect(renderToStaticMarkup(createElement(ReportCards, { base: "/c/x/y", days: 30 }))).toContain("grid-cols-1");
+    const reports = renderToStaticMarkup(createElement(ReportCards, { base: "/c/x/y", days: 30, states: { speed: "included", improvements: "included", field: "included", search: "off", traffic: "off", sources: "off", ai: "off", health: "pending" } }));
+    expect(reports).toContain("grid-cols-1");
+    // Cada apartado nombra si está incluido, sin datos o no activado.
+    expect(reports).toContain("Incluido");
+    expect(reports).toContain("No activado");
+    expect(reports).toContain("Aún sin datos");
+  });
+
+  it("las micro-tarjetas del Resumen usan rejilla con columnas base y celdas que se encogen", () => {
+    const m = { days: 28, seoAccess: true, traffic: null, field: null, fields: [], states: { speed: "included", improvements: "included", field: "pending", search: "pending", traffic: "pending", sources: "pending", ai: "pending", health: "pending" } } as const;
+    const html = renderToStaticMarkup(createElement(MeasurementCards, { m: m as never, base: "/c/x/y" }));
+    expect(html).toContain("Todavía sin datos");
+    const full = renderToStaticMarkup(createElement(MeasurementCards, { m: { ...m, traffic: reportData("summary").seo, fields: reportData("summary").fields, field: reportData("summary").fields[0]! } as never, base: "/c/x/y" }));
+    expect(full).toMatch(/<ul class="grid grid-cols-2[^"]*">/);
+    expect(full).toMatch(/<li class="min-w-0">/);
+    expect(full).toContain("Redes sociales");
+    expect(full).toContain("Instagram");
   });
 });
