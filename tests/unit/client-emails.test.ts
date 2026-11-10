@@ -17,7 +17,6 @@ const base: ClientEmailBase = {
   names: ["Ana", "Luis", "María"],
   clientName: "Café Aurora",
   site: "cafeaurora.com",
-  appUrl: "https://app.example.com",
   portalUrl: "https://app.example.com/c/cafe-aurora",
 };
 const one: ClientEmailBase = { ...base, names: ["Ana"] };
@@ -45,13 +44,12 @@ const weekly: WeeklyInput = {
   rangeShort: "2 al 8 de nov",
   visits: 1240,
   visitsDeltaPct: 8,
-  googleClicks: 310,
-  clicksDeltaPct: 12,
-  impressions: 9800,
+  search: { clicks: 310, clicksDeltaPct: 12, impressions: 9800 },
   sources: [
     { label: "Google (búsqueda)", visits: 610, deltaPct: 11 },
     { label: "TikTok", visits: 40, deltaPct: null },
   ],
+  ai: { visits: 30, deltaPct: null },
   topPages: [{ label: "Inicio", visits: 480 }],
   summaryLine: "Semana estable.",
   dataThrough: "8 de nov",
@@ -95,13 +93,25 @@ describe("bienvenida", () => {
     expect(solo.text).toContain("No tienes que hacer nada");
     expect(solo.subject).toBe("Tu sitio ahora tiene seguimiento técnico permanente");
   });
-  it("lleva el PIN, el portal y la firma de zipnegocios, no la de PageSpeed", () => {
+  it("lleva el PIN, el portal y la firma con tu nombre primero, no la de PageSpeed", () => {
     const m = buildWelcomeEmail({ ...base, ...input });
     expect(m.text).toContain("PIN: 123456");
     expect(m.html).toContain("https://app.example.com/c/cafe-aurora");
     expect(m.html).toContain("zipnegocios");
-    expect(m.html).not.toContain("PAGESPEED");
-    expect(m.text).toContain("Gustavo Amarista · zipnegocios");
+    expect(m.html).not.toMatch(/pagespeed/i);
+    expect(m.html).not.toContain("<img");
+    // El nombre encabeza la banda y la firma; la marca va después.
+    expect(m.html.indexOf("Gustavo Amarista")).toBeLessThan(m.html.indexOf("zipnegocios"));
+    expect(m.text).toContain("Gustavo Amarista\nzipnegocios");
+    expect(m.text).toContain("WhatsApp +1 316 469 5701");
+  });
+  it("se presenta: el cliente no conoce esta dirección y reconoce a la persona", () => {
+    const team = buildWelcomeEmail({ ...base, ...input });
+    expect(team.text).toContain("Soy Gustavo Amarista (zipnegocios), quien se encarga de su sitio. Les escribo desde esta dirección nueva");
+    expect(team.text).toContain("si no la reconocen, es normal, soy yo");
+    const solo = buildWelcomeEmail({ ...one, ...input });
+    expect(solo.text).toContain("quien se encarga de tu sitio. Te escribo desde esta dirección nueva");
+    expect(solo.text).toContain("si no la reconoces, es normal, soy yo");
   });
   it("sin servidor en el plan no promete servidor; sin nota de versiones omite ese dato", () => {
     const m = buildWelcomeEmail({ ...base, ...input, includesServer: false, eolNote: null, kind: "tienda", techLabel: "Shopify" });
@@ -128,6 +138,11 @@ describe("mensual", () => {
   it("sin actuaciones dice que no hizo falta intervenir", () => {
     expect(buildMonthlyEmail(monthly).text).toContain("Este mes no hizo falta intervenir");
   });
+  it("sin mes anterior no inventa una comparación", () => {
+    const m = buildMonthlyEmail({ ...monthly, scores: [{ label: "Rendimiento", mobile: 78, desktop: 91, mobileDelta: null, desktopDelta: null }] });
+    expect(m.subject).toBe("cafeaurora.com: octubre en orden. Rendimiento móvil 78");
+    expect(m.text).toContain("sin comparación");
+  });
   it("la línea del servidor solo sale si el administrador la confirmó", () => {
     expect(buildMonthlyEmail(monthly).text).not.toContain("Servidor y servicios");
     expect(buildMonthlyEmail({ ...monthly, serverConfirmed: true }).text).toContain("Servidor y servicios: supervisados");
@@ -151,6 +166,21 @@ describe("semanal", () => {
     const m = buildWeeklyEmail({ ...weekly, visits: 12 });
     expect(m.subject).toBe("Su semana en la web: 12 visitas · 2 al 8 de nov");
     expect(m.text).not.toContain("%");
+  });
+  it("las visitas de IA van aparte, como mínimo observado, y no entran en las barras", () => {
+    const m = buildWeeklyEmail(weekly);
+    expect(m.text).toContain("asistentes de IA");
+    expect(m.text).toContain("ya incluidas arriba");
+    expect(buildWeeklyEmail({ ...weekly, ai: null }).text).not.toContain("asistentes de IA");
+  });
+  it("si la semana anterior no tuvo clics, no pone «nuevo» junto a los clics", () => {
+    const m = buildWeeklyEmail({ ...weekly, search: { clicks: 310, clicksDeltaPct: null, impressions: 9800 } });
+    expect(m.text).toContain("Clics desde Google: 310 ·");
+    expect(m.text).not.toContain("310 (nuevo)");
+  });
+  it("sin datos de Search Console no muestra la línea de clics", () => {
+    expect(buildWeeklyEmail(weekly).text).toContain("Clics desde Google: 310");
+    expect(buildWeeklyEmail({ ...weekly, search: null }).text).not.toContain("Clics desde Google");
   });
   it("dice hasta qué día llegan los datos", () => {
     expect(buildWeeklyEmail(weekly).text).toContain("Datos hasta el 8 de nov");

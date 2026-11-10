@@ -71,6 +71,18 @@ describe.skipIf(!dbUrl)("PIN del portal", () => {
       expect(sent[0]!.text).toContain("https://app.test/c/acme");
     });
 
+    it("el PIN nuevo le llega a todo el equipo: contacto principal y personas en copia, con un saludo para todos", async () => {
+      const c = await newClient();
+      await db
+        .update(s.clients)
+        .set({ ccContacts: [{ name: "Luis Vega", email: "luis@acme.test" }, { name: "Ana María Osorio", email: "ana@acme.test" }] })
+        .where(sql`id = ${c.id}`);
+      await generateClientPin(c.id, { email: true }, db, deps());
+      expect(sent[0]).toMatchObject({ to: "ana@acme.test", cc: ["luis@acme.test"], subject: "Su PIN para ver su informe" });
+      expect(sent[0]!.text).toContain("Hola Ana, Luis y Ana María,");
+      expect(sent[0]!.text).toContain("Gustavo Amarista");
+    });
+
     it("si el correo falla, el PIN anterior sigue valiendo", async () => {
       const c = await newClient();
       const { pin } = await generateClientPin(c.id, {}, db, deps());

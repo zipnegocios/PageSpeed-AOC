@@ -1,4 +1,5 @@
 import { getDb, type Database } from "@/server/db/client";
+import { ccAddresses, greetingNames } from "@/server/domain/client-welcome";
 import { DomainError } from "@/server/domain/errors";
 import { generatePin, hashPin, isPin, pinMatches } from "@/server/domain/portal-pin";
 import { isValidSlug } from "@/server/domain/slug";
@@ -55,9 +56,17 @@ function baseUrl(deps: PinDeps): string {
 async function sendPin(client: Client, pin: string, deps: PinDeps): Promise<void> {
   const to = client.contactEmail?.trim();
   if (!to) throw new DomainError("INVALID", "Este cliente no tiene correo de contacto. Agrégalo en su ficha para poder enviarle el PIN.");
-  const mail = buildPinEmail({ contactName: client.contactName, clientName: client.name, pin, portalUrl: `${baseUrl(deps)}/c/${client.slug}` });
+  // El acceso es uno solo para todo el equipo: el PIN nuevo le llega al contacto principal y a quienes van en copia.
+  const cc = ccAddresses(client.ccContacts, to);
+  const mail = buildPinEmail({
+    contactName: client.contactName,
+    names: greetingNames(client.contactName, client.ccContacts),
+    clientName: client.name,
+    pin,
+    portalUrl: `${baseUrl(deps)}/c/${client.slug}`,
+  });
   try {
-    await (deps.mailer ?? webMailer()).send({ to, ...mail });
+    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail });
   } catch {
     throw new DomainError("UPSTREAM", "No se pudo enviar el correo. Revisa la configuración SMTP e inténtalo de nuevo.");
   }

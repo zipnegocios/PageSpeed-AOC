@@ -9,7 +9,7 @@ import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { CopyButton } from "@/lib/ui/components/copy-button";
-import { Field, SelectField, TextareaField } from "@/lib/ui/components/field";
+import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
 import { ClientLogoUploader } from "@/app/admin/_components/client-logo-uploader";
@@ -28,6 +28,7 @@ import {
   generatePinAction,
   sendWelcomeAction,
   setClientStatusAction,
+  setReportPreferencesAction,
   updateClientAction,
 } from "@/app/admin/clientes/actions";
 import { pageTitle } from "@/lib/brand";
@@ -132,6 +133,29 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             }))}
           />
         )}
+      </Card>
+
+      <Card
+        title="Correos automáticos"
+        description="Dos correos con la marca de zipnegocios, para el contacto principal y su equipo en copia. Están apagados hasta que los enciendas."
+      >
+        <ActionForm action={setReportPreferencesAction.bind(null, id)} submitLabel="Guardar" pendingLabel="Guardando…" variant="secondary">
+          <CheckboxField
+            label="Semanal: «Tu semana en la web»"
+            id="weekly"
+            defaultChecked={client.reportWeekly}
+            hint="Lunes, con las visitas de la semana anterior y de dónde llegaron. Solo sale si GA4 está conectado y el tráfico es visible para el cliente. Si los datos no están completos, espera hasta el miércoles; pasado eso, se omite esa semana."
+          />
+          <CheckboxField
+            label="Mensual: «Estado general»"
+            id="monthly"
+            defaultChecked={client.reportMonthly}
+            hint="El primer lunes del mes, con las auditorías del mes anterior, lo que atendiste y lo que sigue. No sale si ese mes no hubo auditorías."
+          />
+        </ActionForm>
+        <p className="text-[15px] leading-5 text-ink-muted">
+          Se envía un correo por cada proyecto en producción. Para ver cómo queda con datos reales, usa «Probar con datos reales» en la ficha del proyecto: te llega solo a ti. Los envíos quedan en el historial del proyecto y en la bitácora de correos.
+        </p>
       </Card>
 
       <Card title="Acceso del cliente" description="El cliente entra con un link fijo y un PIN de 6 dígitos, sin usuario ni contraseña.">

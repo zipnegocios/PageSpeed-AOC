@@ -25,6 +25,14 @@ export const CRUX_JOB = "crux";
 export const CRUX_SCHEDULER_ID = "crux";
 export const CRUX_CRON = "47 4 * * *";
 
+/**
+ * Correos automáticos al cliente («Tu semana en la web» y «Estado general»): una revisión diaria a las 13:00 UTC. El servicio
+ * decide qué toca: el semanal sale lunes a miércoles y el mensual el primer lunes del mes y los dos días siguientes.
+ */
+export const CLIENT_REPORTS_JOB = "client-reports";
+export const CLIENT_REPORTS_SCHEDULER_ID = "client-reports";
+export const CLIENT_REPORTS_CRON = "0 13 * * *";
+
 /** Descarga de Search Console y GA4 (cola seo): una vez al día, cuando Google ya cerró los datos de los días anteriores. */
 export const SEO_SYNC_JOB = "seo-sync";
 export const SEO_SYNC_SCHEDULER_ID = "seo-sync";

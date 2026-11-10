@@ -41,7 +41,7 @@ export function AlertList({ alerts, showProject = false }: { alerts: AlertView[]
   );
 }
 
-const TYPE_LABEL = { initial: "Alerta", reminder: "Recordatorio", failure: "Falla de auditoría", report: "Informe", welcome: "Bienvenida" } as const;
+const TYPE_LABEL = { initial: "Alerta", reminder: "Recordatorio", failure: "Falla de auditoría", report: "Informe", welcome: "Bienvenida", weekly: "Semanal", monthly: "Mensual" } as const;
 
 export function NotificationList({
   items,

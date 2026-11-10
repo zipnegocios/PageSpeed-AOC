@@ -1,7 +1,6 @@
-import { SUPPORT_CONTACT } from "@/lib/contact";
 import { lightToken } from "@/lib/tokens";
 import { scoreBand } from "@/server/domain/score-band";
-import { EMAIL, emailButton } from "./email-theme";
+import { CLIENT_SENDER, clientEmailBand, clientEmailFooter, clientTextSignature, EMAIL, emailButton } from "./email-theme";
 
 /**
  * Correos del servicio de seguimiento técnico al cliente (bienvenida, estado mensual, semana en la web e informe
@@ -11,8 +10,8 @@ import { EMAIL, emailButton } from "./email-theme";
  * de «ustedes», y el saludo nombra a todas. Los textos no dependen de la tecnología del cliente.
  */
 
-export const SENDER_BRAND = "zipnegocios";
-export const SERVICE_NAME = "Informes técnicos web";
+export const SENDER_BRAND = CLIENT_SENDER.brand;
+export const SERVICE_NAME = CLIENT_SENDER.service;
 
 export type ClientEmail = { subject: string; text: string; html: string };
 
@@ -23,8 +22,6 @@ export type ClientEmailBase = {
   clientName: string;
   /** Sitio o dominio que se muestra, por ejemplo «cafeaurora.com». */
   site: string;
-  /** Dirección de la app: de ahí sale el logo del correo. */
-  appUrl: string;
   portalUrl: string;
 };
 
@@ -51,7 +48,8 @@ export function formatPct(pct: number | null): string {
 }
 
 /** Variación en puntos: «+5», «−2», «sin cambio». */
-export function formatPoints(diff: number): string {
+export function formatPoints(diff: number | null): string {
+  if (diff === null) return "sin comparación";
   if (diff === 0) return "sin cambio";
   return `${diff > 0 ? "+" : "−"}${Math.abs(diff)}`;
 }
@@ -59,13 +57,15 @@ export function formatPoints(diff: number): string {
 /** Saludo según cuántas personas son: una, hasta tres por nombre, más de tres al equipo. */
 export function greeting(names: string[], clientName: string): string {
   const list = names.map((n) => n.trim()).filter(Boolean);
-  if (list.length === 0 || list.length > 3) return `Hola equipo de ${clientName},`;
+  const team = clientName.trim();
+  if (list.length === 0) return team ? `Hola equipo de ${team},` : "Hola,";
+  if (list.length > 3) return team ? `Hola equipo de ${team},` : "Hola equipo,";
   if (list.length === 1) return `Hola ${list[0]},`;
   return `Hola ${list.slice(0, -1).join(", ")} y ${list[list.length - 1]},`;
 }
 
 /** Elige la forma en singular o plural según haya una o varias personas. */
-const voice = (names: string[]) => (singular: string, plural: string) => (names.filter((n) => n.trim()).length > 1 ? plural : singular);
+export const voice = (names: string[]) => (singular: string, plural: string) => (names.filter((n) => n.trim()).length > 1 ? plural : singular);
 
 const C = {
   ok: lightToken("ok"),
@@ -93,15 +93,15 @@ type Block =
   | { k: "bars"; rows: Array<{ label: string; value: number; delta: string; up: boolean }> }
   | { k: "log"; rows: Array<{ date: string; t: string }> }
   | { k: "ranked"; rows: Array<{ label: string; value: number }> }
-  | { k: "scores"; rows: Array<{ label: string; mobile: number; desktop: number; mobileDelta: number; desktopDelta: number }> };
+  | { k: "scores"; rows: Array<{ label: string; mobile: number; desktop: number; mobileDelta: number | null; desktopDelta: number | null }> };
 
 const TD = `padding:8px 8px;border-bottom:1px solid ${C.line};vertical-align:top;font-size:14px`;
 
-function scoreCell(score: number, diff: number): string {
+function scoreCell(score: number, diff: number | null): string {
   const band = scoreBand(score);
   const [bg, fg] = band.tone === "ok" ? [C.okBg, C.okInk] : band.tone === "warning" ? [C.warnBg, C.warnInk] : ["#FEE2E2", "#7F1D1D"];
   const word = band.word[0]!.toUpperCase() + band.word.slice(1);
-  const dc = diff > 0 ? `color:${C.ok};font-weight:bold` : `color:${EMAIL.muted}`;
+  const dc = diff !== null && diff > 0 ? `color:${C.ok};font-weight:bold` : `color:${EMAIL.muted}`;
   return (
     `<span style="display:inline-block;min-width:34px;text-align:center;font-weight:bold;padding:1px 6px;background:${bg};color:${fg}">${score}</span>` +
     `<br><span style="font-size:12px;color:${EMAIL.muted}">${word}</span><br><span style="font-size:12px;${dc}">${esc(formatPoints(diff))}</span>`
@@ -217,36 +217,23 @@ function blockText(b: Block): string[] {
   }
 }
 
-function band(appUrl: string): string {
-  let origin = "";
-  try {
-    origin = new URL(appUrl).origin;
-  } catch {
-    /* sin logo: queda el nombre */
-  }
-  const img = origin ? `<img src="${origin}/brand/logo-glyph-email.png" width="20" height="29" alt="" style="vertical-align:middle;border:0;margin-right:10px">` : "";
-  return (
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${EMAIL.navy};border-left:4px solid ${EMAIL.lime}"><tr>` +
-    `<td style="padding:12px 16px">${img}<span style="font-size:14px;letter-spacing:.1em;font-weight:bold;color:${EMAIL.lime};vertical-align:middle">${SENDER_BRAND}</span></td>` +
-    `<td align="right" style="padding:12px 16px;font-size:12px;color:#9CA3AF">${SERVICE_NAME}</td></tr></table>`
-  );
-}
+export type ComposeInput = { subject: string; preview: string; names: string[]; clientName: string; blocks: Block[]; footerNote?: string };
+export type { Block as EmailBlock };
 
-function compose(input: { subject: string; preview: string; base: ClientEmailBase; blocks: Block[]; footerNote?: string }): ClientEmail {
-  const hello = greeting(input.base.names, input.base.clientName);
-  const contact = `${SENDER_BRAND} · ${SUPPORT_CONTACT.name} · WhatsApp ${SUPPORT_CONTACT.whatsapp}`;
+/** Arma el correo completo: banda con tu nombre, saludo, bloques, firma y pie. Lo comparten todos los correos al cliente. */
+export function composeClientEmail(input: ComposeInput): ClientEmail {
+  const hello = greeting(input.names, input.clientName);
   const html =
     `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(input.preview)}</div>` +
     `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${EMAIL.ink};max-width:600px;background:#FFFFFF">` +
-    band(input.base.appUrl) +
+    clientEmailBand() +
     `<div style="padding:20px;border:1px solid ${C.line};border-top:0">` +
     `<p style="margin:0 0 14px">${esc(hello)}</p>` +
     input.blocks.map(blockHtml).join("") +
-    `<p style="margin:0 0 14px">${SUPPORT_CONTACT.name} · ${SENDER_BRAND}</p>` +
-    `<div style="border-top:1px solid ${C.line};margin-top:22px;padding-top:12px;color:${EMAIL.muted};font-size:12px">` +
-    (input.footerNote ? `<p style="margin:0 0 4px">${esc(input.footerNote)}</p>` : "") +
-    `<p style="margin:0">${esc(contact)}</p></div></div></div>`;
-  const text = [hello, "", ...input.blocks.flatMap(blockText), `${SUPPORT_CONTACT.name} · ${SENDER_BRAND}`, "", ...(input.footerNote ? [input.footerNote] : []), contact].join("\n");
+    `<p style="margin:0 0 14px"><b>${esc(CLIENT_SENDER.name)}</b><br>${esc(CLIENT_SENDER.brand)}</p>` +
+    clientEmailFooter(input.footerNote) +
+    `</div></div>`;
+  const text = [hello, "", ...input.blocks.flatMap(blockText), ...clientTextSignature(input.footerNote)].join("\n");
   return { subject: input.subject, text, html };
 }
 
@@ -276,6 +263,13 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
   const T = voice(i.names);
   const f = kindForms(i.kind);
   const blocks: Block[] = [
+    {
+      k: "p",
+      t: T(
+        `Soy **${CLIENT_SENDER.name}** (${CLIENT_SENDER.brand}), quien se encarga de tu ${i.kind}. Te escribo desde esta dirección nueva para enviarte los informes: si no la reconoces, es normal, soy yo.`,
+        `Soy **${CLIENT_SENDER.name}** (${CLIENT_SENDER.brand}), quien se encarga de su ${i.kind}. Les escribo desde esta dirección nueva para enviarles los informes: si no la reconocen, es normal, soy yo.`,
+      ),
+    },
     {
       k: "p",
       t: `Desde ahora **${i.site}**, ${i.kind} ${f.made} en **${i.techLabel}**, cuenta con un seguimiento técnico permanente. Lo he incorporado a mi trabajo ${T("contigo", "con ustedes")} para que ${T("tu", "su")} ${i.kind} se mantenga ${f.fast}, visible y al día, y para enterarme antes que ${T("tus", "sus")} visitantes de cualquier cosa que falle.`,
@@ -326,10 +320,11 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
       ),
     },
   ];
-  return compose({
+  return composeClientEmail({
     subject: `${T("Tu", "Su")} ${i.kind} ahora tiene seguimiento técnico permanente`,
     preview: T("Qué vas a recibir, cuándo y cómo verlo cuando quieras. No tienes que hacer nada.", "Qué van a recibir, cuándo y cómo verlo cuando quieran. No tienen que hacer nada."),
-    base: i,
+    names: i.names,
+    clientName: i.clientName,
     blocks,
   });
 }
@@ -344,7 +339,7 @@ export type MonthlyInput = ClientEmailBase & {
   /** Frase de estado elegida por reglas, nunca libre. */
   statusLine: string;
   /** Filas de «En números»: rendimiento primero. */
-  scores: Array<{ label: string; mobile: number; desktop: number; mobileDelta: number; desktopDelta: number }>;
+  scores: Array<{ label: string; mobile: number; desktop: number; mobileDelta: number | null; desktopDelta: number | null }>;
   /** Solo true si el plan incluye servidor y el administrador confirmó la revisión del mes. */
   serverConfirmed: boolean;
   actions: Array<{ date: string; text: string }>;
@@ -375,11 +370,12 @@ export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
     },
     { k: "p", t: T("Cualquier cosa que quieras que revise, respóndeme este correo.", "Cualquier cosa que quieran que revise, respóndanme este correo.") },
   ];
-  const head = perf ? ` Rendimiento móvil ${perf.mobile} (${formatPoints(perf.mobileDelta)})` : "";
-  return compose({
+  const head = perf ? ` Rendimiento móvil ${perf.mobile}${perf.mobileDelta === null ? "" : ` (${formatPoints(perf.mobileDelta)})`}` : "";
+  return composeClientEmail({
     subject: i.tone === "ok" ? `${i.site}: ${i.monthLabel} en orden.${head}` : `${i.site}: resumen de ${i.monthLabel}.${head}`,
     preview: "Lo que revisamos, lo que atendimos y lo que viene.",
-    base: i,
+    names: i.names,
+    clientName: i.clientName,
     blocks,
     footerNote: "Para cambiar la frecuencia, respóndeme este correo.",
   });
@@ -394,11 +390,12 @@ export type WeeklyInput = ClientEmailBase & {
   rangeShort: string;
   visits: number;
   visitsDeltaPct: number | null;
-  googleClicks: number;
-  clicksDeltaPct: number | null;
-  impressions: number;
+  /** Search Console: null si el proyecto no tiene esos datos. */
+  search: { clicks: number; clicksDeltaPct: number | null; impressions: number } | null;
   /** Orígenes ya agrupados y en orden; `deltaPct` null si no había visitas la semana anterior. */
   sources: Array<{ label: string; visits: number; deltaPct: number | null }>;
+  /** Visitas desde asistentes de IA: un mínimo observado que ya está contado dentro de otros orígenes. */
+  ai: { visits: number; deltaPct: number | null } | null;
   topPages: Array<{ label: string; visits: number }>;
   /** Frase descriptiva por reglas; nunca atribuye causas. */
   summaryLine: string;
@@ -417,22 +414,30 @@ export function buildWeeklyEmail(i: WeeklyInput): ClientEmail {
   const blocks: Block[] = [
     { k: "p", t: `Así fue la semana del **${i.rangeLabel}** en **${i.site}**.` },
     { k: "big", value: formatCount(i.visits), caption },
-    {
-      k: "p",
-      t: `Clics desde Google: **${formatCount(i.googleClicks)}**${quiet ? "" : ` (${formatPct(i.clicksDeltaPct)})`} · Veces que ${T("apareciste", "aparecieron")}: **${formatCount(i.impressions)}**`,
-    },
+    ...(i.search
+      ? ([
+          {
+            k: "p",
+            t: `Clics desde Google: **${formatCount(i.search.clicks)}**${quiet || i.search.clicksDeltaPct === null ? "" : ` (${formatPct(i.search.clicksDeltaPct)})`} · Veces que ${T("apareciste", "aparecieron")}: **${formatCount(i.search.impressions)}**`,
+          },
+        ] as Block[])
+      : []),
     { k: "h", t: "De dónde llegaron" },
     { k: "bars", rows: i.sources.map((s) => ({ label: s.label, value: s.visits, delta: pct(s.deltaPct), up: !quiet && (s.deltaPct === null || s.deltaPct > 0) })) },
+    ...(i.ai && i.ai.visits > 0
+      ? ([{ k: "fine", t: `Visitas desde asistentes de IA (un mínimo observado, ya incluidas arriba): **${formatCount(i.ai.visits)}**${quiet ? "" : ` (${formatPct(i.ai.deltaPct)})`}.` }] as Block[])
+      : []),
     { k: "h", t: "Las 3 páginas más vistas" },
     { k: "ranked", rows: i.topPages.slice(0, 3).map((p) => ({ label: p.label, value: p.visits })) },
     { k: "status", label: "En una línea", t: i.summaryLine },
     { k: "buttons", items: [{ label: "Ver más en el portal", url: i.portalUrl }] },
   ];
   const delta = !quiet && i.visitsDeltaPct !== null ? ` (${formatPct(i.visitsDeltaPct)})` : "";
-  return compose({
+  return composeClientEmail({
     subject: `${T("Tu", "Su")} semana en la web: ${formatCount(i.visits)} visitas${delta} · ${i.rangeShort}`,
     preview: "De dónde llegaron y qué páginas funcionaron.",
-    base: i,
+    names: i.names,
+    clientName: i.clientName,
     blocks,
     footerNote: `Datos hasta el ${i.dataThrough}. Para cambiar la frecuencia, respóndeme este correo.`,
   });
@@ -458,5 +463,5 @@ export function buildClientReportEmail(i: ManualReportInput): ClientEmail {
     { k: "p", t: `${T("Siempre puedes ver", "Siempre pueden ver")} el estado actualizado en ${T("tu", "su")} portal:` },
     { k: "buttons", items: [{ label: "Abrir el portal", url: i.portalUrl }] },
   ];
-  return compose({ subject: `Informe de ${i.site} · ${i.periodLabel}`, preview: `Informe de ${i.site}, ${i.periodLabel}.`, base: i, blocks });
+  return composeClientEmail({ subject: `Informe de ${i.site} · ${i.periodLabel}`, preview: `Informe de ${i.site}, ${i.periodLabel}.`, names: i.names, clientName: i.clientName, blocks });
 }

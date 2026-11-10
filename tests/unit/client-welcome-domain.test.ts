@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  ccAddresses,
   CcParseError,
   endOfSupportNote,
   formatCcContacts,
+  givenName,
   greetingNames,
   parseCcContacts,
   siteLabel,
@@ -16,8 +18,21 @@ describe("personas en copia", () => {
       { name: "", email: "beto@x.com" },
     ]);
   });
-  it("normaliza el correo y quita repetidos y al contacto principal", () => {
-    expect(parseCcContacts("A <LUIS@x.com>\nOtro <luis@x.com>\nAna <ana@x.com>", ["ANA@x.com"])).toEqual([{ name: "A", email: "luis@x.com" }]);
+  it("normaliza el correo y quita la línea idéntica repetida", () => {
+    expect(parseCcContacts("Luis <LUIS@x.com>\nLuis <luis@x.com>")).toEqual([{ name: "Luis", email: "luis@x.com" }]);
+  });
+  it("dos personas pueden compartir una dirección: se conservan las dos con su nombre", () => {
+    const list = parseCcContacts("Ana María Osorio <contact@x.com>\nDaniel Osorio <contact@x.com>");
+    expect(list).toEqual([
+      { name: "Ana María Osorio", email: "contact@x.com" },
+      { name: "Daniel Osorio", email: "contact@x.com" },
+    ]);
+  });
+  it("también comparten la del contacto principal, pero sin nombre no aportan nada", () => {
+    expect(parseCcContacts("Ana María Osorio <contact@x.com>\ncontact@x.com\nluis@x.com", ["contact@x.com"])).toEqual([
+      { name: "Ana María Osorio", email: "contact@x.com" },
+      { name: "", email: "luis@x.com" },
+    ]);
   });
   it("ignora líneas vacías y acepta saltos de línea de Windows", () => {
     expect(parseCcContacts("\r\nluis@x.com\r\n\r\n")).toHaveLength(1);
@@ -41,10 +56,37 @@ describe("personas en copia", () => {
   });
 });
 
+describe("direcciones en copia", () => {
+  it("cada dirección una vez y sin la del contacto principal", () => {
+    const list = [
+      { name: "Ana María Osorio", email: "Contact@x.com" },
+      { name: "Luis", email: "luis@x.com" },
+      { name: "Otra", email: "luis@x.com" },
+    ];
+    expect(ccAddresses(list, "contact@x.com")).toEqual(["luis@x.com"]);
+    expect(ccAddresses(list, null)).toEqual(["contact@x.com", "luis@x.com"]);
+    expect(ccAddresses([], "a@x.com")).toEqual([]);
+  });
+});
+
 describe("saludo y sitio", () => {
   it("usa el nombre de pila del contacto principal y de cada persona en copia, sin repetir", () => {
     expect(greetingNames("Ana Ríos", [{ name: "Luis Vega", email: "l@x.com" }, { name: "ana Soto", email: "a@x.com" }, { name: "", email: "z@x.com" }])).toEqual(["Ana", "Luis"]);
     expect(greetingNames(null, [])).toEqual([]);
+  });
+  it("el caso real: Daniel y Ana María Osorio con una misma dirección", () => {
+    expect(greetingNames("Daniel Osorio", [{ name: "Ana María Osorio", email: "contact@x.com" }])).toEqual(["Daniel", "Ana María"]);
+  });
+  it("respeta los nombres compuestos frecuentes y no inventa otros", () => {
+    expect(givenName("Ana María Osorio")).toBe("Ana María");
+    expect(givenName("Ana María")).toBe("Ana María");
+    expect(givenName("José Luis Pérez")).toBe("José Luis");
+    expect(givenName("María José Soto")).toBe("María José");
+    expect(givenName("Daniel Osorio")).toBe("Daniel");
+    expect(givenName("Luis Vega")).toBe("Luis");
+    expect(givenName("Ana Torres Díaz")).toBe("Ana");
+    expect(givenName("Ana Ríos (dirección)")).toBe("Ana");
+    expect(givenName("  ")).toBe("");
   });
   it("muestra el host sin www", () => {
     expect(siteLabel("https://www.cafeaurora.com")).toBe("cafeaurora.com");

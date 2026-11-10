@@ -37,13 +37,13 @@ describe("PIN del portal", () => {
   });
 
   it("el correo lleva el PIN, el enlace y escapa lo que viene del cliente", () => {
-    const m = buildPinEmail({ contactName: "Ana <b>", clientName: "Acme & Co", pin: "004217", portalUrl: "https://app.test/c/acme" });
+    const m = buildPinEmail({ contactName: "Ana", clientName: "Acme & Co <i>", pin: "004217", portalUrl: "https://app.test/c/acme" });
     expect(m.subject).toBe("Tu PIN para ver tu informe");
     expect(m.text).toContain("PIN: 004217");
     expect(m.text).toContain("https://app.test/c/acme");
     expect(m.html).toContain("004217");
-    expect(m.html).not.toContain("<b>");
-    expect(m.html).toContain("Acme &amp; Co");
+    expect(m.html).not.toContain("<i>");
+    expect(m.html).toContain("Acme &amp; Co &lt;i&gt;");
   });
 });
 

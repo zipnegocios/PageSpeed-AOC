@@ -54,7 +54,6 @@ async function main(): Promise<void> {
     names: flag("una-persona") ? ["Ana"] : ["Ana", "Luis", "María"],
     clientName: "Café Aurora",
     site: "cafeaurora.com",
-    appUrl,
     portalUrl: `${appUrl}/c/cafe-aurora`,
   };
 
@@ -87,9 +86,7 @@ async function main(): Promise<void> {
       rangeShort: "2 al 8 de nov",
       visits: 1240,
       visitsDeltaPct: 8,
-      googleClicks: 310,
-      clicksDeltaPct: 12,
-      impressions: 9800,
+      search: { clicks: 310, clicksDeltaPct: 12, impressions: 9800 },
       sources: [
         { label: "Google (búsqueda)", visits: 610, deltaPct: 11 },
         { label: "Instagram", visits: 140, deltaPct: 9 },
@@ -99,8 +96,8 @@ async function main(): Promise<void> {
         { label: "Otras redes", visits: 10, deltaPct: 0 },
         { label: "Directo o sin identificar", visits: 210, deltaPct: -4 },
         { label: "Otros sitios", visits: 90, deltaPct: 20 },
-        { label: "Asistentes de IA (mínimo observado)", visits: 30, deltaPct: null },
       ],
+      ai: { visits: 30, deltaPct: null },
       topPages: [
         { label: "Inicio", visits: 480 },
         { label: "Servicios", visits: 210 },
@@ -134,7 +131,8 @@ async function main(): Promise<void> {
       port,
       user: process.env.SMTP_USER || undefined,
       pass: process.env.SMTP_PASS || undefined,
-      from: process.env.EMAIL_FROM ?? "zipnegocios <no-reply@localhost>",
+      from: process.env.EMAIL_FROM ?? "Gustavo Amarista <no-reply@localhost>",
+    replyTo: process.env.EMAIL_REPLY_TO || undefined,
     });
     const cc = opt("cc")?.split(",").map((s) => s.trim()).filter(Boolean);
     for (const n of names) {

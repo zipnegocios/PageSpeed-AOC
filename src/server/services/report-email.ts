@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@/server/db/client";
 import { env } from "@/server/config/env";
+import { ccAddresses, greetingNames } from "@/server/domain/client-welcome";
 import { DomainError } from "@/server/domain/errors";
 import type { Period } from "@/server/domain/history";
 import type { Mailer } from "@/server/notify/mailer";
@@ -45,16 +46,20 @@ export async function sendProjectReport(
   const getPdf = deps.getPdf ?? getProjectReportPdf;
   const summary = await getPdf(projectId, days, "summary", db);
   const engineering = await getPdf(projectId, days, "engineering", db);
+  const cc = ccAddresses(client.ccContacts, to);
   const mail = buildReportEmail({
     contactName: client.contactName,
+    names: greetingNames(client.contactName, client.ccContacts),
+    clientName: client.name,
     projectName: project.name,
     days,
     portalUrl: `${base}${portalProjectPath(client.slug, project.slug)}`,
   });
-  const record = { projectId, clientId: client.id, type: "report" as const, recipient: to, subject: mail.subject, sentAt: now };
+  const record = { projectId, clientId: client.id, type: "report" as const, recipient: [to, ...cc].join(", "), subject: mail.subject, sentAt: now };
   try {
     await (deps.mailer ?? webMailer()).send({
       to,
+      ...(cc.length > 0 ? { cc } : {}),
       ...mail,
       attachments: [summary, engineering].map((f) => ({ filename: f.filename, content: f.pdf, contentType: "application/pdf" })),
     });

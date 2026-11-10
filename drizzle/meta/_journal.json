@@ -148,6 +148,13 @@
       "when": 1794288755807,
       "tag": "0020_bienvenida_cliente",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794289239506,
+      "tag": "0021_correos_automaticos",
+      "breakpoints": true
     }
   ]
 }

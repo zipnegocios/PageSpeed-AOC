@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getDb, type Database } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
 import {
+  ccAddresses,
   CcParseError,
   endOfSupportNote,
   greetingNames,
@@ -122,7 +123,6 @@ export async function sendClientWelcome(
     names: greetingNames(client.contactName, cc),
     clientName: client.name,
     site: siteLabel(project.baseUrl),
-    appUrl: base,
     portalUrl: `${base}/c/${client.slug}`,
     kind: PROJECT_KIND_LABEL[kind],
     techLabel,
@@ -132,18 +132,18 @@ export async function sendClientWelcome(
   });
 
   const to = test ? opts.testTo! : primary!;
-  const ccAddresses = test ? [] : cc.map((c) => c.email);
+  const ccTo = test ? [] : ccAddresses(cc, primary);
   const subject = test ? `[PRUEBA] ${mail.subject}` : mail.subject;
   const record = {
     projectId: project.id,
     clientId: client.id,
     type: "welcome" as const,
-    recipient: [to, ...ccAddresses].join(", "),
+    recipient: [to, ...ccTo].join(", "),
     subject,
     sentAt: now,
   };
   try {
-    await (deps.mailer ?? webMailer()).send({ to, ...(ccAddresses.length > 0 ? { cc: ccAddresses } : {}), ...mail, subject });
+    await (deps.mailer ?? webMailer()).send({ to, ...(ccTo.length > 0 ? { cc: ccTo } : {}), ...mail, subject });
   } catch (err) {
     if (!test) {
       const e = err as { code?: unknown; message?: unknown };
@@ -159,5 +159,5 @@ export async function sendClientWelcome(
     await setWelcomeSent(db, client.id, now);
     await insertNotification(db, { ...record, status: "sent" });
   }
-  return { to, cc: ccAddresses, test, newPin };
+  return { to, cc: ccTo, test, newPin };
 }
