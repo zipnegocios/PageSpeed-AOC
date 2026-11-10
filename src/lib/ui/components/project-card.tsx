@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PROFILE_LABEL, formatAgo } from "@/lib/audit-format";
+import { formatCount } from "@/lib/seo-format";
 import { projectPath } from "@/lib/urls";
 import type { FleetProject } from "@/server/services/dashboard";
 import { AgenticFraction } from "./agentic-fraction";
@@ -62,6 +63,19 @@ export function ProjectCard({ project: p, now }: { project: FleetProject; now?: 
             <Delta change={p.performanceChange} />
           </div>
         </div>
+
+        {p.traffic ? (
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[15px] leading-5 text-ink-muted">
+            <span className="text-[13px] leading-4 font-semibold tracking-[0.08em] uppercase">Visitas 28 d</span>
+            <b className="font-semibold text-ink tabular-nums">{formatCount(p.traffic.sessions)}</b>
+            {p.traffic.deltaPct !== null ? (
+              <span className={p.traffic.deltaPct >= 0 ? "font-semibold text-ok" : "font-semibold text-danger"}>
+                <span aria-hidden>{p.traffic.deltaPct >= 0 ? "▲" : "▼"}</span> {Math.abs(Math.round(p.traffic.deltaPct))} %<span className="sr-only">{p.traffic.deltaPct >= 0 ? " (suben)" : " (bajan)"}</span>
+              </span>
+            ) : null}
+            {p.traffic.topSource ? <span>· principal: {p.traffic.topSource}</span> : null}
+          </p>
+        ) : null}
 
         <footer className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-3">
           {p.lastByProfile.mobile || p.lastByProfile.desktop ? (

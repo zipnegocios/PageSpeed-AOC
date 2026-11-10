@@ -192,7 +192,7 @@ Dos correos con la marca de zipnegocios, para el contacto principal y su equipo 
 **Están apagados por defecto**: se encienden por cliente en su ficha, tarjeta «Correos automáticos».
 
 - **Semanal, «Tu semana en la web»:** visitas de la última semana completa (lunes a domingo, UTC) frente a la anterior, de
-  dónde llegaron (canales de GA4; las redes sociales separadas por red cuando hay datos por fuente), clics de Google, visitas
+  dónde llegaron (el reparto completo por origen, con cada red social por su nombre y «Directo o sin identificar»), clics de Google y con qué palabras buscaron, visitas
   desde asistentes de IA (aparte, como mínimo observado: ya están contadas en otros orígenes) y las 3 páginas más vistas. Solo
   sale si GA4 está conectado y el tráfico es visible para el cliente. Nunca con una semana a medias: si los datos de GA4 no
   llegan al domingo, espera; sale lunes, martes o miércoles, y pasado eso se omite esa semana. Con menos de 50 visitas no
@@ -201,7 +201,11 @@ Dos correos con la marca de zipnegocios, para el contacto principal y su equipo 
   las auditorías correctas en producción (rendimiento, SEO y accesibilidad, móvil y escritorio) frente al mes anterior, el
   registro de actuaciones del mes, las páginas nuevas del sitemap ya vigiladas y el estado (por reglas: alertas abiertas, mejora
   del móvil, lo atendido). No sale si ese mes no hubo auditorías. «Servidor y servicios: supervisados, sin incidencias» solo
-  aparece si el administrador confirmó la revisión de ese mes (hoy es manual).
+  aparece si el administrador confirmó la revisión de ese mes (hoy es manual). Además suma «Experiencia real de tus visitantes»
+  (veredicto de Core Web Vitals del Chrome UX Report), «Visitas del mes» con sus orígenes y «Visibilidad en Google» con las
+  búsquedas principales (estos dos solo con el tráfico visible para el cliente y el mes completo descargado), y enlaza los dos PDF.
+- **Informe a mano («Enviar a …»):** misma plantilla (`buildClientReportEmail`), con los **dos PDF adjuntos**, el índice real de cada
+  uno y tres cifras (velocidad, visitas, Google) leídas de lo mismo que el portal.
 - **Cuándo corre:** el worker revisa una vez al día (13:00 UTC, trabajo `client-reports` de la cola `maintenance`) y envía lo
   que toca. Cada envío queda en `client_report_sends` (un registro por proyecto, tipo y periodo: lo ya enviado no se repite; lo
   omitido o fallido se reintenta al día siguiente mientras la ventana siga abierta) y en la bitácora de correos. El worker
@@ -480,14 +484,23 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   (`line-clamp-2`), `.portal` lleva `overflow-x: clip` como red de seguridad y `tests/unit/portal-layout-guard.test.ts` falla si se
   reintroduce. Comprobación manual en un teléfono simulado de 320 a 412 px (con títulos de 60 caracteres):
   `PORTAL_CLIENT=… PORTAL_PROJECT=… PORTAL_PIN=… node scripts/portal-fit-audit.mjs`.
-- **Redes sociales** (migración 0019: tabla `seo_social_daily`). GA4 agrupa todo en un solo canal («Organic Social»); la descarga ahora
-  pide también la **fuente de cada sesión** (filtro amplio: grupo de canal social o de vídeo, o fuente de una red conocida) y
-  `domain/seo-social.ts` la normaliza a la red (Facebook, Instagram, LinkedIn, X, TikTok, YouTube, Pinterest, Reddit, WhatsApp,
-  Telegram, Threads, Snapchat…; lo que GA4 marca como social y no se reconoce va a «Otras redes»; un referido que solo coincidió con el
-  filtro amplio se descarta). Se ve en la pestaña Tráfico → Visitas (tarjeta «Redes sociales», con el porcentaje de cada red y las
-  páginas a las que llegan), en el panel (tabla «Visitas desde redes sociales») y en el resumen en PDF. Es un **mínimo observado**: los
-  mensajes privados llegan sin referido y GA4 los cuenta como directo. La migración pone `synced_through = null` en las conexiones de GA4
-  **una sola vez** para que la siguiente descarga traiga los últimos 90 días (hasta entonces el portal no muestra «visitas hasta el…»).
+- **Todas las mediciones, en todas partes** (revisión integral). `domain/measurements.ts` es la lista única de lo que se mide
+  (velocidad, mejoras, experiencia real, búsqueda en Google, visitas, de dónde llegan, IA, salud SEO) y la usan el Resumen del
+  portal (micro-tarjetas de `app/c/_components/measurement-cards.tsx`, datos de `services/project-measurements.ts`, con la misma
+  puerta que Tráfico), la pestaña Informes (cada apartado marca «Incluido», «Aún sin datos» o «No activado» según
+  `sectionState` de `domain/report-outline.ts`), los dos PDF (el índice cubre cada medición: lo comprueba una prueba), los correos
+  y la tarjeta del proyecto en el panel (línea «Visitas 28 d», calculada con dos consultas para toda la flota).
+- **Fuentes completas** (migraciones 0022 y 0023: tablas `seo_source_daily` y `seo_query_daily`; se retira `seo_social_daily`).
+  GA4 se pide **sin filtro** por fuente y grupo de canal y `domain/seo-sources.ts` clasifica cada fila **una sola vez** (buscadores,
+  redes sociales por nombre, directo, otros sitios con su dominio, asistentes de IA, correo, anuncios, otros), así que el reparto
+  suma el 100 % de las visitas. Search Console guarda además las 50 consultas con más clics de cada día. Las filas de
+  `seo_social_daily` se **copian** a la tabla nueva (no se pierde nada) y la migración pone `synced_through = null` en GA4 y Search
+  Console **una sola vez** para que la siguiente descarga traiga los últimos 90 días completos (hasta entonces el portal no muestra
+  «visitas hasta el…» y los correos automáticos esperan). Se ve en Tráfico → Visitas («De dónde llegan», con redes por nombre,
+  buscadores y dominios) y Tráfico → Google («Con qué buscan»). Es un **mínimo observado**: los mensajes privados y algunas apps
+  llegan sin referido y GA4 los cuenta como «Directo o sin identificar» (la nota recomienda enlaces con UTM).
+- **Cloudflare** (rastreadores de IA y bots): hay conexión pero todavía **no se descarga ni se guarda ningún dato**; queda fuera de esta
+  revisión (primero hay que persistir, después mostrar).
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el

@@ -1,4 +1,4 @@
-import { and, between, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, between, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Database } from "@/server/db/client";
 import { seoAiReferralsDaily, seoQueryDaily, seoSearchDaily, seoSourceDaily, seoTrafficDaily } from "@/server/db/schema";
@@ -215,4 +215,40 @@ export async function trafficByLanguage(db: Database, projectId: string, r: { fr
     .from(seoTrafficDaily)
     .where(trafficIn(projectId, r))
     .groupBy(sql`1`);
+}
+
+// ------------------------------------------------------------ la flota
+
+/** Sesiones de cada proyecto en dos periodos (el actual y el anterior), en una sola consulta para toda la flota. */
+export async function fleetSessions(db: Database, projectIds: string[], cur: { from: string; to: string }, prev: { from: string; to: string }): Promise<Array<{ projectId: string; current: number; previous: number; rows: number }>> {
+  if (projectIds.length === 0) return [];
+  const inCur = sql`${seoTrafficDaily.date} between ${cur.from} and ${cur.to}`;
+  const inPrev = sql`${seoTrafficDaily.date} between ${prev.from} and ${prev.to}`;
+  return db
+    .select({
+      projectId: seoTrafficDaily.projectId,
+      current: sql<number>`coalesce(sum(case when ${inCur} then ${seoTrafficDaily.sessions} else 0 end), 0)::double precision`,
+      previous: sql<number>`coalesce(sum(case when ${inPrev} then ${seoTrafficDaily.sessions} else 0 end), 0)::double precision`,
+      rows: sql<number>`count(*) filter (where ${inCur})::int`,
+    })
+    .from(seoTrafficDaily)
+    .where(and(inArray(seoTrafficDaily.projectId, projectIds), between(seoTrafficDaily.date, prev.from, cur.to)))
+    .groupBy(seoTrafficDaily.projectId);
+}
+
+/** La fuente con más sesiones de cada proyecto en el periodo (sin contar «directo»), en una sola consulta. */
+export async function fleetTopSources(db: Database, projectIds: string[], r: { from: string; to: string }): Promise<Array<{ projectId: string; group: string; key: string; sessions: number }>> {
+  if (projectIds.length === 0) return [];
+  const sessions = num(seoSourceDaily.sessions);
+  const rows = await db
+    .select({ projectId: seoSourceDaily.projectId, group: seoSourceDaily.grp, key: seoSourceDaily.source, sessions })
+    .from(seoSourceDaily)
+    .where(and(inArray(seoSourceDaily.projectId, projectIds), between(seoSourceDaily.date, r.from, r.to), sql`${seoSourceDaily.grp} <> 'direct'`))
+    .groupBy(seoSourceDaily.projectId, seoSourceDaily.grp, seoSourceDaily.source);
+  const best = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    const cur = best.get(row.projectId);
+    if (!cur || row.sessions > cur.sessions) best.set(row.projectId, row);
+  }
+  return [...best.values()];
 }

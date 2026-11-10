@@ -2,7 +2,10 @@ import type { ClientLogoInfo } from "@/server/domain/client-logo";
 import { getDb, type Database } from "@/server/db/client";
 import { average, type Change } from "@/server/domain/history";
 import * as repo from "@/server/repositories/dashboard";
+import { addDays, percentChange } from "@/server/domain/seo-data";
+import { sourceLabel, type SourceGroup } from "@/server/domain/seo-sources";
 import { listDailyPerformance } from "@/server/repositories/history";
+import * as seoData from "@/server/repositories/seo-data";
 import { listAllProjects } from "@/server/repositories/projects";
 import { listOpenAlerts } from "./alerts";
 import { averageScores, getLatestScoresMany, type LatestScores } from "./history";
@@ -36,7 +39,12 @@ export type FleetProject = {
   openAlerts: number;
   /** Auditorías en cola o en curso. */
   pending: number;
+  /** Visitas de los últimos 28 días (GA4), su variación y la fuente que más aporta; null si el proyecto no tiene datos de tráfico. */
+  traffic: { sessions: number; deltaPct: number | null; topSource: string | null } | null;
 };
+
+/** Días del periodo de la línea de tráfico de cada tarjeta (el mismo que «Tráfico y búsqueda» del portal). */
+export const FLEET_TRAFFIC_DAYS = 28;
 
 export const SPARKLINE_DAYS = 30;
 
@@ -60,20 +68,33 @@ function sumAgentic(latest: LatestScores[]): FleetProject["agentic"] {
   return items.length === 0 ? null : { passed: items.reduce((a, i) => a + i.passed, 0), total: items.reduce((a, i) => a + i.total, 0) };
 }
 
+function trafficOf(s: { current: number; previous: number; rows: number } | undefined, top: { group: string; key: string } | undefined): FleetProject["traffic"] {
+  if (!s || s.rows === 0) return null;
+  return { sessions: Math.round(s.current), deltaPct: percentChange(s.current, s.previous), topSource: top ? sourceLabel(top.group as SourceGroup, top.key) : null };
+}
+
 /**
  * La flota: todos los proyectos vigentes con sus últimas puntuaciones, miniatura de rendimiento, alertas y pendientes.
- * Son 5 consultas en total sea cual sea el número de proyectos (sin una consulta por proyecto).
+ * Son 7 consultas en total (las del tráfico incluidas) sea cual sea el número de proyectos (sin una consulta por proyecto).
  */
 export async function getFleet(db: Database = getDb(), now: Date = new Date()): Promise<FleetProject[]> {
   const list = await listAllProjects(db);
   const ids = list.map((p) => p.id);
   const since = new Date(now.getTime() - SPARKLINE_DAYS * 86_400_000);
-  const [latestBy, daily, pending, alerts] = await Promise.all([
+  // El tráfico de toda la flota: dos consultas, sin una por proyecto. Termina ayer (GA4 cierra el día con retraso).
+  const end = addDays(now.toISOString().slice(0, 10), -1);
+  const cur = { from: addDays(end, -(FLEET_TRAFFIC_DAYS - 1)), to: end };
+  const prev = { from: addDays(cur.from, -FLEET_TRAFFIC_DAYS), to: addDays(cur.from, -1) };
+  const [latestBy, daily, pending, alerts, sessions, topSources] = await Promise.all([
     getLatestScoresMany(ids, db),
     listDailyPerformance(db, ids, since),
     repo.listPendingCounts(db, ids),
     listOpenAlerts(undefined, db).catch(() => []),
+    seoData.fleetSessions(db, ids, cur, prev),
+    seoData.fleetTopSources(db, ids, cur),
   ]);
+  const sessionsBy = new Map(sessions.map((r) => [r.projectId, r]));
+  const topBy = new Map(topSources.map((r) => [r.projectId, r]));
   const alertCount = new Map<string, number>();
   for (const a of alerts) alertCount.set(a.projectId, (alertCount.get(a.projectId) ?? 0) + 1);
   return list.map((p) => {
@@ -100,6 +121,7 @@ export async function getFleet(db: Database = getDb(), now: Date = new Date()): 
       sparkline: daily.filter((d) => d.projectId === p.id).map((d) => Math.round(d.value)),
       openAlerts: alertCount.get(p.id) ?? 0,
       pending: pending.get(p.id) ?? 0,
+      traffic: trafficOf(sessionsBy.get(p.id), topBy.get(p.id)),
     };
   });
 }

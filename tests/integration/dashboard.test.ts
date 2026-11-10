@@ -89,10 +89,30 @@ describe.skipIf(!dbUrl)("datos del dashboard", () => {
       expect(p!.sparkline).toEqual([60, 80, 100]); // por día: hace 5 d, hace 1 d, hoy
     });
 
+    it("la línea de tráfico de cada proyecto: visitas de 28 días, variación y la fuente principal (sin «directo»), y null sin datos", async () => {
+      const a = await setup("Acme", "Tienda");
+      const b = await setup("Beta", "Blog");
+      const day = (n: number) => new Date(NOW.getTime() - n * DAY).toISOString().slice(0, 10);
+      await db.insert(s.seoTrafficDaily).values([
+        { projectId: a.project.id, date: day(5), page: "/", country: "col", channel: "Organic Search", sessions: 300, users: 200 },
+        { projectId: a.project.id, date: day(40), page: "/", country: "col", channel: "Organic Search", sessions: 200, users: 150 },
+        // fuera de ambos periodos: no cuenta
+        { projectId: a.project.id, date: day(120), page: "/", country: "col", channel: "Organic Search", sessions: 999, users: 999 },
+      ]);
+      await db.insert(s.seoSourceDaily).values([
+        { projectId: a.project.id, date: day(5), grp: "direct", source: "(direct)", page: "/", sessions: 400, users: 300 },
+        { projectId: a.project.id, date: day(5), grp: "social", source: "instagram", page: "/", sessions: 90, users: 70 },
+        { projectId: a.project.id, date: day(6), grp: "search", source: "google", page: "/", sessions: 150, users: 100 },
+      ]);
+      const fleet = await getFleet(db, NOW);
+      expect(fleet.find((p) => p.id === a.project.id)!.traffic).toEqual({ sessions: 300, deltaPct: 50, topSource: "Google" });
+      expect(fleet.find((p) => p.id === b.project.id)!.traffic).toBeNull();
+    });
+
     it("un proyecto sin auditorías aparece con valores vacíos y sin romper nada", async () => {
       await setup("Acme", "Nuevo", "development", ["/"]);
       const [p] = await getFleet(db, NOW);
-      expect(p).toMatchObject({ scores: { performance: null, seo: null, accessibility: null, best_practices: null }, performanceChange: null, agentic: null, lastAudit: null, sparkline: [], openAlerts: 0, pending: 0, phase: "development" });
+      expect(p).toMatchObject({ scores: { performance: null, seo: null, accessibility: null, best_practices: null }, performanceChange: null, agentic: null, lastAudit: null, sparkline: [], openAlerts: 0, pending: 0, phase: "development", traffic: null });
     });
 
     it("excluye proyectos y clientes archivados y sin proyectos devuelve una lista vacía", async () => {
