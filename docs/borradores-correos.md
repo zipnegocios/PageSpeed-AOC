@@ -95,7 +95,7 @@ Se envía cuando generas el PIN y eliges «enviar al correo». Un solo correo pa
 
 ## 1. Estado general del mes (mensual)
 
-**Asunto:** [Sitio]: octubre en orden. Rendimiento [82], [+4] sobre septiembre
+**Asunto:** [Sitio]: octubre en orden. Rendimiento móvil [78] ([+5])
 **Previsualización:** Lo que revisamos, lo que atendimos y lo que viene.
 
 > Hola [Ana, Luis y María],
@@ -159,7 +159,7 @@ Se envía cuando generas el PIN y eliges «enviar al correo». Un solo correo pa
 > | TikTok | [40] | [nuevo] |
 > | Facebook | [25] | [-5 %] |
 > | Otras redes | [10] | [=] |
-> | Directo o sin identificar | [220] | [-4 %] |
+> | Directo o sin identificar | [210] | [-4 %] |
 > | Otros sitios | [90] | [+20 %] |
 > | Asistentes de IA (mínimo observado) | [30] | [nuevo] |
 >
