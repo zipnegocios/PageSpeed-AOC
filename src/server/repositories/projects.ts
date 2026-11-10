@@ -155,3 +155,12 @@ export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
     .orderBy(asc(sql`lower(${clients.name})`), asc(sql`lower(${projects.name})`));
   return rows.map(({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt, ...p }) => ({ ...p, clientLogo: logoInfo({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt }) }));
 }
+
+/** Qué es el proyecto y en qué está hecho, para los correos al cliente. */
+export async function setProjectEmailProfile(
+  db: Database,
+  id: string,
+  values: { kind: "site" | "shop" | "app"; techLabel: string; includesServer: boolean },
+): Promise<void> {
+  await db.update(projects).set(values).where(and(eq(projects.id, id), live()));
+}

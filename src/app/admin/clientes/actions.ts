@@ -9,6 +9,7 @@ import { DomainError } from "@/server/domain/errors";
 import { isLogoKind } from "@/server/domain/client-logo";
 import * as clientLogo from "@/server/services/client-logo";
 import * as clients from "@/server/services/clients";
+import { sendClientWelcome } from "@/server/services/client-welcome";
 import { generateClientPin } from "@/server/services/portal-pin";
 import * as projects from "@/server/services/projects";
 
@@ -79,6 +80,29 @@ export async function generateAndEmailPinAction(id: string, _prev: ActionState):
     const { to } = await generateClientPin(id, { email: true });
     revalidateAdmin();
     return { ok: `PIN generado y enviado a ${to}. El anterior y las sesiones abiertas del cliente ya no valen.` };
+  });
+}
+
+export async function sendWelcomeAction(clientId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  const session = await verifySession();
+  return guarded(async () => {
+    const test = fd.get("test") === "on";
+    const result = await sendClientWelcome(
+      clientId,
+      {
+        projectId: field(fd, "projectId"),
+        kind: field(fd, "kind"),
+        techLabel: field(fd, "techLabel"),
+        includesServer: fd.get("includesServer") === "on",
+        ccText: (fd.get("ccText") as string | null) ?? "",
+      },
+      test ? { testTo: session.email } : {},
+    );
+    revalidateAdmin();
+    if (result.test) return { ok: `Prueba enviada a ${result.to}. No se guardó nada ni se envió al cliente.` };
+    const copy = result.cc.length > 0 ? `, con copia a ${result.cc.join(", ")}` : "";
+    const pin = result.newPin ? " Se generó un PIN nuevo y ya vale." : " Lleva el PIN actual.";
+    return { ok: `Bienvenida enviada a ${result.to}${copy}.${pin}` };
   });
 }
 

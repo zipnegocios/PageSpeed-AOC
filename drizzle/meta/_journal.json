@@ -134,6 +134,13 @@
       "when": 1794277742503,
       "tag": "0018_mejoras_por_auditoria",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794288350172,
+      "tag": "0019_bienvenida_cliente",
+      "breakpoints": true
     }
   ]
 }

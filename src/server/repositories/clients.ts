@@ -132,3 +132,13 @@ export async function setClientLogoBg(db: Database, id: string, bg: string | nul
   const rows = await db.update(clients).set({ logoBg: bg, logoUpdatedAt: new Date() }).where(and(eq(clients.id, id), isNull(clients.deletedAt))).returning({ id: clients.id });
   return rows.length > 0;
 }
+
+/** Guarda las personas que reciben los correos en copia. */
+export async function setClientCc(db: Database, id: string, ccContacts: Array<{ name: string; email: string }>): Promise<void> {
+  await db.update(clients).set({ ccContacts }).where(and(eq(clients.id, id), isNull(clients.deletedAt)));
+}
+
+/** Anota cuándo se envió la última bienvenida. */
+export async function setWelcomeSent(db: Database, id: string, at: Date): Promise<void> {
+  await db.update(clients).set({ welcomeSentAt: at }).where(and(eq(clients.id, id), isNull(clients.deletedAt)));
+}

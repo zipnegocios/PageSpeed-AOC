@@ -15,6 +15,8 @@ import { listProjects } from "@/server/services/projects";
 import { ClientLogoUploader } from "@/app/admin/_components/client-logo-uploader";
 import { logoInfo } from "@/server/domain/client-logo";
 import { PinForms } from "@/app/admin/_components/pin-forms";
+import { WelcomeForm } from "@/app/admin/_components/welcome-form";
+import { formatCcContacts, siteLabel } from "@/server/domain/client-welcome";
 import { readStoredPin } from "@/server/services/portal-pin";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { AdminShell } from "@/app/admin/_components/admin-shell";
@@ -24,6 +26,7 @@ import {
   renameClientSlugAction,
   generateAndEmailPinAction,
   generatePinAction,
+  sendWelcomeAction,
   setClientStatusAction,
   updateClientAction,
 } from "@/app/admin/clientes/actions";
@@ -43,6 +46,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   const currentPin = readStoredPin(client);
   const active = client.status === "active";
   const logo = logoInfo(client);
+  const productionProjects = projects.filter((p) => p.phase === "production");
 
   return (
     <AdminShell
@@ -97,6 +101,37 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
 
       <Card title="Logotipo" description="Dos versiones del logotipo del cliente. Se ven en su portal, en el panel y en los informes en PDF.">
         <ClientLogoUploader clientId={id} name={client.name} icon={Boolean(logo?.icon)} full={Boolean(logo?.full)} bg={client.logoBg} v={logo?.v ?? 0} />
+      </Card>
+
+      <Card
+        title="Bienvenida"
+        description="Un solo correo que explica el servicio y da el acceso al portal, para el contacto principal y su equipo en copia."
+      >
+        {client.welcomeSentAt ? (
+          <p className="text-ink">
+            <Badge tone="ok">Enviada</Badge> <span className="text-[15px] text-ink-muted">El {formatDate(client.welcomeSentAt)}. Puedes reenviarla.</span>
+          </p>
+        ) : null}
+        {!client.contactEmail ? (
+          <p className="text-ink-muted">Agrega el correo de contacto del cliente (abajo, en sus datos) para poder enviarle la bienvenida.</p>
+        ) : productionProjects.length === 0 ? (
+          <p className="text-ink-muted">Pon al menos un proyecto en producción: el portal del cliente solo muestra los proyectos en producción.</p>
+        ) : (
+          <WelcomeForm
+            action={sendWelcomeAction.bind(null, id)}
+            contactName={client.contactName}
+            contactEmail={client.contactEmail}
+            initialCc={formatCcContacts(client.ccContacts)}
+            projects={productionProjects.map((p) => ({
+              id: p.id,
+              name: p.name,
+              site: siteLabel(p.baseUrl),
+              kind: p.kind,
+              techLabel: p.techLabel ?? "",
+              includesServer: p.includesServer,
+            }))}
+          />
+        )}
       </Card>
 
       <Card title="Acceso del cliente" description="El cliente entra con un link fijo y un PIN de 6 dígitos, sin usuario ni contraseña.">

@@ -143,6 +143,29 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
   nombre del cliente. Iconos en `public/pwa` (origen: `design/icons/app-icon.svg`). No hay service worker: sin
   conexión el navegador lo dice, nunca se muestran puntuaciones viejas.
 
+## Bienvenida al cliente
+
+Un solo correo que explica el servicio y da el acceso al portal (link y PIN), firmado por zipnegocios. Se envía desde la
+ficha del cliente, tarjeta **Bienvenida** (`services/client-welcome.ts`, plantilla en `notify/client-emails.ts`).
+
+- **Qué pide el formulario:** el proyecto del que habla (solo en producción), qué es (sitio, tienda o aplicación), la
+  tecnología (texto libre, con sugerencias), si el plan incluye supervisar servidor, servicios y APIs, y las personas en
+  copia (una por línea, «Nombre <correo>»). Todo se guarda (`projects.kind/tech_label/includes_server`,
+  `clients.cc_contacts`) y se rellena solo en los envíos siguientes.
+- **Destinatarios:** va **Para** el correo de contacto del cliente y **CC** a las personas en copia; el saludo nombra a todas
+  por su nombre de pila («Hola Ana, Luis y María,»). Con una persona habla de «tú»; con varias, de «ustedes».
+- **PIN:** si el cliente ya tiene un PIN que se puede mostrar, se reutiliza (no se cierran sesiones). Si no, se genera uno
+  nuevo, y solo se activa si el correo salió. El portal sigue siendo un único acceso por cliente.
+- **Prueba:** la casilla «Enviarme solo una prueba» manda el mismo correo, con los mismos datos, al correo del administrador
+  que tiene la sesión abierta: no se envía al cliente, no se guarda nada y no cambia el PIN.
+- **Frenos y bitácora:** no se repite antes de 5 minutos; cada envío queda en la bitácora de correos (tipo «Bienvenida»,
+  también los fallidos). El dato de fin de soporte (PHP o Node.js) depende de la tecnología y **caduca solo** (ver
+  `domain/client-welcome.ts`; revisar cada trimestre).
+- **Correos de prueba con datos de ejemplo:** desde la consola del servicio web, `node send-test-emails-cli.cjs <correo>`
+  envía los cuatro correos del servicio (bienvenida, estado mensual, semana en la web e informe manual). Ver
+  `scripts/send-test-emails.ts` para las opciones.
+- Aún **no hay envío automático** del correo semanal ni del mensual: hoy solo existen sus plantillas.
+
 ## Visor de auditorías (informe completo, idioma y agentes)
 
 - **Informe oficial de Lighthouse**: se genera desde el JSON guardado en R2 (`lighthouse/report`) y se muestra en un marco

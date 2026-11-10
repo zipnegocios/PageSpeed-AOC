@@ -66,7 +66,10 @@ export const notificationType = pgEnum("notification_type", [
   "reminder",
   "failure",
   "report",
+  "welcome",
 ]);
+// Qué es el proyecto para el cliente: se usa en los correos («tu sitio», «tu tienda», «tu aplicación»).
+export const projectKind = pgEnum("project_kind", ["site", "shop", "app"]);
 export const notificationStatus = pgEnum("notification_status", ["sent", "failed"]);
 
 // -------------------------------------------------------------- clients
@@ -99,6 +102,10 @@ export const clients = pgTable("clients", {
   pinUpdatedAt: timestamp("pin_updated_at", { withTimezone: true }),
   // Último envío de PIN por correo pedido por el cliente: limita la frecuencia.
   pinRequestedAt: timestamp("pin_requested_at", { withTimezone: true }),
+  // Otras personas del equipo del cliente que reciben los correos en copia (CC): [{ name, email }].
+  ccContacts: jsonb("cc_contacts").$type<Array<{ name: string; email: string }>>().notNull().default(sql`'[]'::jsonb`),
+  // Cuándo se envió la última bienvenida; frena el doble envío.
+  welcomeSentAt: timestamp("welcome_sent_at", { withTimezone: true }),
   notes: text("notes"),
   // Logotipo del cliente en R2 (`_logos/<id>/…`): el isotipo (icono) y el logotipo completo. Los objetos no entran en los
   // respaldos: una clave colgante se trata como «sin logotipo». `logoBg` es el color de fondo (#RRGGBB) para logotipos
@@ -143,6 +150,11 @@ export const projects = pgTable(
     authConfigEnc: bytea("auth_config_enc"),
     // El cliente ve «Tráfico y búsqueda» en su portal solo si el administrador lo activa (por defecto, oculto).
     seoClientVisible: boolean("seo_client_visible").notNull().default(false),
+    // Para los correos al cliente: qué es (sitio, tienda, aplicación), en qué tecnología está hecho (texto libre) y si el
+    // plan incluye la supervisión de servidor, servicios y APIs.
+    kind: projectKind("kind").notNull().default("site"),
+    techLabel: text("tech_label"),
+    includesServer: boolean("includes_server").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },
