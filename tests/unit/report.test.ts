@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSerialCache } from "@/server/report/cache";
 import { renderReportPdf } from "@/server/report/pdf";
-import { buildReportEmail } from "@/server/notify/report-email";
 import { reportData } from "../helpers/report-data";
 import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
 import { MEASUREMENTS } from "@/server/domain/measurements";
@@ -165,21 +164,6 @@ describe("informe", () => {
     const rows = worstFirst(reportData("summary", { routes: 5 }).latest);
     const perf = rows.map((r) => r.scores.performance!);
     expect(perf).toEqual([...perf].sort((a, b) => a - b));
-  });
-});
-
-describe("correo del informe", () => {
-  it("saluda al contacto, nombra el periodo y enlaza el portal con el texto escapado", () => {
-    const m = buildReportEmail({ contactName: "Ana", projectName: "Tienda <b>", days: 90, portalUrl: "https://app.test/c/tok/proj" });
-    expect(m.subject).toBe("Informes técnicos web · Tienda <b>");
-    expect(m.text).toContain("Informe resumen");
-    expect(m.text).toContain("Informe de ingeniería");
-    expect(m.text).toContain("Hola Ana,");
-    expect(m.text).toContain("90 días");
-    expect(m.text).toContain("https://app.test/c/tok/proj");
-    expect(m.html).toContain("Tienda &lt;b&gt;");
-    expect(m.html).not.toContain("Tienda <b>");
-    expect(buildReportEmail({ contactName: null, projectName: "T", days: 7, portalUrl: "u" }).text).toMatch(/^Hola,/);
   });
 });
 

@@ -1,14 +1,20 @@
 import { getDb, type Database } from "@/server/db/client";
 import { env } from "@/server/config/env";
-import { ccAddresses, greetingNames } from "@/server/domain/client-welcome";
+import { ccAddresses, greetingNames, siteLabel } from "@/server/domain/client-welcome";
 import { DomainError } from "@/server/domain/errors";
-import type { Period } from "@/server/domain/history";
+import { PERIOD_LABEL, type Period } from "@/server/domain/history";
 import type { Mailer } from "@/server/notify/mailer";
 import { webMailer } from "@/server/notify/web-mailer";
-import { buildReportEmail } from "@/server/notify/report-email";
+import { buildClientReportEmail } from "@/server/notify/client-emails";
 import { getProjectReportPdf } from "@/server/report";
 import { insertNotification, listRecentNotifications } from "@/server/repositories/alerts";
+import { formatCount, formatPct } from "@/server/notify/client-emails";
+import { percentChange } from "@/server/domain/seo-data";
+import { listOpenAlerts } from "./alerts";
 import { getClient } from "./clients";
+import { averageScores, getLatestScores } from "./history";
+import { getPortalMeasurements } from "./project-measurements";
+import { seoDaysFor } from "./report";
 import { getProject } from "./projects";
 import { portalProjectPath } from "@/lib/urls";
 
@@ -47,13 +53,27 @@ export async function sendProjectReport(
   const summary = await getPdf(projectId, days, "summary", db);
   const engineering = await getPdf(projectId, days, "engineering", db);
   const cc = ccAddresses(client.ccContacts, to);
-  const mail = buildReportEmail({
-    contactName: client.contactName,
+  // Las cifras del correo salen de lo mismo que el portal y los PDF (con la misma puerta: tráfico solo si el cliente puede verlo).
+  const [latest, alerts] = await Promise.all([getLatestScores(project.id, db), listOpenAlerts(project.id, db)]);
+  const measurements = await getPortalMeasurements(client.id, { id: project.id, name: project.name }, { days: seoDaysFor(days), hasLighthouse: latest.length > 0 }, db);
+  const facts: string[] = [];
+  const perf = averageScores(latest).performance;
+  if (perf !== null) facts.push(`**Velocidad:** rendimiento medio de tus páginas, ${Math.round(perf)} sobre 100.`);
+  const d = measurements.traffic?.dashboard;
+  if (d?.traffic) {
+    const delta = percentChange(d.traffic.totals.sessions, d.traffic.previousTotals.sessions);
+    const top = d.sources?.items.find((i) => i.group !== "direct");
+    facts.push(`**Visitas:** ${formatCount(d.traffic.totals.sessions)}${delta === null ? "" : ` (${formatPct(delta)})`}${top ? `; el origen que más aporta: ${top.label}` : ""}.`);
+  }
+  if (d?.search) facts.push(`**Google:** ${formatCount(d.search.totals.clicks)} clics y ${formatCount(d.search.totals.impressions)} veces que apareció tu sitio.`);
+  const mail = buildClientReportEmail({
     names: greetingNames(client.contactName, client.ccContacts),
     clientName: client.name,
-    projectName: project.name,
-    days,
+    site: siteLabel(project.baseUrl),
     portalUrl: `${base}${portalProjectPath(client.slug, project.slug)}`,
+    periodLabel: days === 365 ? "último año" : `últimos ${PERIOD_LABEL[days]}`,
+    summaryLine: alerts.length > 0 ? `Hay ${alerts.length} ${alerts.length === 1 ? "punto" : "puntos"} por mejorar; el detalle está en los informes.` : "Todo está dentro de la meta acordada.",
+    facts,
   });
   const record = { projectId, clientId: client.id, type: "report" as const, recipient: [to, ...cc].join(", "), subject: mail.subject, sentAt: now };
   try {

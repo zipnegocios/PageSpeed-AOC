@@ -1,4 +1,5 @@
 import { lightToken } from "@/lib/tokens";
+import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
 import { scoreBand } from "@/server/domain/score-band";
 import { CLIENT_SENDER, clientEmailBand, clientEmailFooter, clientTextSignature, EMAIL, emailButton } from "./email-theme";
 
@@ -283,8 +284,8 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
       k: "table",
       head: ["Cuándo", "Qué"],
       rows: [
-        ["**Cada lunes**", `**${T("Tu", "Su")} semana en la web**\nCuántas visitas ${T("tuviste", "tuvieron")}, de dónde llegaron (Google, Instagram, LinkedIn…) y qué páginas funcionaron.`],
-        ["**Una vez al mes**", "**Estado general**\nVelocidad y visibilidad, lo que atendimos y lo que sigue."],
+        ["**Cada lunes**", `**${T("Tu", "Su")} semana en la web**\nCuántas visitas ${T("tuviste", "tuvieron")}, de dónde llegaron (Google, Instagram, WhatsApp, Facebook, TikTok, LinkedIn…), con qué palabras ${T("te buscaron", "los buscaron")} y qué páginas funcionaron.`],
+        ["**Una vez al mes**", "**Estado general**\nVelocidad, experiencia real de los visitantes, visitas y visibilidad en Google, lo que atendimos y lo que sigue."],
         ["**Solo si hace falta**", `**Aviso de incidencia**\n${T("Te escribo", "Les escribo")} yo cuando algo ya está atendido, o necesito algo de ${T("ti", "ustedes")}.`],
       ],
     },
@@ -293,8 +294,11 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
     {
       k: "list",
       items: [
-        "**Velocidad y rendimiento:** medido automáticamente en móvil y escritorio.",
-        "**Visibilidad en buscadores y tráfico:** medido automáticamente.",
+        "**Velocidad y calidad de cada página:** medida automáticamente en móvil y escritorio, con lo que hay que mejorar.",
+        "**Experiencia real de tus visitantes:** cómo vivieron la velocidad del sitio personas de verdad (datos de Chrome, últimos 28 días).",
+        "**Visitas y de dónde llegan:** buscadores, redes sociales (Instagram, WhatsApp, Facebook, TikTok, LinkedIn…), otros sitios y directo; también las visitas desde asistentes de IA.",
+        "**Visibilidad en Google:** cuántas veces apareces, cuántos clics recibes y con qué palabras te buscan.",
+        "**Salud SEO:** una revisión técnica del sitio para que Google lo encuentre y lo muestre bien.",
         ...(i.includesServer ? ["**Servidor, servicios y APIs:** yo los superviso de forma continua."] : []),
         "**Seguridad y actualizaciones:** yo las superviso y las aplico.",
       ],
@@ -308,7 +312,7 @@ export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
     },
     { k: "pin", pin: i.pin },
     { k: "buttons", items: [{ label: "Abrir el portal", url: i.portalUrl }] },
-    { k: "fine", t: T("Lo puedes instalar como app en el móvil.", "Lo pueden instalar como app en el móvil. Si alguien cambia el PIN, les llega a todos.") },
+    { k: "fine", t: T("Lo puedes instalar como app en el móvil. Ahí mismo, en «Informes», descargas dos informes en PDF: un resumen y el detalle de ingeniería.", "Lo pueden instalar como app en el móvil. Ahí mismo, en «Informes», descargan dos informes en PDF: un resumen y el detalle de ingeniería. Si alguien cambia el PIN, les llega a todos.") },
     { k: "h", t: "Por qué esto importa" },
     { k: "list", items: [WHY_SPEED, WHY_VULNERABILITIES, ...(i.eolNote ? [whyVersions(i.eolNote)] : [])] },
     { k: "fine", t: `Fuentes: Deloitte y 55 para Google (web.dev), Verizon DBIR 2026${i.eolNote ? ", endoflife.date" : ""}.` },
@@ -345,8 +349,20 @@ export type MonthlyInput = ClientEmailBase & {
   actions: Array<{ date: string; text: string }>;
   upcoming: string | null;
   newPages: string | null;
+  /** Visitas del mes y de dónde llegaron; null si no hay tráfico visible para el cliente o el mes no está completo. */
+  traffic?: { visits: number; deltaPct: number | null; sources: Array<{ label: string; visits: number; deltaPct: number | null }> } | null;
+  /** Search Console del mes; null si no hay datos completos. */
+  search?: { clicks: number; clicksDeltaPct: number | null; impressions: number; position: number | null; queries: Array<{ query: string; clicks: number }> } | null;
+  /** Experiencia real de los visitantes (Chrome UX Report); null si no hay datos. */
+  field?: { verdict: "passed" | "failed" | "no-data"; items: Array<{ label: string; value: string; word: string }> } | null;
   reportUrl: string | null;
+  /** El informe de ingeniería en PDF. */
+  engineeringUrl?: string | null;
 };
+
+const DIRECT_FINE =
+  "«Directo o sin identificar» incluye a quien escribe la dirección, usa un marcador o llega desde aplicaciones que no informan de dónde vienen (por ejemplo, mensajes privados). Con enlaces con parámetros UTM puedo decirte más.";
+const VERDICT_WORD = { passed: "aprobada", failed: "por mejorar", "no-data": "sin veredicto" } as const;
 
 export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
   const T = voice(i.names);
@@ -357,6 +373,30 @@ export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
     { k: "h", t: "En números" },
     { k: "fine", t: `Promedio del mes, frente a ${i.prevMonthLabel}` },
     { k: "scores", rows: i.scores },
+    ...(i.field && i.field.items.length > 0
+      ? ([
+          { k: "h", t: "Experiencia real de tus visitantes" },
+          { k: "p", t: `Evaluación de Core Web Vitals en el móvil: **${VERDICT_WORD[i.field.verdict]}**. ${i.field.items.map((x) => `${x.label} ${x.value} (${x.word})`).join(" · ")}.` },
+        ] as Block[])
+      : []),
+    ...(i.traffic
+      ? ([
+          { k: "h", t: "Visitas del mes" },
+          { k: "big", value: formatCount(i.traffic.visits), caption: i.traffic.deltaPct === null ? "visitas" : `visitas · **${formatPct(i.traffic.deltaPct)}** frente a ${i.prevMonthLabel}` },
+          { k: "bars", rows: i.traffic.sources.map((s) => ({ label: s.label, value: s.visits, delta: formatPct(s.deltaPct), up: s.deltaPct === null || s.deltaPct > 0 })) },
+          ...(i.traffic.sources.some((s) => s.label === "Directo o sin identificar") ? ([{ k: "fine", t: DIRECT_FINE }] as Block[]) : []),
+        ] as Block[])
+      : []),
+    ...(i.search
+      ? ([
+          { k: "h", t: "Visibilidad en Google" },
+          {
+            k: "p",
+            t: `Clics desde Google: **${formatCount(i.search.clicks)}**${i.search.clicksDeltaPct === null ? "" : ` (${formatPct(i.search.clicksDeltaPct)})`} · Veces que ${T("apareciste", "aparecieron")}: **${formatCount(i.search.impressions)}**${i.search.position === null ? "" : ` · Posición media: **${String(i.search.position).replace(".", ",")}**`}`,
+          },
+          ...(i.search.queries.length > 0 ? ([{ k: "p", t: `Con qué palabras ${T("te buscaron", "los buscaron")} más: ${i.search.queries.map((q) => `«${q.query}» (${formatCount(q.clicks)} clics)`).join(" · ")}.` }] as Block[]) : []),
+        ] as Block[])
+      : []),
     ...(i.serverConfirmed ? ([{ k: "p", t: "**Servidor y servicios:** supervisados durante todo el mes, sin incidencias." }] as Block[]) : []),
     { k: "h", t: "Lo que atendimos este mes" },
     i.actions.length > 0
@@ -366,7 +406,11 @@ export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
     ...(i.newPages ? ([{ k: "h", t: "Páginas nuevas que detectamos" }, { k: "p", t: i.newPages }] as Block[]) : []),
     {
       k: "buttons",
-      items: [{ label: "Ver el detalle en el portal", url: i.portalUrl }, ...(i.reportUrl ? [{ label: "Descargar el informe en PDF", url: i.reportUrl, alt: true }] : [])],
+      items: [
+        { label: "Ver el detalle en el portal", url: i.portalUrl },
+        ...(i.reportUrl ? [{ label: "Descargar el resumen en PDF", url: i.reportUrl, alt: true }] : []),
+        ...(i.engineeringUrl ? [{ label: "Descargar el informe de ingeniería", url: i.engineeringUrl, alt: true }] : []),
+      ],
     },
     { k: "p", t: T("Cualquier cosa que quieras que revise, respóndeme este correo.", "Cualquier cosa que quieran que revise, respóndanme este correo.") },
   ];
@@ -397,6 +441,8 @@ export type WeeklyInput = ClientEmailBase & {
   /** Visitas desde asistentes de IA: un mínimo observado que ya está contado dentro de otros orígenes. */
   ai: { visits: number; deltaPct: number | null } | null;
   topPages: Array<{ label: string; visits: number }>;
+  /** Con qué palabras buscaron en Google (Search Console): las principales de la semana. */
+  queries?: Array<{ query: string; clicks: number }>;
   /** Frase descriptiva por reglas; nunca atribuye causas. */
   summaryLine: string;
   /** Último día con datos, «8 de nov». */
@@ -422,8 +468,12 @@ export function buildWeeklyEmail(i: WeeklyInput): ClientEmail {
           },
         ] as Block[])
       : []),
+    ...(i.queries && i.queries.length > 0
+      ? ([{ k: "p", t: `Con qué palabras ${T("te buscaron", "los buscaron")} más: ${i.queries.map((q) => `«${q.query}» (${formatCount(q.clicks)} clics)`).join(" · ")}.` }] as Block[])
+      : []),
     { k: "h", t: "De dónde llegaron" },
     { k: "bars", rows: i.sources.map((s) => ({ label: s.label, value: s.visits, delta: pct(s.deltaPct), up: !quiet && (s.deltaPct === null || s.deltaPct > 0) })) },
+    ...(i.sources.some((s) => s.label === "Directo o sin identificar") ? ([{ k: "fine", t: DIRECT_FINE }] as Block[]) : []),
     ...(i.ai && i.ai.visits > 0
       ? ([{ k: "fine", t: `Visitas desde asistentes de IA (un mínimo observado, ya incluidas arriba): **${formatCount(i.ai.visits)}**${quiet ? "" : ` (${formatPct(i.ai.deltaPct)})`}.` }] as Block[])
       : []),
@@ -449,19 +499,30 @@ export type ManualReportInput = ClientEmailBase & {
   /** «últimos 30 días». */
   periodLabel: string;
   summaryLine: string;
+  /** Cifras clave ya redactadas («Rendimiento medio: 78 en móvil», «Visitas: 9.394 (+4 %)»); vacío si no hay. */
+  facts?: string[];
 };
 
-/** Correo del botón «Enviar a …». El PDF lo adjunta quien envía. */
+/** Correo del botón «Enviar a …»: acompaña los dos PDF (resumen e ingeniería) que adjunta quien envía. */
 export function buildClientReportEmail(i: ManualReportInput): ClientEmail {
   const T = voice(i.names);
+  const names = (list: readonly { title: string }[]) => list.map((s) => s.title.toLowerCase()).join(", ");
   const blocks: Block[] = [
     {
       k: "p",
-      t: `${T("Te adjunto", "Les adjunto")} el informe de **${i.site}** de los ${i.periodLabel}: cómo está cada página en móvil y escritorio, qué mejoró y qué sigue en revisión.`,
+      t: `${T("Te adjunto", "Les adjunto")} los dos informes de **${i.site}** de los ${i.periodLabel}, en PDF:`,
+    },
+    {
+      k: "list",
+      items: [
+        `**Informe resumen** (${SUMMARY_SECTIONS.length} apartados, en lenguaje claro): ${names(SUMMARY_SECTIONS)}.`,
+        `**Informe de ingeniería** (${ENGINEERING_SECTIONS.length} apartados, medición por medición): ${names(ENGINEERING_SECTIONS)}.`,
+      ],
     },
     { k: "status", label: "Lo más importante", t: i.summaryLine },
-    { k: "p", t: `${T("Siempre puedes ver", "Siempre pueden ver")} el estado actualizado en ${T("tu", "su")} portal:` },
+    ...(i.facts && i.facts.length > 0 ? ([{ k: "list", items: i.facts }] as Block[]) : []),
+    { k: "p", t: `${T("Siempre puedes ver", "Siempre pueden ver")} el estado actualizado, y descargar los informes de nuevo, en ${T("tu", "su")} portal:` },
     { k: "buttons", items: [{ label: "Abrir el portal", url: i.portalUrl }] },
   ];
-  return composeClientEmail({ subject: `Informe de ${i.site} · ${i.periodLabel}`, preview: `Informe de ${i.site}, ${i.periodLabel}.`, names: i.names, clientName: i.clientName, blocks });
+  return composeClientEmail({ subject: `Informes técnicos web · ${i.site} · ${i.periodLabel}`, preview: `Los informes de ${i.site}, ${i.periodLabel}, en PDF.`, names: i.names, clientName: i.clientName, blocks });
 }

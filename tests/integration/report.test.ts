@@ -130,7 +130,7 @@ describe.skipIf(!dbUrl)("informe del proyecto y envío por correo", () => {
       expect(out).toEqual({ to: "ana@acme.test" });
       expect(sent).toHaveLength(1);
       const m = sent[0]!;
-      expect(m).toMatchObject({ to: "ana@acme.test", subject: "Informes técnicos web · Tienda" });
+      expect(m).toMatchObject({ to: "ana@acme.test", subject: expect.stringMatching(/^Informes técnicos web · .+ · últimos 90 días$/) });
       // Los dos informes van adjuntos: el resumen y el de ingeniería.
       expect(m.attachments!.map((a) => a.filename)).toEqual(["resumen-x.pdf", "informe-ingenieria-x.pdf"]);
       for (const a of m.attachments!) {

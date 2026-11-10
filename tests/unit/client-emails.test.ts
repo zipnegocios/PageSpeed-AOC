@@ -130,6 +130,24 @@ describe("bienvenida", () => {
   });
 });
 
+describe("mensual: tráfico, Google y experiencia real", () => {
+  it("añade visitas con sus orígenes, visibilidad en Google y la evaluación de los visitantes, y los dos PDF", () => {
+    const m = buildMonthlyEmail({
+      ...monthly,
+      traffic: { visits: 9394, deltaPct: 4, sources: [{ label: "Instagram", visits: 1500, deltaPct: 10 }, { label: "Directo o sin identificar", visits: 800, deltaPct: null }] },
+      search: { clicks: 4689, clicksDeltaPct: 17, impressions: 140670, position: 7, queries: [{ query: "ingeniería civil", clicks: 320 }] },
+      field: { verdict: "failed", items: [{ label: "LCP", value: "2.9 s", word: "mejorable" }] },
+      reportUrl: "https://app.example.com/r1",
+      engineeringUrl: "https://app.example.com/r2",
+    });
+    for (const t of ["Visitas del mes", "9.394", "Instagram: 1.500", "Visibilidad en Google", "Posición media: 7", "«ingeniería civil» (320 clics)", "Experiencia real de tus visitantes", "por mejorar", "LCP 2.9 s (mejorable)", "https://app.example.com/r1", "https://app.example.com/r2"]) expect(m.text).toContain(t);
+  });
+  it("sin esos datos el correo del mes queda como antes", () => {
+    const m = buildMonthlyEmail(monthly);
+    for (const t of ["Visitas del mes", "Visibilidad en Google", "Experiencia real"]) expect(m.text).not.toContain(t);
+  });
+});
+
 describe("mensual", () => {
   it("el asunto dice «en orden» solo si el mes fue tranquilo", () => {
     expect(buildMonthlyEmail(monthly).subject).toBe("cafeaurora.com: octubre en orden. Rendimiento móvil 78 (+5)");
@@ -154,7 +172,20 @@ describe("mensual", () => {
   });
 });
 
+describe("bienvenida: qué se mide", () => {
+  it("nombra todo lo que se mide: velocidad, experiencia real, visitas y redes por nombre, Google y salud SEO, y los dos PDF", () => {
+    const m = buildWelcomeEmail({ ...base, kind: "sitio", techLabel: "WordPress", includesServer: false, eolNote: null, pin: "123456" });
+    for (const t of ["Velocidad y calidad de cada página", "Experiencia real", "Instagram, WhatsApp, Facebook, TikTok, LinkedIn", "Visibilidad en Google", "Salud SEO", "dos informes en PDF"]) expect(m.text).toContain(t);
+  });
+});
+
 describe("semanal", () => {
+  it("con consultas de búsqueda nombra con qué palabras buscaron; y explica «Directo o sin identificar»", () => {
+    const m = buildWeeklyEmail({ ...weekly, queries: [{ query: "grúas torre", clicks: 21 }], sources: [...weekly.sources, { label: "Directo o sin identificar", visits: 300, deltaPct: 2 }] });
+    expect(m.text).toContain("«grúas torre» (21 clics)");
+    expect(m.text).toContain("mensajes privados");
+    expect(buildWeeklyEmail(weekly).text).not.toContain("mensajes privados");
+  });
   it("asunto con visitas con punto de miles y variación", () => {
     expect(buildWeeklyEmail(weekly).subject).toBe("Su semana en la web: 1.240 visitas (+8 %) · 2 al 8 de nov");
     expect(buildWeeklyEmail({ ...weekly, names: ["Ana"] }).subject).toBe("Tu semana en la web: 1.240 visitas (+8 %) · 2 al 8 de nov");
@@ -190,8 +221,15 @@ describe("semanal", () => {
 describe("informe enviado a mano", () => {
   it("usa la voz del equipo o la de una persona según los destinatarios", () => {
     const m = buildClientReportEmail({ ...base, periodLabel: "últimos 30 días", summaryLine: "Todo bien." });
-    expect(m.subject).toBe("Informe de cafeaurora.com · últimos 30 días");
-    expect(m.text).toContain("Les adjunto el informe");
-    expect(buildClientReportEmail({ ...one, periodLabel: "últimos 30 días", summaryLine: "Todo bien." }).text).toContain("Te adjunto el informe");
+    expect(m.subject).toBe("Informes técnicos web · cafeaurora.com · últimos 30 días");
+    expect(m.text).toContain("Les adjunto los dos informes");
+    expect(buildClientReportEmail({ ...one, periodLabel: "últimos 30 días", summaryLine: "Todo bien." }).text).toContain("Te adjunto los dos informes");
+  });
+  it("nombra los dos informes con los apartados reales del índice y las cifras clave", () => {
+    const m = buildClientReportEmail({ ...base, periodLabel: "últimos 30 días", summaryLine: "Todo bien.", facts: ["**Visitas:** 9.394 (+4 %)."] });
+    expect(m.text).toContain("Informe resumen (7 apartados");
+    expect(m.text).toContain("Informe de ingeniería (11 apartados");
+    for (const t of ["experiencia real de los visitantes", "búsqueda en google", "search console en detalle", "visitas y de dónde llegan"]) expect(m.text.toLowerCase()).toContain(t);
+    expect(m.text).toContain("Visitas: 9.394 (+4 %).");
   });
 });

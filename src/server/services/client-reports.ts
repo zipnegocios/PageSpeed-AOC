@@ -2,6 +2,7 @@ import { getDb, type Database } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
 import { ccAddresses, greetingNames, siteLabel } from "@/server/domain/client-welcome";
 import {
+  buildPartitionRows,
   buildSourceRows,
   lastFullMonth,
   lastFullWeek,
@@ -13,8 +14,10 @@ import {
   weeklySummary,
   weeklyWindowOpen,
   type MonthPeriod,
+  type SourceRow,
   type WeekPeriod,
 } from "@/server/domain/client-reports";
+import { FIELD_LABEL, assess, formatField, rate } from "@/server/domain/field-data";
 import { percentChange } from "@/server/domain/seo-data";
 import {
   buildMonthlyEmail,
@@ -34,6 +37,7 @@ import { findProject, type Project } from "@/server/repositories/projects";
 import * as seoData from "@/server/repositories/seo-data";
 import * as seoIntegrations from "@/server/repositories/seo-integrations";
 import { portalProjectPath } from "@/lib/urls";
+import { findFieldData } from "./crux";
 import { assertUuid } from "./shared";
 
 export type ReportDeps = {
@@ -65,6 +69,22 @@ function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps
   };
 }
 
+/** Los orígenes a partir de los canales de GA4 y las redes (solo mientras no exista el reparto completo). */
+async function legacyRows(db: Database, projectId: string, cur: { from: string; to: string }, prev: { from: string; to: string }): Promise<SourceRow[]> {
+  const [channels, prevChannels, networks, prevNetworks] = await Promise.all([
+    seoData.trafficBy(db, projectId, cur, "channel", TOP_SOURCES),
+    seoData.trafficBy(db, projectId, prev, "channel", TOP_SOURCES),
+    seoData.socialBy(db, projectId, cur, "network", TOP_SOURCES),
+    seoData.socialBy(db, projectId, prev, "network", TOP_SOURCES),
+  ]);
+  return buildSourceRows({
+    channels: channels.map((r) => ({ key: r.key, sessions: r.sessions })),
+    prevChannels: prevChannels.map((r) => ({ key: r.key, sessions: r.sessions })),
+    networks: networks.map((r) => ({ key: r.key, sessions: r.sessions })),
+    prevNetworks: prevNetworks.map((r) => ({ key: r.key, sessions: r.sessions })),
+  });
+}
+
 // ---------------------------------------------------------------- semanal
 
 /** Arma «Tu semana en la web» con lo guardado de GA4 y Search Console. Nunca con una semana a medias. */
@@ -79,23 +99,18 @@ export async function prepareWeekly(c: Ctx, week: WeekPeriod, db: Database): Pro
   const [now, before] = await Promise.all([seoData.trafficTotals(db, c.project.id, cur), seoData.trafficTotals(db, c.project.id, prev)]);
   if (now.rows === 0) return { ok: false, reason: "No hay datos de tráfico de esa semana." };
 
-  const [channels, prevChannels, networks, prevNetworks, pages, search, prevSearch, ai, prevAi] = await Promise.all([
-    seoData.trafficBy(db, c.project.id, cur, "channel", TOP_SOURCES),
-    seoData.trafficBy(db, c.project.id, prev, "channel", TOP_SOURCES),
-    seoData.socialBy(db, c.project.id, cur, "network", TOP_SOURCES),
-    seoData.socialBy(db, c.project.id, prev, "network", TOP_SOURCES),
+  const [items, prevItems, pages, search, prevSearch, ai, prevAi, queries] = await Promise.all([
+    seoData.sourceTop(db, c.project.id, cur, TOP_SOURCES),
+    seoData.sourceTop(db, c.project.id, prev, TOP_SOURCES),
     seoData.trafficBy(db, c.project.id, cur, "page", 3),
     seoData.searchTotals(db, c.project.id, cur),
     seoData.searchTotals(db, c.project.id, prev),
     seoData.aiTotals(db, c.project.id, cur),
     seoData.aiTotals(db, c.project.id, prev),
+    seoData.queryTop(db, c.project.id, cur, 3),
   ]);
-  const rows = buildSourceRows({
-    channels: channels.map((r) => ({ key: r.key, sessions: r.sessions })),
-    prevChannels: prevChannels.map((r) => ({ key: r.key, sessions: r.sessions })),
-    networks: networks.map((r) => ({ key: r.key, sessions: r.sessions })),
-    prevNetworks: prevNetworks.map((r) => ({ key: r.key, sessions: r.sessions })),
-  });
+  // Con el reparto completo las filas suman las visitas; si todavía no se descargó (antes de la primera descarga), se usan los canales de GA4.
+  const rows = items.length > 0 ? buildPartitionRows(items, prevItems) : await legacyRows(db, c.project.id, cur, prev);
   const visitsDeltaPct = percentChange(now.sessions, before.sessions);
   return {
     ok: true,
@@ -108,6 +123,7 @@ export async function prepareWeekly(c: Ctx, week: WeekPeriod, db: Database): Pro
       search: search.rows > 0 ? { clicks: search.clicks, clicksDeltaPct: percentChange(search.clicks, prevSearch.clicks), impressions: search.impressions } : null,
       sources: rows,
       ai: ai.sessions > 0 ? { visits: ai.sessions, deltaPct: percentChange(ai.sessions, prevAi.sessions) } : null,
+      queries: queries.map((q) => ({ query: q.query, clicks: q.clicks })),
       topPages: pages.map((p) => ({ label: pageLabel(p.key), visits: p.sessions })),
       summaryLine: weeklySummary({ visits: now.sessions, visitsDeltaPct, rows }),
       dataThrough: week.endShort,
@@ -116,6 +132,57 @@ export async function prepareWeekly(c: Ctx, week: WeekPeriod, db: Database): Pro
 }
 
 // ---------------------------------------------------------------- mensual
+
+/** Las visitas del mes y de dónde llegaron; solo con el tráfico visible para el cliente y el mes completo descargado. */
+async function monthlyTraffic(c: Ctx, month: MonthPeriod, db: Database): Promise<NonNullable<MonthlyInput["traffic"]> | null> {
+  if (!c.project.seoClientVisible) return null;
+  const ga4 = await seoIntegrations.findOne(db, c.project.id, "ga4");
+  if (!ga4?.syncedThrough || ga4.syncedThrough < month.to) return null;
+  const cur = { from: month.from, to: month.to };
+  const prev = { from: month.prevFrom, to: month.prevTo };
+  const [now, before] = await Promise.all([seoData.trafficTotals(db, c.project.id, cur), seoData.trafficTotals(db, c.project.id, prev)]);
+  if (now.rows === 0) return null;
+  const [items, prevItems] = await Promise.all([seoData.sourceTop(db, c.project.id, cur, TOP_SOURCES), seoData.sourceTop(db, c.project.id, prev, TOP_SOURCES)]);
+  const rows = items.length > 0 ? buildPartitionRows(items, prevItems) : await legacyRows(db, c.project.id, cur, prev);
+  return { visits: now.sessions, deltaPct: percentChange(now.sessions, before.sessions), sources: rows.slice(0, 5) };
+}
+
+/** Clics, impresiones, posición y las búsquedas principales del mes (Search Console), si el mes está completo. */
+async function monthlySearch(c: Ctx, month: MonthPeriod, db: Database): Promise<NonNullable<MonthlyInput["search"]> | null> {
+  if (!c.project.seoClientVisible) return null;
+  const gsc = await seoIntegrations.findOne(db, c.project.id, "gsc");
+  if (!gsc?.syncedThrough || gsc.syncedThrough < month.to) return null;
+  const cur = { from: month.from, to: month.to };
+  const [now, before, queries] = await Promise.all([
+    seoData.searchTotals(db, c.project.id, cur),
+    seoData.searchTotals(db, c.project.id, { from: month.prevFrom, to: month.prevTo }),
+    seoData.queryTop(db, c.project.id, cur, 3),
+  ]);
+  if (now.rows === 0) return null;
+  return {
+    clicks: now.clicks,
+    clicksDeltaPct: percentChange(now.clicks, before.clicks),
+    impressions: now.impressions,
+    position: now.impressions > 0 ? Math.round((now.positionSum / now.impressions) * 10) / 10 : null,
+    queries: queries.map((q) => ({ query: q.query, clicks: q.clicks })),
+  };
+}
+
+const RATING_WORD = { good: "bueno", "needs-improvement": "mejorable", poor: "deficiente" } as const;
+
+/** La experiencia real de los visitantes (Chrome UX Report, móvil): veredicto y LCP, INP y CLS. No depende de Google Analytics. */
+async function monthlyField(projectId: string, db: Database): Promise<NonNullable<MonthlyInput["field"]> | null> {
+  const view = await findFieldData(projectId, "origin", "mobile", db);
+  if (view?.status !== "ok" || !view.metrics) return null;
+  const verdict = assess(view.metrics);
+  if (verdict === "no-data") return null;
+  const items = (["lcp", "inp", "cls"] as const).flatMap((m) => {
+    const p75 = view.metrics?.[m]?.p75 ?? null;
+    const rating = rate(m, p75);
+    return rating ? [{ label: FIELD_LABEL[m].split(" ")[0]!, value: formatField(m, p75), word: RATING_WORD[rating] }] : [];
+  });
+  return { verdict, items };
+}
 
 /** Arma «Estado general» con las auditorías del mes, el registro de actuaciones y la revisión del servidor. */
 export async function prepareMonthly(c: Ctx, month: MonthPeriod, db: Database): Promise<Prepared<MonthlyInput>> {
@@ -143,6 +210,7 @@ export async function prepareMonthly(c: Ctx, month: MonthPeriod, db: Database): 
     c.project.includesServer ? repo.hasServerCheck(db, c.project.id, month.key) : Promise.resolve(false),
   ]);
   const status = monthlyStatus({ openAlerts, mobilePerfDelta: scores[0]?.mobileDelta ?? null, actions: actions.length });
+  const [traffic, search, field] = await Promise.all([monthlyTraffic(c, month, db), monthlySearch(c, month, db), monthlyField(c.project.id, db)]);
   return {
     ok: true,
     input: {
@@ -155,8 +223,12 @@ export async function prepareMonthly(c: Ctx, month: MonthPeriod, db: Database): 
       serverConfirmed: checked,
       actions: actions.map((a) => ({ date: shortDay(a.happenedOn), text: a.text })),
       upcoming: null,
+      traffic,
+      search,
+      field,
       newPages: newPages > 0 ? `${newPages} ${newPages === 1 ? "página nueva" : "páginas nuevas"} en ${month.label}, ya en seguimiento automático.` : null,
-      reportUrl: `${c.emailBase.portalUrl}/informe`,
+      reportUrl: `${c.emailBase.portalUrl}/informe?tipo=resumen&dias=30`,
+      engineeringUrl: `${c.emailBase.portalUrl}/informe?tipo=ingenieria&dias=30`,
     },
   };
 }

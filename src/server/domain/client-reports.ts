@@ -5,6 +5,7 @@
 import { addDays, percentChange } from "./seo-data";
 import { channelLabel } from "./seo-data";
 import { SOCIAL_CHANNEL_GROUPS, socialLabel } from "./seo-social";
+import { sourceLabel, type SourceGroup } from "./seo-sources";
 
 const DAY_MS = 86_400_000;
 const toMs = (date: string) => Date.parse(`${date}T00:00:00Z`);
@@ -175,8 +176,13 @@ export function buildSourceRows(input: { channels: SessionsBy; prevChannels: Ses
     if (useNetworks) for (const n of networks) add(`n:${n.key}`, socialLabel(n.key), n.sessions);
     return out;
   };
-  const current = entries(input.channels, input.networks);
-  const before = entries(input.prevChannels, input.prevNetworks);
+  return rankRows(entries(input.channels, input.networks), entries(input.prevChannels, input.prevNetworks));
+}
+
+type Entries = Map<string, { label: string; visits: number }>;
+
+/** Ordena de más a menos visitas, calcula la variación frente al periodo anterior y junta lo que pasa del tope en «Otros orígenes». */
+function rankRows(current: Entries, before: Entries): SourceRow[] {
   const rows = [...current.entries()]
     .map(([id, v]) => ({ id, label: v.label, visits: v.visits, deltaPct: percentChange(v.visits, before.get(id)?.visits ?? 0) }))
     .sort((a, b) => b.visits - a.visits || a.label.localeCompare(b.label, "es"));
@@ -186,6 +192,39 @@ export function buildSourceRows(input: { channels: SessionsBy; prevChannels: Ses
   const restNow = rest.reduce((n, r) => n + r.visits, 0);
   const restBefore = rest.reduce((n, r) => n + (before.get(r.id)?.visits ?? 0), 0);
   return [...head.map(({ label, visits, deltaPct }) => ({ label, visits, deltaPct })), { label: "Otros orígenes", visits: restNow, deltaPct: percentChange(restNow, restBefore) }];
+}
+
+export type SourceItem = { group: string; key: string; sessions: number };
+
+/** Cómo se nombra en el correo cada grupo de `seo_source_daily` que no se separa por fuente. */
+const EMAIL_GROUP_LABEL: Record<SourceGroup, string> = {
+  search: "Buscadores (Google y otros)",
+  social: "Redes sociales",
+  direct: "Directo o sin identificar",
+  referral: "Otros sitios",
+  ai: "Asistentes de IA",
+  email: "Correo electrónico",
+  paid: "Anuncios",
+  other: "Otros orígenes",
+};
+const isGroup = (g: string): g is SourceGroup => g in EMAIL_GROUP_LABEL;
+
+/**
+ * Los orígenes de las visitas desde el reparto completo (`seo_source_daily`): cada sesión está en un solo origen, así que las
+ * filas suman el total. Las redes sociales van por nombre (Instagram, WhatsApp, Facebook…); los demás grupos, juntos.
+ */
+export function buildPartitionRows(current: SourceItem[], previous: SourceItem[]): SourceRow[] {
+  const entries = (items: SourceItem[]): Entries => {
+    const out: Entries = new Map();
+    for (const it of items) {
+      if (it.sessions <= 0 || !isGroup(it.group)) continue;
+      const id = it.group === "social" ? `social:${it.key}` : it.group;
+      const label = it.group === "social" ? sourceLabel("social", it.key) : EMAIL_GROUP_LABEL[it.group];
+      out.set(id, { label, visits: (out.get(id)?.visits ?? 0) + it.sessions });
+    }
+    return out;
+  };
+  return rankRows(entries(current), entries(previous));
 }
 
 /** Variación de las visitas desde las redes (por origen) que pasa de este umbral se menciona como lo que más subió. */

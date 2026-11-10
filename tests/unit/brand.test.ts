@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BRAND_NAME, COPYRIGHT, COPYRIGHT_LONG, LOGO_BOLT_PATH, LOGO_CORNERS_PATH, LOGO_FRAME_PATH, pageTitle } from "@/lib/brand";
 import { buildInviteEmail } from "@/server/notify/invite-email";
 import { buildPinEmail } from "@/server/notify/pin-email";
-import { buildReportEmail } from "@/server/notify/report-email";
+import { buildClientReportEmail } from "@/server/notify/client-emails";
 
 const root = join(__dirname, "..", "..");
 
@@ -48,7 +48,7 @@ describe("marca", () => {
 
   it("los correos al cliente van firmados por tu nombre y por zipnegocios, sin el producto ni imágenes", () => {
     const pin = buildPinEmail({ contactName: null, clientName: "Acme", pin: "123456", portalUrl: "https://app.test/c/acme" });
-    const report = buildReportEmail({ contactName: null, projectName: "T", days: 7, portalUrl: "https://app.test/c/acme" });
+    const report = buildClientReportEmail({ names: [], clientName: "Acme", site: "t.com", periodLabel: "últimos 7 días", summaryLine: "Todo bien.", portalUrl: "https://app.test/c/acme" });
     for (const m of [pin, report]) {
       expect(m.html).toContain("Gustavo Amarista");
       expect(m.html).toContain("zipnegocios");
