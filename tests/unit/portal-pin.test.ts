@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generatePin, hashPin, isPin, pinMatches } from "@/server/domain/portal-pin";
+import { DEFAULT_SENDER } from "@/server/domain/client-sender";
 import { buildPinEmail } from "@/server/notify/pin-email";
 import { readPortalSession, signPortalSession } from "@/server/auth/portal-session";
 
@@ -37,7 +38,7 @@ describe("PIN del portal", () => {
   });
 
   it("el correo lleva el PIN, el enlace y escapa lo que viene del cliente", () => {
-    const m = buildPinEmail({ contactName: "Ana", clientName: "Acme & Co <i>", pin: "004217", portalUrl: "https://app.test/c/acme" });
+    const m = buildPinEmail({ contactName: "Ana", clientName: "Acme & Co <i>", pin: "004217", portalUrl: "https://app.test/c/acme", sender: DEFAULT_SENDER, appUrl: "https://app.test" });
     expect(m.subject).toBe("Tu PIN para ver tu informe");
     expect(m.text).toContain("PIN: 004217");
     expect(m.text).toContain("https://app.test/c/acme");

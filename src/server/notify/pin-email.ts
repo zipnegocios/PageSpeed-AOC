@@ -1,3 +1,4 @@
+import type { ClientSender } from "@/server/domain/client-sender";
 import { givenName } from "@/server/domain/client-welcome";
 import { composeClientEmail, voice, type ClientEmail } from "./client-emails";
 
@@ -5,7 +6,7 @@ import { composeClientEmail, voice, type ClientEmail } from "./client-emails";
  * Correo con el PIN nuevo del portal. Firma tu nombre (ver `CLIENT_SENDER`). Con una persona habla de «tú»; con varias, de
  * «ustedes», y le llega a todo el equipo (contacto principal y copia).
  */
-export function buildPinEmail(input: { contactName: string | null; names?: string[]; clientName: string; pin: string; portalUrl: string }): ClientEmail {
+export function buildPinEmail(input: { contactName: string | null; names?: string[]; clientName: string; pin: string; portalUrl: string; sender: ClientSender; appUrl: string }): ClientEmail {
   const names = input.names ?? (input.contactName?.trim() ? [givenName(input.contactName)] : []);
   const T = voice(names);
   return composeClientEmail({
@@ -13,6 +14,8 @@ export function buildPinEmail(input: { contactName: string | null; names?: strin
     preview: "El PIN nuevo para entrar al portal.",
     names,
     clientName: input.clientName,
+    sender: input.sender,
+    appUrl: input.appUrl,
     blocks: [
       { k: "p", t: `Este es ${T("tu", "el")} PIN nuevo para entrar al portal de ${input.clientName}. Los PIN anteriores dejan de funcionar.` },
       { k: "pin", pin: input.pin },

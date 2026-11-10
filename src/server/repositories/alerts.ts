@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
-import { alertStates, alertThresholds, auditLogs, clients, notifications, projects, routes } from "@/server/db/schema";
+import { adminUsers, alertStates, alertThresholds, auditLogs, clients, notifications, projects, routes } from "@/server/db/schema";
 
 export type AlertState = typeof alertStates.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
@@ -61,6 +61,21 @@ export function listOpenAlerts(db: Database, filter: { projectId?: string } = {}
       ),
     )
     .orderBy(asc(clients.name), asc(projects.name), asc(routes.path), asc(alertStates.openedAt));
+}
+
+/**
+ * Correo del responsable de cada proyecto, solo cuando el responsable es otra persona del equipo (no la cuenta
+ * propietaria): a esos clientes les avisa quien los atiende. El resto sigue el destinatario general.
+ */
+export async function ownerAlertRecipients(db: Database, projectIds: string[]): Promise<Map<string, string>> {
+  if (projectIds.length === 0) return new Map();
+  const rows = await db
+    .select({ projectId: projects.id, email: adminUsers.email, role: adminUsers.role })
+    .from(projects)
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .innerJoin(adminUsers, eq(adminUsers.id, clients.ownerId))
+    .where(inArray(projects.id, projectIds));
+  return new Map(rows.filter((r) => r.role !== "owner").map((r) => [r.projectId, r.email]));
 }
 
 /** Proyectos que tienen auditorías en cola o en curso encoladas después de `since`. */

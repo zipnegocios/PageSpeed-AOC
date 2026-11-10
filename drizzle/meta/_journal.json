@@ -155,6 +155,13 @@
       "when": 1794289239506,
       "tag": "0021_correos_automaticos",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794291370323,
+      "tag": "0022_responsable_cliente",
+      "breakpoints": true
     }
   ]
 }

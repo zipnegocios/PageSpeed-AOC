@@ -99,7 +99,7 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
       const { client } = await setup();
       await generateClientPin(client.id, {}, db, PIN_DEPS);
       await clients.setClientStatus(client.id, "suspended", db);
-      expect(await portal.resolvePortal(client.slug, noSession, db)).toEqual({ state: "suspended", clientName: "Acme" });
+      expect(await portal.resolvePortal(client.slug, noSession, db)).toMatchObject({ state: "suspended", clientName: "Acme", contact: { name: expect.any(String) } });
       await clients.setClientStatus(client.id, "active", db);
       expect(await portal.resolvePortal(client.slug, noSession, db)).toEqual({ state: "pin" });
       await clients.archiveClient(client.id, db);

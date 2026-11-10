@@ -111,6 +111,9 @@ export const clients = pgTable("clients", {
   ccContacts: jsonb("cc_contacts").$type<Array<{ name: string; email: string }>>().notNull().default(sql`'[]'::jsonb`),
   // Cuándo se envió la última bienvenida; frena el doble envío.
   welcomeSentAt: timestamp("welcome_sent_at", { withTimezone: true }),
+  // Responsable del cliente (admin_users.id): quien lo creó o a quien se reasignó. Firma sus correos, recibe sus alertas y es el
+  // contacto del portal. Sin clave foránea a propósito: si esa cuenta desaparece, el cliente pasa a la cuenta propietaria.
+  ownerId: uuid("owner_id"),
   // Correos automáticos: «Tu semana en la web» (lunes) y «Estado general» (primer lunes del mes). Apagados hasta que se activen.
   reportWeekly: boolean("report_weekly").notNull().default(false),
   reportMonthly: boolean("report_monthly").notNull().default(false),
@@ -630,6 +633,8 @@ export const adminUsers = pgTable("admin_users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   avatarKey: text("avatar_key"),
+  // WhatsApp que firma los correos de sus clientes y se muestra en el aviso de servicio suspendido.
+  phone: text("phone"),
   // La cuenta la creó el propietario con una contraseña provisional y la persona aún no la cambió.
   provisionalPassword: boolean("provisional_password").notNull().default(false),
   ...timestamps,

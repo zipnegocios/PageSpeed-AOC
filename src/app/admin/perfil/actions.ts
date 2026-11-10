@@ -9,7 +9,7 @@ import { changePassword, removeAvatar, setAvatar, updateProfile } from "@/server
 export async function updateProfileAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const session = await verifySession();
   return guarded(async () => {
-    await updateProfile(session, { firstName: field(fd, "firstName"), lastName: field(fd, "lastName") });
+    await updateProfile(session, { firstName: field(fd, "firstName"), lastName: field(fd, "lastName"), phone: field(fd, "phone") });
     revalidatePath("/admin", "layout");
     return { ok: "Datos guardados." };
   });

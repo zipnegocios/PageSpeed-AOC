@@ -1,4 +1,4 @@
-/** A quién escribe un cliente suspendido. Cambiar estos datos cambia el aviso del portal. */
+/** Marca y datos por defecto del aviso de servicio suspendido; el nombre y el WhatsApp salen del responsable de cada cliente. */
 export const SUPPORT_CONTACT = {
   name: "Gustavo Amarista",
   brand: "zipnegocios",
@@ -7,6 +7,6 @@ export const SUPPORT_CONTACT = {
 } as const;
 
 /** Mensaje ya escrito para reactivar el servicio. */
-export function reactivationMessage(clientName: string): string {
-  return `Hola ${SUPPORT_CONTACT.name}, soy de ${clientName}. Mi portal de informes de PageSpeed aparece suspendido y quiero reactivarlo.`;
+export function reactivationMessage(clientName: string, contactName: string = SUPPORT_CONTACT.name): string {
+  return `Hola ${contactName}, soy de ${clientName}. Mi portal de informes de PageSpeed aparece suspendido y quiero reactivarlo.`;
 }

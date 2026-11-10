@@ -8,6 +8,7 @@
 //   --cc=a@x.com,b@y.com   copia a más personas (así se ve el CC real)
 //   --una-persona          saluda a una sola persona («tú») en lugar de a tres («ustedes»)
 //   --tech=wp|shopify|next tecnología del cliente de ejemplo (por defecto wp)
+//   --responsable=luis     firma como el segundo responsable (nombre y WhatsApp de ejemplo)
 //   --solo=bienvenida,mensual,semanal,manual   envía solo esos
 //   --dry-run=carpeta      no envía: escribe un .html y un .txt por correo en esa carpeta
 //
@@ -15,6 +16,7 @@
 // debe ser la dirección pública de la app).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_SENDER, senderMailFields, type ClientSender } from "../src/server/domain/client-sender";
 import { createMailer } from "../src/server/notify/mailer";
 import {
   buildClientReportEmail,
@@ -50,7 +52,11 @@ async function main(): Promise<void> {
   }
 
   const appUrl = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
-  const base: ClientEmailBase = {
+  // Quién firma: por defecto Gustavo; --responsable=luis prueba cómo ve el cliente a un segundo responsable.
+const sender: ClientSender = opt("responsable") === "luis" ? { ...DEFAULT_SENDER, name: "Luis Porteles", whatsapp: "+1 555 010 0000", email: "luis@example.com" } : DEFAULT_SENDER;
+const base: ClientEmailBase = {
+  sender,
+  appUrl,
     names: flag("una-persona") ? ["Ana"] : ["Ana", "Luis", "María"],
     clientName: "Café Aurora",
     site: "cafeaurora.com",
@@ -137,7 +143,7 @@ async function main(): Promise<void> {
     const cc = opt("cc")?.split(",").map((s) => s.trim()).filter(Boolean);
     for (const n of names) {
       const mail = all[n]!;
-      await mailer.send({ to: to!, ...(cc && cc.length > 0 ? { cc } : {}), subject: `[PRUEBA] ${mail.subject}`, text: mail.text, html: mail.html });
+      await mailer.send({ to: to!, ...senderMailFields(sender), ...(cc && cc.length > 0 ? { cc } : {}), subject: `[PRUEBA] ${mail.subject}`, text: mail.text, html: mail.html });
       console.log(`Enviado: ${n} → ${to}`);
     }
   }
