@@ -116,3 +116,19 @@ export async function findClientByToken(db: Database, token: string): Promise<Cl
     .limit(1);
   return row;
 }
+
+const LOGO_COLUMN = { icon: "logoIconKey", full: "logoFullKey" } as const;
+
+/** Guarda (o quita, con null) la clave del logotipo de un tipo. Devuelve la clave anterior para borrar su objeto. */
+export async function setClientLogoKey(db: Database, id: string, kind: "icon" | "full", key: string | null): Promise<{ previous: string | null } | undefined> {
+  const column = LOGO_COLUMN[kind];
+  const [before] = await db.select({ key: clients[column] }).from(clients).where(and(eq(clients.id, id), isNull(clients.deletedAt))).limit(1);
+  if (!before) return undefined;
+  await db.update(clients).set({ [column]: key, logoUpdatedAt: new Date() }).where(eq(clients.id, id));
+  return { previous: before.key };
+}
+
+export async function setClientLogoBg(db: Database, id: string, bg: string | null): Promise<boolean> {
+  const rows = await db.update(clients).set({ logoBg: bg, logoUpdatedAt: new Date() }).where(and(eq(clients.id, id), isNull(clients.deletedAt))).returning({ id: clients.id });
+  return rows.length > 0;
+}

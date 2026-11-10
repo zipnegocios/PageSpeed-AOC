@@ -365,6 +365,16 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   WebP, máximo 1 MB) y se guarda en R2 bajo `_avatars/<id>/…`; solo se sirve con sesión de administrador
   (`/api/admin/avatar/<id>`). Reemplazarla o quitarla borra el objeto anterior. Migración 0010: `first_name`, `last_name`,
   `avatar_key` en `admin_users`.
+- **Logotipos de cliente** (migración 0017: `logo_icon_key`, `logo_full_key`, `logo_bg`, `logo_updated_at` en `clients`). Dos
+  versiones por cliente: **isotipo** (casi cuadrado) y **logotipo completo** (cualquier proporción), subidas desde la ficha del
+  cliente. El navegador las convierte a PNG con transparencia (SVG, JPEG, WebP y GIF incluidos; sin recorte) y el servidor las
+  vuelve a validar por firma, peso (512 KB) y medidas (`domain/client-logo.ts`). Viven en R2 bajo `_logos/<cliente>/…` y se
+  sirven solo con sesión de administrador (`/api/admin/client-logo/<id>`) o, en el portal, con el PIN ya validado
+  (`/c/<enlace>/logo?k=icon|full`; nunca en la pantalla del PIN). Color de fondo opcional por cliente para logotipos blancos.
+- **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
+  se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
+  (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el
+  manifiesto es genérico.
 
 ## Marca
 

@@ -4,6 +4,7 @@ import { projectPath } from "@/lib/urls";
 import type { FleetProject } from "@/server/services/dashboard";
 import { AgenticFraction } from "./agentic-fraction";
 import { Badge } from "./badge";
+import { ClientLogo, adminLogoUrl } from "./client-logo";
 import { Delta } from "./delta";
 import { ScoreRing } from "./score-ring";
 import { Sparkline } from "./sparkline";
@@ -19,11 +20,14 @@ export function ProjectCard({ project: p, now }: { project: FleetProject; now?: 
       <Link href={href} aria-label={`Abrir el proyecto ${p.name} de ${p.clientName}`} className="absolute inset-0 rounded-lg" />
       <div className="pointer-events-none relative flex min-w-0 flex-col gap-4">
         <header className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-col">
-            <h4 className="text-[20px] leading-6 font-semibold break-words text-ink">{p.name}</h4>
-            <span className="text-[15px] leading-5 break-all text-ink-muted">
-              {p.clientName} · {p.baseUrl.replace(/^https?:\/\//, "")}
-            </span>
+          <div className="flex min-w-0 items-center gap-3">
+            <ClientLogo src={p.clientLogo ? adminLogoUrl(p.clientId, p.clientLogo.icon ? "icon" : "full", p.clientLogo.v) : null} name={p.clientName} bg={p.clientLogo?.bg} className="size-11 text-[26px]" />
+            <div className="flex min-w-0 flex-col">
+              <h4 className="text-[20px] leading-6 font-semibold break-words text-ink">{p.name}</h4>
+              <span className="text-[15px] leading-5 break-all text-ink-muted">
+                {p.clientName} · {p.baseUrl.replace(/^https?:\/\//, "")}
+              </span>
+            </div>
           </div>
           <Badge tone={p.phase === "production" ? "primary" : "neutral"}>{p.phase === "production" ? "Producción" : "Desarrollo"}</Badge>
         </header>

@@ -1,4 +1,5 @@
 import { and, asc, count, eq, isNull, or, sql } from "drizzle-orm";
+import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
 import type { Database } from "@/server/db/client";
 import { alertStates, alertThresholds, auditLogs, clients, projects, routes } from "@/server/db/schema";
 
@@ -126,11 +127,13 @@ export type ProjectListing = {
   auditFrequency: "weekly" | "daily";
   clientId: string;
   clientName: string;
+  /** Logotipo del cliente (para dibujarlo junto al proyecto); null si no tiene. */
+  clientLogo: ClientLogoInfo | null;
 };
 
 /** Todos los proyectos vigentes con su cliente, para listados. */
 export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
-  return db
+  const rows = await db
     .select({
       id: projects.id,
       name: projects.name,
@@ -141,9 +144,14 @@ export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
       auditFrequency: projects.auditFrequency,
       clientId: clients.id,
       clientName: clients.name,
+      logoIconKey: clients.logoIconKey,
+      logoFullKey: clients.logoFullKey,
+      logoBg: clients.logoBg,
+      logoUpdatedAt: clients.logoUpdatedAt,
     })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))
     .where(and(isNull(projects.deletedAt), isNull(clients.deletedAt)))
     .orderBy(asc(sql`lower(${clients.name})`), asc(sql`lower(${projects.name})`));
+  return rows.map(({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt, ...p }) => ({ ...p, clientLogo: logoInfo({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt }) }));
 }

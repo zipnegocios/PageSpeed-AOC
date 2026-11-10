@@ -12,6 +12,8 @@ import { CopyButton } from "@/lib/ui/components/copy-button";
 import { Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
+import { ClientLogoUploader } from "@/app/admin/_components/client-logo-uploader";
+import { logoInfo } from "@/server/domain/client-logo";
 import { PinForms } from "@/app/admin/_components/pin-forms";
 import { readStoredPin } from "@/server/services/portal-pin";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
@@ -40,6 +42,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   const fixedUrl = `${appUrl()}/c/${client.slug}`;
   const currentPin = readStoredPin(client);
   const active = client.status === "active";
+  const logo = logoInfo(client);
 
   return (
     <AdminShell
@@ -90,6 +93,10 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             <Field label="URL del sitemap (opcional)" id="sitemapUrl" type="url" placeholder="Por defecto: /sitemap.xml" autoComplete="off" />
           </ActionForm>
         </details>
+      </Card>
+
+      <Card title="Logotipo" description="Dos versiones del logotipo del cliente. Se ven en su portal, en el panel y en los informes en PDF.">
+        <ClientLogoUploader clientId={id} name={client.name} icon={Boolean(logo?.icon)} full={Boolean(logo?.full)} bg={client.logoBg} v={logo?.v ?? 0} />
       </Card>
 
       <Card title="Acceso del cliente" description="El cliente entra con un link fijo y un PIN de 6 dígitos, sin usuario ni contraseña.">

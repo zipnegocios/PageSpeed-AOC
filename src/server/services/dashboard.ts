@@ -1,3 +1,4 @@
+import type { ClientLogoInfo } from "@/server/domain/client-logo";
 import { getDb, type Database } from "@/server/db/client";
 import { average, type Change } from "@/server/domain/history";
 import * as repo from "@/server/repositories/dashboard";
@@ -18,6 +19,8 @@ export type FleetProject = {
   clientId: string;
   clientName: string;
   clientSlug: string;
+  /** Logotipo del cliente, si lo tiene. */
+  clientLogo?: ClientLogoInfo | null;
   /** Promedio de las últimas puntuaciones de todas sus rutas y perfiles (null si aún no hay auditorías correctas). */
   scores: ReturnType<typeof averageScores>;
   /** Variación media del rendimiento frente a la auditoría anterior (null si no hay anterior). */
@@ -85,6 +88,7 @@ export async function getFleet(db: Database = getDb(), now: Date = new Date()): 
       clientId: p.clientId,
       clientName: p.clientName,
       clientSlug: p.clientSlug,
+      clientLogo: p.clientLogo,
       scores: averageScores(latest),
       performanceChange: meanPerformanceChange(latest),
       agentic: sumAgentic(latest),

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BRAND_NAME } from "@/lib/brand";
 import { BrandGlyph } from "@/lib/ui/components/brand-mark";
+import { ClientLogo } from "@/lib/ui/components/client-logo";
 import { CopyrightLine } from "@/lib/ui/components/copyright-line";
 import { PortalTabs, type PortalTabId } from "./portal-tabs";
 
@@ -14,6 +15,7 @@ export function PortalChrome({
   token,
   base,
   clientName,
+  logo,
   projectName,
   several,
   badges,
@@ -22,6 +24,8 @@ export function PortalChrome({
   token: string;
   base: string;
   clientName: string;
+  /** Logotipo pequeño de la barra (isotipo, o el completo a falta de él) y su fondo; null = sin logotipo. */
+  logo: { src: string; bg: string | null } | null;
   projectName: string;
   several: boolean;
   badges: Partial<Record<PortalTabId, number>>;
@@ -32,7 +36,7 @@ export function PortalChrome({
       <header className="portal-topbar sticky top-0 z-40">
         <div className="mx-auto flex h-12 w-full max-w-[1920px] items-center gap-4 px-4 md:h-14 md:px-8">
           <p className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-ink">
-            <BrandGlyph className="h-5" />
+            {logo ? <ClientLogo src={logo.src} bg={logo.bg} name={clientName} className="size-8 rounded-lg" /> : <BrandGlyph className="h-5" />}
             <span className="truncate">{clientName}</span>
             <span className="hidden truncate font-normal text-ink-muted md:inline">· {projectName}</span>
           </p>

@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
 import { verifySession } from "@/lib/auth/session";
 import { clientPath, projectPath } from "@/lib/urls";
+import { DomainError } from "@/server/domain/errors";
+import { isLogoKind } from "@/server/domain/client-logo";
+import * as clientLogo from "@/server/services/client-logo";
 import * as clients from "@/server/services/clients";
 import { generateClientPin } from "@/server/services/portal-pin";
 import * as projects from "@/server/services/projects";
@@ -101,5 +104,37 @@ export async function createProjectAction(clientId: string, _prev: ActionState, 
     });
     revalidateAdmin();
     redirect(projectPath(client.slug, project.slug));
+  });
+}
+
+/** El logotipo llega ya convertido a PNG y reducido por el navegador; aquí se vuelve a validar por firma, tamaño y proporción. */
+export async function uploadClientLogoAction(id: string, kind: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    if (!isLogoKind(kind)) throw new DomainError("INVALID", "Tipo de logotipo no válido.");
+    const file = fd.get("logo");
+    if (!(file instanceof File) || file.size === 0) throw new DomainError("INVALID", "Elige una imagen.");
+    await clientLogo.setClientLogo(id, kind, new Uint8Array(await file.arrayBuffer()));
+    revalidateAdmin();
+    return { ok: "Logotipo guardado." };
+  });
+}
+
+export async function removeClientLogoAction(id: string, kind: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    if (!isLogoKind(kind)) throw new DomainError("INVALID", "Tipo de logotipo no válido.");
+    await clientLogo.removeClientLogo(id, kind);
+    revalidateAdmin();
+    return { ok: "Logotipo quitado." };
+  });
+}
+
+export async function setClientLogoBgAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await clientLogo.setClientLogoBg(id, field(fd, "bg"));
+    revalidateAdmin();
+    return { ok: "Color de fondo guardado." };
   });
 }

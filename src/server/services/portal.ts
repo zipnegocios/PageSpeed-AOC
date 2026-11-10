@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
+import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
 import { isValidSlug } from "@/server/domain/slug";
 import { findClientBySlug, findClientByToken } from "@/server/repositories/clients";
 import { listOpenAlerts, type AlertView } from "./alerts";
@@ -13,7 +14,8 @@ import { getRoute } from "./routes";
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 export const isPlausibleToken = (token: string) => TOKEN_RE.test(token);
 
-export type PortalClient = { id: string; name: string };
+/** El cliente del portal. `logo` solo viaja con el acceso ya concedido: nunca en las pantallas de PIN, bloqueo o suspensión. */
+export type PortalClient = { id: string; name: string; logo?: ClientLogoInfo };
 
 export type PortalAccess =
   | { state: "invalid" }
@@ -42,7 +44,8 @@ export async function resolvePortal(ref: string, hasSession: SessionCheck, db: D
   if (!client) return { state: "pin" };
   if (client.status === "suspended") return { state: "suspended", clientName: client.name };
   if (client.pinHash && (await hasSession({ id: client.id, pinVersion: client.pinVersion }))) {
-    return { state: "ok", client: { id: client.id, name: client.name } };
+    const logo = logoInfo(client);
+    return { state: "ok", client: { id: client.id, name: client.name, ...(logo ? { logo } : {}) } };
   }
   return { state: "pin" };
 }

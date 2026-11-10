@@ -3,6 +3,8 @@
  * La geometría es la de `design/brand/logo-mark.svg` (lienzo de 256 unidades); si cambia allí, cambia aquí.
  */
 export const BRAND_NAME = "PageSpeed";
+/** Nombre de la app instalable del portal; el manifiesto y el título de iOS le añaden « - <cliente>». */
+export const PWA_TITLE = "Informes técnicos web";
 export const BRAND_WORDMARK = "PAGESPEED";
 
 export const COPYRIGHT_YEAR = 2026;

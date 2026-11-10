@@ -6,7 +6,9 @@ import { HistoryPanel, type HistorySearch } from "@/app/_components/history-pane
 import { formatDate } from "@/lib/audit-format";
 import { pageTitle } from "@/lib/brand";
 import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
+import { portalLogoUrl } from "@/lib/ui/components/client-logo";
 import { ScoreRing } from "@/lib/ui/components/score-ring";
+import { clientInitials } from "@/server/domain/client-logo";
 import { averageScores } from "@/server/services/history";
 import { ChevronRight } from "../../_components/portal-icons";
 import { PortalPage } from "../../_components/portal-page";
@@ -21,14 +23,6 @@ const TILES = [
   ["accessibility", "Accesibilidad"],
   ["best_practices", "Buenas prácticas"],
 ] as const;
-
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
 
 export default async function PortalSummary({ params, searchParams }: { params: Promise<{ token: string; projectId: string }>; searchParams: Promise<HistorySearch> }) {
   const { token, projectId } = await params;
@@ -51,12 +45,19 @@ export default async function PortalSummary({ params, searchParams }: { params: 
         <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <li className="hud flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-3 text-center">
-            <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-primary-subtle text-[20px] font-bold text-on-primary-subtle">
-              {initialsOf(client.name)}
-            </span>
-            <span className="line-clamp-2 text-[15px] leading-5 font-semibold text-ink">{client.name}</span>
-          </li>
+          {client.logo ? (
+            <li className="hud flex min-h-36 items-center justify-center overflow-hidden rounded-lg p-4" style={client.logo.bg ? { background: client.logo.bg } : undefined}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- logotipo privado ya reducido, servido por la ruta del portal. */}
+              <img src={portalLogoUrl(token, client.logo.full ? "full" : "icon", client.logo.v)} alt={client.name} className="max-h-24 w-full object-contain" />
+            </li>
+          ) : (
+            <li className="hud flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-3 text-center">
+              <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-primary-subtle text-[20px] font-bold text-on-primary-subtle">
+                {clientInitials(client.name)}
+              </span>
+              <span className="line-clamp-2 text-[15px] leading-5 font-semibold text-ink">{client.name}</span>
+            </li>
+          )}
           {TILES.map(([key, label]) => (
             <li key={key} className="hud flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-3 text-center">
               <ScoreRing value={avg[key]} label={label} size={72} />

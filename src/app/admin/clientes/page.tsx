@@ -5,6 +5,8 @@ import { clientPath } from "@/lib/urls";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
+import { ClientLogo, adminLogoUrl } from "@/lib/ui/components/client-logo";
+import { logoInfo } from "@/server/domain/client-logo";
 import { Field, TextareaField } from "@/lib/ui/components/field";
 import { listClients } from "@/server/services/clients";
 import { AdminShell } from "../_components/admin-shell";
@@ -30,11 +32,14 @@ export default async function ClientsPage() {
                   href={clientPath(c.slug)}
                   className="flex flex-wrap items-center justify-between gap-3 px-3 py-3 hover:bg-surface-300"
                 >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="text-[19px] font-semibold break-words text-ink">{c.name}</span>
-                    <span className="text-[15px] text-ink-muted">
-                      {c.contactEmail ?? "Sin correo de contacto"} · {c.projectCount}{" "}
-                      {c.projectCount === 1 ? "proyecto" : "proyectos"}
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ClientLogo src={logoInfo(c) ? adminLogoUrl(c.id, logoInfo(c)!.icon ? "icon" : "full", logoInfo(c)!.v) : null} name={c.name} bg={c.logoBg} className="size-12 text-[28px]" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-[19px] font-semibold break-words text-ink">{c.name}</span>
+                      <span className="text-[15px] text-ink-muted">
+                        {c.contactEmail ?? "Sin correo de contacto"} · {c.projectCount}{" "}
+                        {c.projectCount === 1 ? "proyecto" : "proyectos"}
+                      </span>
                     </span>
                   </span>
                   <Badge tone={c.status === "active" ? "ok" : "danger"}>{c.status === "active" ? "Activo" : "Suspendido"}</Badge>

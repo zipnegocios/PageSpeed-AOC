@@ -99,6 +99,13 @@ export const clients = pgTable("clients", {
   // Último envío de PIN por correo pedido por el cliente: limita la frecuencia.
   pinRequestedAt: timestamp("pin_requested_at", { withTimezone: true }),
   notes: text("notes"),
+  // Logotipo del cliente en R2 (`_logos/<id>/…`): el isotipo (icono) y el logotipo completo. Los objetos no entran en los
+  // respaldos: una clave colgante se trata como «sin logotipo». `logoBg` es el color de fondo (#RRGGBB) para logotipos
+  // claros o blancos; null = fondo blanco. `logoUpdatedAt` versiona las direcciones (`?v=`).
+  logoIconKey: text("logo_icon_key"),
+  logoFullKey: text("logo_full_key"),
+  logoBg: text("logo_bg"),
+  logoUpdatedAt: timestamp("logo_updated_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
 });
