@@ -40,9 +40,9 @@ export function RouteLegend() {
 /** La cinta de cinco indicadores de una fila: R, S, A, B e IA, con su valor y su color por banda. */
 function Strip({ data, dashed }: { data: ProfileScores | null; dashed?: boolean }) {
   return (
-    <div className={cx("grid grid-cols-5 gap-1.5", dashed && "opacity-90")}>
+    <div className={cx("grid grid-cols-5 gap-1 min-[360px]:gap-1.5", dashed && "opacity-90")}>
       {STRIP.map(([key, letter, name]) => (
-        <div key={key} className={cx("flex flex-col items-center rounded-md bg-surface-100 py-1", dashed && "border border-dashed border-border-strong bg-transparent")}>
+        <div key={key} className={cx("flex min-w-0 flex-col items-center overflow-hidden rounded-md bg-surface-100 py-1", dashed && "border border-dashed border-border-strong bg-transparent")}>
           <span aria-hidden className="text-[11px] leading-3 font-semibold text-ink-muted">
             {letter}
           </span>
@@ -50,12 +50,12 @@ function Strip({ data, dashed }: { data: ProfileScores | null; dashed?: boolean 
           <Score value={data?.scores[key] ?? null} className="text-[17px] leading-5" />
         </div>
       ))}
-      <div className={cx("flex flex-col items-center rounded-md bg-surface-100 py-1", dashed && "border border-dashed border-border-strong bg-transparent")}>
+      <div className={cx("flex min-w-0 flex-col items-center overflow-hidden rounded-md bg-surface-100 py-1", dashed && "border border-dashed border-border-strong bg-transparent")}>
         <span aria-hidden className="text-[11px] leading-3 font-semibold text-ink-muted">
           IA
         </span>
         <span className="sr-only">Navegación agéntica</span>
-        <AgenticFraction value={data?.agentic ?? null} className="text-[14px] leading-5 tracking-tight whitespace-nowrap" />
+        <AgenticFraction value={data?.agentic ?? null} className={cx("leading-5 tracking-tight whitespace-nowrap", (data?.agentic?.total ?? 0) > 99 ? "text-[11px]" : "text-[14px]")} />
       </div>
     </div>
   );
@@ -122,11 +122,11 @@ function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; 
   const open = node.totalImprovements - node.ownImprovements > 0 && countPages(node.children) <= AUTO_OPEN_MAX_PAGES;
   const virtual = node.page === null;
   return (
-    <li>
-      <details open={open} className={cx("group rounded-lg", depth === 0 ? "hud" : "border border-border bg-surface-200")}>
+    <li className="min-w-0">
+      <details open={open} className={cx("group min-w-0 rounded-lg", depth === 0 ? "hud" : "border border-border bg-surface-200")}>
         <summary className="press flex min-h-14 flex-col gap-2 rounded-lg px-3 py-2.5 focus-visible:outline-2">
           <span className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-[17px] leading-6 font-semibold text-ink">{node.title}</span>
+            <span className="min-w-0 flex-1 text-[17px] leading-6 font-semibold break-words text-ink [overflow-wrap:anywhere] line-clamp-2">{node.title}</span>
             {virtual ? <span className="shrink-0 text-[12px] text-ink-muted">promedio del grupo</span> : null}
             {node.totalImprovements > 0 ? (
               <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[13px] leading-6 font-semibold text-white tabular-nums">
@@ -138,7 +138,7 @@ function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; 
           </span>
           <Strip data={strip} dashed={virtual} />
         </summary>
-        <div className="flex flex-col gap-4 px-3 pb-4">
+        <div className="flex min-w-0 flex-col gap-4 px-3 pb-4">
           {node.page ? (
             <section aria-label={`Esta página: ${node.title}`} className="flex flex-col gap-3">
               <h3 className="text-[13px] font-semibold tracking-[0.04em] text-ink-muted">
@@ -150,7 +150,7 @@ function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; 
           {node.children.length > 0 ? (
             <section aria-label={`Páginas dentro de ${node.title}`} className="flex flex-col gap-2">
               <h3 className="text-[13px] font-semibold tracking-[0.04em] text-ink-muted">Páginas dentro de «{node.title}»</h3>
-              <ul className={cx("flex flex-col gap-2", depth < 3 && "border-l-2 border-border pl-2.5")}>
+              <ul className={cx("flex min-w-0 flex-col gap-2", depth < 2 && "border-l-2 border-border pl-2 min-[400px]:pl-2.5")}>
                 {node.children.map((c) => (
                   <RouteNode key={c.path} node={c} base={base} depth={depth + 1} />
                 ))}
@@ -166,7 +166,8 @@ function RouteNode({ node, base, depth }: { node: PortalTreeNode; base: string; 
 /** El árbol de páginas del proyecto. Cada fila se abre sola, sin JavaScript (elemento `<details>`). */
 export function PortalRouteTree({ nodes, base }: { nodes: PortalTreeNode[]; base: string }) {
   return (
-    <ul className="grid items-start gap-3 xl:grid-cols-2">
+    // `grid-cols-1` es `minmax(0, 1fr)`: sin él la columna implícita es `auto` y un título largo la ensancha más que la pantalla.
+    <ul className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
       {nodes.map((n) => (
         <RouteNode key={n.path} node={n} base={base} depth={0} />
       ))}

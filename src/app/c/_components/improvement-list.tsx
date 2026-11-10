@@ -20,7 +20,7 @@ function Item({ n, text, impact }: { n: number; text: string; impact: string }) 
       <span aria-hidden className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-300 text-[13px] font-semibold text-ink-muted tabular-nums">
         {n}
       </span>
-      <span className="min-w-0 flex-1 text-[16px] leading-6 text-ink">{text}</span>
+      <span className="min-w-0 flex-1 text-[16px] leading-6 break-words text-ink">{text}</span>
       {impact ? <span className="shrink-0 pt-0.5 text-[14px] font-semibold text-danger tabular-nums">{impact}</span> : null}
     </li>
   );
@@ -77,11 +77,11 @@ function PageRow({ page, base, open }: { page: PortalImprovementPage; base: stri
   const primary = page.blocks.find((b) => b.auditId) ?? null;
   const href = primary ? detailHref(base, primary) : null;
   return (
-    <li>
-      <details open={open} className="hud rounded-lg">
+    <li className="min-w-0">
+      <details open={open} className="hud min-w-0 rounded-lg">
         <summary className="press flex min-h-14 flex-col gap-2 rounded-lg px-3 py-2.5">
           <span className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-[17px] leading-6 font-semibold text-ink">{page.title}</span>
+            <span className="min-w-0 flex-1 text-[17px] leading-6 font-semibold break-words text-ink [overflow-wrap:anywhere] line-clamp-2">{page.title}</span>
             <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[13px] leading-6 font-semibold text-white tabular-nums">
               {page.blocks.length}
               <span className="sr-only"> {page.blocks.length === 1 ? "mejora pendiente" : "mejoras pendientes"}</span>
@@ -96,7 +96,7 @@ function PageRow({ page, base, open }: { page: PortalImprovementPage; base: stri
             ))}
           </span>
         </summary>
-        <div className="flex flex-col gap-3 px-3 pb-4">
+        <div className="flex min-w-0 flex-col gap-3 px-3 pb-4">
           {page.blocks.map((b, i) => (
             <Block key={i} block={b} base={base} />
           ))}
@@ -114,7 +114,8 @@ function PageRow({ page, base, open }: { page: PortalImprovementPage; base: stri
 /** Las páginas con algo por mejorar: se abre la primera (la más urgente); cada una enumera sus causas por rubro. */
 export function ImprovementList({ data, base }: { data: PortalImprovements; base: string }) {
   return (
-    <ul className="grid items-start gap-3 xl:grid-cols-2">
+    // `grid-cols-1`: ver route-tree.tsx (una columna `auto` crece con el título más largo).
+    <ul className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
       {data.pages.map((p, i) => (
         <PageRow key={p.path} page={p} base={base} open={i === 0} />
       ))}

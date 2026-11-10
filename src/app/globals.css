@@ -122,6 +122,10 @@ body::before {
   letter-spacing: -0.011em;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+  /* Red de seguridad, no el arreglo: si algo llegara a desbordar, que no ensanche la página (en iOS la achicaría y las barras
+     fijas dejarían de verse ancladas). `clip`, a diferencia de `hidden`, no crea un contenedor de desplazamiento y no rompe
+     `position: sticky`. Las pruebas de regresión comprueban que nada desborde. */
+  overflow-x: clip;
 }
 /* El rebote de iOS al pasar del borde muestra el fondo de <html>: que sea claro también. */
 html:has(.portal) {

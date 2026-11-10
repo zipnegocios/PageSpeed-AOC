@@ -31,7 +31,7 @@ function ReportCard({ kind, base, days }: { kind: ReportKind; base: string; days
   const copy = COPY[kind];
   const sections = REPORT_SECTIONS[kind];
   return (
-    <section aria-label={REPORT_TITLE[kind]} className="hud flex flex-col gap-3 rounded-lg p-4">
+    <section aria-label={REPORT_TITLE[kind]} className="hud flex min-w-0 flex-col gap-3 rounded-lg p-4">
       <div className="flex items-start gap-3">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-subtle text-on-primary-subtle">{TabIcons.informes}</span>
         <div className="flex min-w-0 flex-col">
@@ -95,7 +95,7 @@ export function ReportPeriodSwitch({ base, days }: { base: string; days: ReportP
 
 export function ReportCards({ base, days }: { base: string; days: ReportPeriodChoice }) {
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
       <ReportCard kind="summary" base={base} days={days} />
       <ReportCard kind="engineering" base={base} days={days} />
     </div>

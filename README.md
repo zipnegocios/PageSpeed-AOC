@@ -404,6 +404,12 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   Generación en serie con caché de 2 minutos por proyecto, periodo y tipo; con 100 rutas el de ingeniería tarda ~3 s y añade ~130 MB.
   Un enlace antiguo (`.../informe` sin `tipo`) sigue entregando el resumen. El **correo** (botón «Enviar los dos informes» del panel)
   adjunta **ambos**: `resumen-…pdf` e `informe-ingenieria-…pdf`. Fuente de los PDF: Rajdhani, que no trae «•» ni «≈» (se usan «–» y «aprox.»).
+- **Que el portal quepa en el teléfono.** Regla: ninguna rejilla sin `grid-cols-N` base (los prefijos `md:`/`xl:` no cuentan) ni
+  título en una sola línea (`truncate`) dentro de una rejilla: una columna implícita `auto` no baja de la anchura mínima de su contenido y
+  un título largo ensancha la página (Safari la encoge y las barras fijas dejan de verse ancladas). Los títulos envuelven en dos líneas
+  (`line-clamp-2`), `.portal` lleva `overflow-x: clip` como red de seguridad y `tests/unit/portal-layout-guard.test.ts` falla si se
+  reintroduce. Comprobación manual en un teléfono simulado de 320 a 412 px (con títulos de 60 caracteres):
+  `PORTAL_CLIENT=… PORTAL_PROJECT=… PORTAL_PIN=… node scripts/portal-fit-audit.mjs`.
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el
