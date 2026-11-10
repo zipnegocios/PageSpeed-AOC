@@ -35,7 +35,7 @@ Postgres es la fuente de verdad. Si Redis se pierde, el worker reconstruye la co
 ## 2. Recursos recomendados (VPS compartido)
 
 - **Worker**: límite de memoria **2 GB**, 1,5 CPU. Chromium es el consumidor (≈ 400-900 MB por auditoría). Una sola réplica y una sola auditoría a la vez: es la defensa principal de los sitios vecinos.
-- **Web**: 512 MB. El PDF se genera de uno en uno y se reutiliza 2 minutos.
+- **Web**: 512 MB. Los PDF (resumen e ingeniería) se generan de uno en uno y se reutilizan 2 minutos; el de ingeniería con 100 rutas añade ~130 MB y tarda ~3 s (detalla como máximo 30 páginas). El correo del informe genera y adjunta los dos.
 - **Redis**: 128 MB bastan (`maxmemory-policy noeviction`, AOF activado). Con `noeviction`, si se llena, falla en lugar de borrar trabajos.
 - **Capacidad de referencia**: 15 proyectos × 5 rutas × 2 perfiles ≈ 150 auditorías/día × (~30 s + 12 s de pausa) ≈ 1 h de cola al día en el peor caso diario.
 - Si un sitio de un cliente se resiente durante una auditoría: sube `AUDIT_COOLDOWN_MS`, pasa ese proyecto a frecuencia semanal o, en el peor caso, desactiva el monitoreo de sus rutas más pesadas.

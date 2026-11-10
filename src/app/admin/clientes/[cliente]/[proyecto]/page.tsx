@@ -39,6 +39,7 @@ import {
   saveCookieAuthAction,
   saveFormAuthAction,
   toggleRouteAuthAction,
+  updateRouteLabelAction,
   setPhaseAction,
   setThresholdsAction,
   toggleRouteAction,
@@ -198,10 +199,20 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 <span className="flex min-w-0 flex-col">
                   <span className="font-mono text-[15px] break-all text-ink">{r.path}</span>
                   <span className="flex flex-wrap gap-2 text-[14px] text-ink-muted">
-                    {r.label ? <span>{r.label}</span> : null}
-                    <span>{r.source === "sitemap" ? "Desde sitemap" : "Manual"}</span>
+                                        <span>{r.source === "sitemap" ? "Desde sitemap" : "Manual"}</span>
                     {r.requiresAuth ? <Badge>Requiere sesión</Badge> : null}
                   </span>
+                  <ActionForm action={updateRouteLabelAction.bind(null, id, r.id)} submitLabel="Guardar nombre" variant="ghost" pendingLabel="…" className="mt-1 flex-row flex-wrap items-center gap-2">
+                    <input
+                      name="label"
+                      defaultValue={r.label ?? ""}
+                      maxLength={120}
+                      autoComplete="off"
+                      aria-label={`Nombre de ${r.path} para el cliente`}
+                      placeholder="Nombre que verá el cliente (opcional)"
+                      className="min-h-11 w-72 max-w-full rounded-sm border border-border-strong bg-surface-100 px-3 text-[15px] text-ink"
+                    />
+                  </ActionForm>
                 </span>
                 <span className="flex flex-wrap items-center gap-2">
                   <ActionForm action={requestAuditAction.bind(null, id, r.id)} submitLabel="Auditar" variant="secondary" pendingLabel="Encolando…" className="flex-row flex-wrap items-center gap-2">
@@ -355,21 +366,23 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         footer={<ActionForm action={refreshFieldDataAction.bind(null, id)} submitLabel="Actualizar datos reales" pendingLabel="Pidiendo…" variant="secondary" />}
       />
 
-      <Card title="Informe" description="Resumen en PDF con el estado actual, los puntos por mejorar y la evolución del rendimiento.">
+      <Card title="Informes" description="Dos PDF: el resumen (estado, mejoras, evolución, tráfico y salud SEO) y el de ingeniería (el detalle técnico de cada página). Es lo que recibe el cliente y lo que puede descargar en su portal.">
         <div className="flex flex-wrap gap-2">
-          {([30, 90] as const).map((d) => (
-            <a
-              key={d}
-              href={`/api/admin/projects/${id}/report?dias=${d}`}
-              download
-              className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
-            >
-              Descargar PDF · {d} días
-            </a>
-          ))}
+          {(["resumen", "ingenieria"] as const).flatMap((tipo) =>
+            ([30, 90] as const).map((d) => (
+              <a
+                key={`${tipo}-${d}`}
+                href={`/api/admin/projects/${id}/report?tipo=${tipo}&dias=${d}`}
+                download
+                className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
+              >
+                {tipo === "resumen" ? "Resumen" : "Ingeniería"} (PDF) · {d} días
+              </a>
+            )),
+          )}
         </div>
         {client.contactEmail ? (
-          <ActionForm action={sendReportAction.bind(null, id)} submitLabel={`Enviar a ${client.contactEmail}`} pendingLabel="Enviando…" variant="secondary" className="max-w-md">
+          <ActionForm action={sendReportAction.bind(null, id)} submitLabel={`Enviar los dos informes a ${client.contactEmail}`} pendingLabel="Enviando…" variant="secondary" className="max-w-md">
             <SelectField label="Periodo del informe" id="dias" defaultValue="30">
               <option value="30">Últimos 30 días</option>
               <option value="90">Últimos 90 días</option>

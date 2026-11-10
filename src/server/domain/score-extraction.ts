@@ -20,7 +20,9 @@ export type LhrLike = {
         displayValue?: string;
         scoreDisplayMode?: string;
         score?: number | null;
-        details?: { type?: string; overallSavingsMs?: number; items?: Array<Record<string, unknown>> };
+        /** Ahorro estimado por métrica (en «insights» de Lighthouse 13), p. ej. `{ LCP: 1900 }`. */
+        metricSavings?: Record<string, number>;
+        details?: { type?: string; overallSavingsMs?: number; overallSavingsBytes?: number; items?: Array<Record<string, unknown>> };
       }
     | undefined
   >;

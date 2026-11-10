@@ -1,3 +1,4 @@
+import type { AuditImprovements } from "@/server/domain/improvements";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -231,6 +232,9 @@ export const auditLogs = pgTable(
     httpStatus: smallint("http_status"),
     // Clave completa del JSON en R2; se persiste, no se reconstruye.
     r2Key: text("r2_key"),
+    // Lo que hay que mejorar por rubro (extraído del JSON al terminar): el portal lo lee de aquí en lugar de abrir R2.
+    // null en auditorías anteriores a la migración 0018: se calcula la primera vez que se pide y se guarda.
+    improvements: jsonb("improvements").$type<AuditImprovements>(),
     queuedAt: timestamp("queued_at", { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),

@@ -22,7 +22,7 @@ export type SendReportDeps = {
   getPdf?: typeof getProjectReportPdf;
 };
 
-/** Envía por correo al contacto del cliente el informe PDF del proyecto y lo deja en la bitácora. */
+/** Envía por correo al contacto del cliente los dos informes en PDF del proyecto (resumen e ingeniería) y lo deja en la bitácora. */
 export async function sendProjectReport(
   projectId: string,
   days: Period,
@@ -41,7 +41,10 @@ export async function sendProjectReport(
   if (recent) throw new DomainError("CONFLICT", "El informe de este proyecto ya se envió hace unos minutos. Espera un poco antes de reenviarlo.");
 
   const base = (deps.appUrl ?? env().APP_URL).replace(/\/+$/, "");
-  const { filename, pdf } = await (deps.getPdf ?? getProjectReportPdf)(projectId, days, db);
+  // Los dos informes, uno tras otro (el carril del PDF es serial y el web tiene poca memoria). Si uno falla no sale ninguno.
+  const getPdf = deps.getPdf ?? getProjectReportPdf;
+  const summary = await getPdf(projectId, days, "summary", db);
+  const engineering = await getPdf(projectId, days, "engineering", db);
   const mail = buildReportEmail({
     contactName: client.contactName,
     projectName: project.name,
@@ -53,7 +56,7 @@ export async function sendProjectReport(
     await (deps.mailer ?? webMailer()).send({
       to,
       ...mail,
-      attachments: [{ filename, content: pdf, contentType: "application/pdf" }],
+      attachments: [summary, engineering].map((f) => ({ filename: f.filename, content: f.pdf, contentType: "application/pdf" })),
     });
   } catch (err) {
     const e = err as { code?: unknown; message?: unknown };

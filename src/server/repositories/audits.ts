@@ -1,3 +1,4 @@
+import type { AuditImprovements } from "@/server/domain/improvements";
 import { and, desc, eq, getTableColumns, inArray, isNotNull, lt, lte, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { auditLogs, clients, projects, routes } from "@/server/db/schema";
@@ -102,7 +103,7 @@ export async function markRetry(db: Database, id: string, error: { code: string;
     .where(eq(auditLogs.id, id));
 }
 
-export async function markSucceeded(db: Database, id: string, metrics: AuditMetrics, r2Key: string): Promise<void> {
+export async function markSucceeded(db: Database, id: string, metrics: AuditMetrics, r2Key: string, improvements: AuditImprovements | null = null): Promise<void> {
   await db
     .update(auditLogs)
     .set({
@@ -125,6 +126,7 @@ export async function markSucceeded(db: Database, id: string, metrics: AuditMetr
       finalUrl: metrics.finalUrl,
       httpStatus: metrics.httpStatus,
       r2Key,
+      improvements,
       finishedAt: new Date(),
       durationMs: sql`(extract(epoch from (now() - ${auditLogs.startedAt})) * 1000)::int`,
     })
@@ -220,4 +222,19 @@ export async function listLatestByRoute(db: Database, routeId: string): Promise<
     .where(and(eq(auditLogs.routeId, routeId), eq(auditLogs.status, "succeeded"), isNotNull(auditLogs.finishedAt)))
     .orderBy(auditLogs.profile, desc(auditLogs.finishedAt));
   return rows.flatMap((r) => (r.finishedAt ? [{ ...r, finishedAt: r.finishedAt }] : []));
+}
+
+export type AuditImprovementsRow = { id: string; status: string; r2Key: string | null; improvements: AuditImprovements | null };
+
+/** Lo que hay que mejorar de varias auditorías (guardado al terminar; null en las anteriores a la migración 0018). */
+export async function listAuditImprovements(db: Database, ids: string[]): Promise<AuditImprovementsRow[]> {
+  if (ids.length === 0) return [];
+  return db
+    .select({ id: auditLogs.id, status: auditLogs.status, r2Key: auditLogs.r2Key, improvements: auditLogs.improvements })
+    .from(auditLogs)
+    .where(inArray(auditLogs.id, ids));
+}
+
+export async function saveAuditImprovements(db: Database, id: string, improvements: AuditImprovements): Promise<void> {
+  await db.update(auditLogs).set({ improvements }).where(eq(auditLogs.id, id));
 }

@@ -27,7 +27,7 @@ describe.skipIf(!dbUrl)("informe del proyecto y envío por correo", () => {
       sent.push(m);
     },
   };
-  const fakePdf = async () => ({ filename: "informe-x.pdf", pdf: Buffer.from("%PDF-1.7 fake"), data: {} as never });
+  const fakePdf = async (_id: string, _days: number, kind: "summary" | "engineering" = "summary") => ({ filename: kind === "summary" ? "resumen-x.pdf" : "informe-ingenieria-x.pdf", pdf: Buffer.from(`%PDF-1.7 fake ${kind}`), data: {} as never });
 
   beforeAll(async () => { await runMigrations(dbUrl!, "./drizzle"); });
   afterAll(() => pool.end());
@@ -72,6 +72,41 @@ describe.skipIf(!dbUrl)("informe del proyecto y envío por correo", () => {
       expect(r.improvements).toEqual([{ routePath: "/", profile: "mobile", text: "Rendimiento 75 (mínimo 80)" }]);
     });
 
+    it("el informe de ingeniería lleva el detalle de las páginas más débiles (con tope); el resumen no", async () => {
+      const { project } = await setup();
+      const rs = [];
+      for (let i = 0; i < 34; i++) rs.push(await routes.addRoute(project.id, { path: `/p${i}`, label: `Página ${i}` }, db));
+      const stored = { v: 1, categories: { seo: [{ id: "meta-description", title: "x", impact: { count: 1 } }] } };
+      for (const [i, r] of rs.entries()) {
+        const a = await audit(project.id, r.id, "mobile", daysAgo(2), 30 + i);
+        await db.update(s.auditLogs).set({ improvements: stored as never }).where(eq(s.auditLogs.id, a.id));
+      }
+      const eng = await buildProjectReport(project.id, { days: 30, now: NOW, kind: "engineering" }, db);
+      expect(eng.kind).toBe("engineering");
+      expect(eng.detail).toHaveLength(30); // el tope: las 30 más débiles
+      expect(eng.detail[0]).toMatchObject({ path: "/p0" }); // la de peor nota primero
+      expect(eng.detail[0]!.improvements?.categories.seo?.[0]?.id).toBe("meta-description");
+      expect(eng.titles["/p0"]).toBe("Página 0");
+      expect(eng.latest).toHaveLength(34);
+      expect(eng.lighthouseVersion).toBeNull();
+      const sum = await buildProjectReport(project.id, { days: 30, now: NOW }, db);
+      expect(sum.kind).toBe("summary");
+      expect(sum.detail).toEqual([]);
+      expect(sum.daily.length).toBeGreaterThan(0);
+      expect(sum.logo).toBeNull();
+    });
+
+    it("el tráfico y la salud SEO solo entran si el cliente puede verlos en su portal", async () => {
+      const { project } = await setup();
+      const [run] = await db.insert(s.seoCrawlRuns).values({ projectId: project.id, trigger: "manual", status: "succeeded", finishedAt: NOW, pagesCrawled: 5 }).returning();
+      await db.insert(s.seoCrawlIssues).values({ runId: run!.id, page: "/x", code: "title_missing", severity: "error", evidence: {} });
+      expect((await buildProjectReport(project.id, { now: NOW }, db)).seo).toBeNull(); // sin activar para el cliente
+      await db.update(s.projects).set({ seoClientVisible: true }).where(eq(s.projects.id, project.id));
+      const r = await buildProjectReport(project.id, { now: NOW, kind: "engineering" }, db);
+      expect(r.seo?.health).toMatchObject({ errors: 1, pagesCrawled: 5 });
+      expect(r.seo?.dashboard).toBeNull(); // sin Google conectado
+    });
+
     it("un proyecto sin auditorías da un informe vacío válido", async () => {
       const { project } = await setup();
       const r = await buildProjectReport(project.id, { now: NOW }, db);
@@ -95,10 +130,15 @@ describe.skipIf(!dbUrl)("informe del proyecto y envío por correo", () => {
       expect(out).toEqual({ to: "ana@acme.test" });
       expect(sent).toHaveLength(1);
       const m = sent[0]!;
-      expect(m).toMatchObject({ to: "ana@acme.test", subject: "Informe de Tienda" });
-      expect(m.attachments).toHaveLength(1);
-      expect(m.attachments![0]).toMatchObject({ filename: "informe-x.pdf", contentType: "application/pdf" });
-      expect(m.attachments![0]!.content.subarray(0, 5).toString()).toBe("%PDF-");
+      expect(m).toMatchObject({ to: "ana@acme.test", subject: "Informes técnicos web · Tienda" });
+      // Los dos informes van adjuntos: el resumen y el de ingeniería.
+      expect(m.attachments!.map((a) => a.filename)).toEqual(["resumen-x.pdf", "informe-ingenieria-x.pdf"]);
+      for (const a of m.attachments!) {
+        expect(a.contentType).toBe("application/pdf");
+        expect(a.content.subarray(0, 5).toString()).toBe("%PDF-");
+      }
+      expect(m.text).toContain("Informe resumen");
+      expect(m.text).toContain("Informe de ingeniería");
       expect(m.text).toContain(`https://app.test/c/${client.slug}/${project.slug}`);
       expect(m.text).toContain("90 días");
 

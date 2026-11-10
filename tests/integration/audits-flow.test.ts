@@ -328,6 +328,8 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
       const stored = s3.objects.get(done.r2Key!)!;
       expect(stored).toBeDefined();
       expect(JSON.parse(gunzipSync(stored).toString("utf8")).categories.performance.score).toBe(1);
+      // Lo que hay que mejorar queda guardado al terminar, para que el portal no abra el JSON completo.
+      expect(done.improvements).toMatchObject({ v: 1, categories: expect.any(Object) });
     });
 
     it("publica un latido mientras corre y lo retira al cerrar", async () => {

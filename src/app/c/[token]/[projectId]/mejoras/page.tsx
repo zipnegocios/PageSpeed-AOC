@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
 import { pageTitle } from "@/lib/brand";
-import { Badge } from "@/lib/ui/components/badge";
+import { getPortalImprovements } from "@/server/services/portal";
+import { ImprovementList } from "../../../_components/improvement-list";
 import { PortalPage } from "../../../_components/portal-page";
 import { loadProjectGate } from "../../../_lib/project-gate";
 
@@ -15,24 +15,20 @@ export default async function PortalImprovements({ params }: { params: Promise<{
   if (gate.kind === "notice") return gate.element;
   const { project, base } = gate;
   if (projectId !== project.slug) redirect(`${base}/mejoras`);
+  const data = await getPortalImprovements(project);
   return (
-    <PortalPage title="Mejoras" subtitle="Lo que está por debajo de la meta acordada para tu sitio.">
-      {project.improvements.length === 0 ? (
-        <p className="rounded-lg bg-surface-200 p-4 text-ink">Todo está dentro de la meta. No hay nada pendiente por ahora.</p>
+    <PortalPage
+      title="Mejoras"
+      subtitle={
+        data.total === 0
+          ? "Todo está dentro de la meta acordada."
+          : `${data.total} ${data.total === 1 ? "punto" : "puntos"} por mejorar en ${data.pages.length} ${data.pages.length === 1 ? "página" : "páginas"}. Esto es lo que hace que cada nota esté por debajo de la meta.`
+      }
+    >
+      {data.total === 0 ? (
+        <p className="rounded-lg bg-surface-200 p-4 text-ink">No hay nada pendiente por ahora. Te avisaremos si algo baja de la meta.</p>
       ) : (
-        <ul className="hud divide-y divide-border overflow-hidden rounded-lg">
-          {project.improvements.map((a) => (
-            <li key={a.id} className="flex flex-col gap-1 px-4 py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone="danger">{a.kind === "audit_failure" ? "Sin datos" : "Bajo la meta"}</Badge>
-                <span className="font-semibold text-ink">{a.kind === "audit_failure" ? "No pudimos auditar esta página" : a.summary}</span>
-              </div>
-              <p className="text-[15px] text-ink-muted">
-                <span className="font-mono break-all">{a.routePath}</span> · {PROFILE_LABEL[a.profile]} · desde {formatDate(a.openedAt)}
-              </p>
-            </li>
-          ))}
-        </ul>
+        <ImprovementList data={data} base={base} />
       )}
     </PortalPage>
   );

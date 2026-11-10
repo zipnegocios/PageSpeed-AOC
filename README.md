@@ -371,6 +371,39 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   vuelve a validar por firma, peso (512 KB) y medidas (`domain/client-logo.ts`). Viven en R2 bajo `_logos/<cliente>/…` y se
   sirven solo con sesión de administrador (`/api/admin/client-logo/<id>`) o, en el portal, con el PIN ya validado
   (`/c/<enlace>/logo?k=icon|full`; nunca en la pantalla del PIN). Color de fondo opcional por cliente para logotipos blancos.
+- **Rutas del portal en árbol** (`/c/<enlace>/<proyecto>/rutas`): `domain/route-tree.ts` deriva la jerarquía de `routes.path`
+  (la tabla es plana): «/» es «Inicio», una página puede ser a la vez ruta y padre, un padre que solo existe porque tiene hijas
+  es un nodo **virtual** (con el promedio de lo que contiene) y las mejoras suben a los padres. Cada fila muestra el **título**
+  de la página (no la ruta), un globito con las mejoras y la cinta R · S · A · B · IA; al abrirla salen LCP, CLS, TBT, agentes,
+  el botón «Ver detalle de ingeniería» y las páginas que contiene. Título (`domain/page-title.ts`): **etiqueta del
+  administrador** (ficha del proyecto → Rutas → «Nombre que verá el cliente») → título del último rastreo sin la marca del
+  sitio (solo si la página respondió 200 sin redirección y no exige sesión) → último segmento de la ruta. Se abren solas las
+  ramas con mejoras dentro (hasta 12 páginas); las enormes se abren a mano. Con 109 rutas la pestaña tarda ~0,8 s en producción.
+- **Mejoras del portal** (`/c/<enlace>/<proyecto>/mejoras`): cada alerta abierta (rubro por debajo de la meta, por dispositivo) se
+  muestra con las **causas concretas** que Lighthouse encontró en la última auditoría de esa página, en frases llanas
+  (`domain/improvement-glossary.ts`, con respaldo al título de Lighthouse en español) y con su impacto («≈ 1,9 s», «3 elementos»).
+  Las causas (`domain/improvements.ts`) se extraen **al terminar cada auditoría** y se guardan en `audit_logs.improvements`
+  (migración 0018): el portal no abre el JSON de R2 en cada vista. Las auditorías anteriores a la migración se leen de R2 una
+  sola vez (hasta 12 por petición) y quedan guardadas. Cada página lleva su botón «Ver detalle de ingeniería» (a la pestaña del
+  rubro afectado).
+- **Tráfico y búsqueda del portal** (`.../trafico?periodo=7|28|90&seccion=visitas|google|salud`): periodo, cuatro cifras con su
+  variación (clics, impresiones, sesiones y visitas desde IA como «mínimo observado») y tres secciones con tarjetas que se abren:
+  **Visitas** (canales, páginas con su título, países, asistentes de IA), **Google** (CTR, posición, clics, países, dispositivos,
+  idiomas) y **Salud SEO**: el último rastreo técnico en frases llanas (`domain/seo-client-glossary.ts`), solo errores y avisos
+  (la información no se muestra), agrupado por tema (acceso, indexación, direcciones principales, contenido, idiomas, datos
+  estructurados), con nuevos y resueltos frente a la revisión anterior y las páginas afectadas. Mismo interruptor que antes
+  («Visible para el cliente», `seo_client_visible`) y solo proyectos en producción; la salud SEO no exige tener Google conectado.
+- **Informes en PDF: resumen e ingeniería** (`/c/<enlace>/<proyecto>/informes`, `.../informe?tipo=resumen|ingenieria&dias=7|30|90`).
+  Dos documentos con el **logotipo del cliente y el de la aplicación**: el **resumen** (5 apartados, normalmente 2 a 4 páginas, en
+  lenguaje claro) y el de **ingeniería** (portada con índice y 8 apartados: método, notas y métricas por página, rendimiento a fondo,
+  fallos por rubro, navegación agéntica, salud SEO del sitio, evolución y glosario; detalla las **30 páginas más débiles**). Los
+  apartados salen de **una sola lista** (`domain/report-outline.ts`) que usan la pestaña (con el índice desplegable), los títulos del
+  PDF y sus **marcadores** (el panel de navegación del lector); una prueba comprueba que cada PDF trae exactamente esos apartados. Todo
+  se lee de lo ya guardado (notas y métricas, mejoras por auditoría, salud SEO, logotipos): no se abre R2 por ruta salvo el relleno
+  acotado de auditorías anteriores a la migración 0018. Tráfico y salud SEO solo entran si el cliente puede verlos en su portal.
+  Generación en serie con caché de 2 minutos por proyecto, periodo y tipo; con 100 rutas el de ingeniería tarda ~3 s y añade ~130 MB.
+  Un enlace antiguo (`.../informe` sin `tipo`) sigue entregando el resumen. El **correo** (botón «Enviar los dos informes» del panel)
+  adjunta **ambos**: `resumen-…pdf` e `informe-ingenieria-…pdf`. Fuente de los PDF: Rajdhani, que no trae «•» ni «≈» (se usan «–» y «aprox.»).
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el

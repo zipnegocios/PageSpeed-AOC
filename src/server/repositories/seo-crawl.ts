@@ -178,3 +178,16 @@ export async function projectsWithActiveRun(db: Database, projectIds: string[]):
     .where(and(inArray(seoCrawlRuns.projectId, projectIds), inArray(seoCrawlRuns.status, ["queued", "running"])));
   return new Set(rows.map((r) => r.projectId));
 }
+
+export type CrawlTitle = { path: string; title: string; status: number; finalPath: string | null };
+
+/** Títulos de las páginas del último rastreo terminado de un proyecto (solo las que tienen título). */
+export async function latestCrawlTitles(db: Database, projectId: string): Promise<CrawlTitle[]> {
+  const [run] = await listFinishedRuns(db, projectId, 1);
+  if (!run) return [];
+  const rows = await db
+    .select({ path: seoCrawlPages.path, title: seoCrawlPages.title, status: seoCrawlPages.status, finalPath: seoCrawlPages.finalPath })
+    .from(seoCrawlPages)
+    .where(eq(seoCrawlPages.runId, run.id));
+  return rows.flatMap((r) => (r.title ? [{ path: r.path, title: r.title, status: r.status, finalPath: r.finalPath }] : []));
+}

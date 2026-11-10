@@ -127,6 +127,13 @@
       "when": 1794274501621,
       "tag": "0017_logotipos_cliente",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794277742503,
+      "tag": "0018_mejoras_por_auditoria",
+      "breakpoints": true
     }
   ]
 }
