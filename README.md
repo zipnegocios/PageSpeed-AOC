@@ -153,7 +153,19 @@ ficha del cliente, tarjeta **Bienvenida** (`services/client-welcome.ts`, plantil
   copia (una por línea, «Nombre <correo>»). Todo se guarda (`projects.kind/tech_label/includes_server`,
   `clients.cc_contacts`) y se rellena solo en los envíos siguientes.
 - **Destinatarios:** va **Para** el correo de contacto del cliente y **CC** a las personas en copia; el saludo nombra a todas
-  por su nombre de pila («Hola Ana, Luis y María,»). Con una persona habla de «tú»; con varias, de «ustedes».
+  por su nombre de pila («Hola Ana, Luis y María,»; los compuestos frecuentes se respetan: «Ana María Osorio» → «Ana María»).
+  Con una persona habla de «tú»; con varias, de «ustedes». **Dos personas pueden compartir una dirección** (incluida la del
+  contacto principal): se escriben en líneas aparte con la misma dirección, se nombran las dos y el correo llega una sola vez.
+  Las direcciones en copia nunca se repiten.
+- **Quién firma:** los clientes reconocen a la persona (nombre y apellido) antes que a la marca, así que todos los correos que
+  ve el cliente (bienvenida, semanal, mensual, informes enviados a mano y PIN) llevan en la banda y en la firma «Gustavo
+  Amarista» primero y «zipnegocios · Informes técnicos web» debajo, con el WhatsApp. No muestran «PageSpeed», ni logo, ni ©
+  (`CLIENT_SENDER` en `notify/email-theme.ts`). La bienvenida se presenta («Soy Gustavo Amarista… te escribo desde esta
+  dirección nueva; si no la reconoces, es normal, soy yo»). Los correos al administrador (alertas, invitaciones) siguen con
+  la marca del producto.
+- **Remitente y respuestas:** `EMAIL_FROM` es lo que ve el cliente en su bandeja: pon tu nombre primero, por ejemplo
+  `Gustavo Amarista <correo@tudominio.com>`. `EMAIL_REPLY_TO` (opcional, web y worker) es adonde responde el cliente: tu correo
+  de siempre. El PIN nuevo también llega a todo el equipo (contacto principal y copia), y el informe enviado a mano igual.
 - **PIN:** si el cliente ya tiene un PIN que se puede mostrar, se reutiliza (no se cierran sesiones). Si no, se genera uno
   nuevo, y solo se activa si el correo salió. El portal sigue siendo un único acceso por cliente.
 - **Prueba:** la casilla «Enviarme solo una prueba» manda el mismo correo, con los mismos datos, al correo del administrador
@@ -164,7 +176,34 @@ ficha del cliente, tarjeta **Bienvenida** (`services/client-welcome.ts`, plantil
 - **Correos de prueba con datos de ejemplo:** desde la consola del servicio web, `node send-test-emails-cli.cjs <correo>`
   envía los cuatro correos del servicio (bienvenida, estado mensual, semana en la web e informe manual). Ver
   `scripts/send-test-emails.ts` para las opciones.
-- Aún **no hay envío automático** del correo semanal ni del mensual: hoy solo existen sus plantillas.
+- El semanal y el mensual automáticos se encienden aparte (ver «Correos automáticos al cliente»).
+
+## Correos automáticos al cliente
+
+Dos correos con la marca de zipnegocios, para el contacto principal y su equipo en copia (plantillas en
+`notify/client-emails.ts`, datos y envío en `services/client-reports.ts`, reglas puras en `domain/client-reports.ts`).
+**Están apagados por defecto**: se encienden por cliente en su ficha, tarjeta «Correos automáticos».
+
+- **Semanal, «Tu semana en la web»:** visitas de la última semana completa (lunes a domingo, UTC) frente a la anterior, de
+  dónde llegaron (canales de GA4; las redes sociales separadas por red cuando hay datos por fuente), clics de Google, visitas
+  desde asistentes de IA (aparte, como mínimo observado: ya están contadas en otros orígenes) y las 3 páginas más vistas. Solo
+  sale si GA4 está conectado y el tráfico es visible para el cliente. Nunca con una semana a medias: si los datos de GA4 no
+  llegan al domingo, espera; sale lunes, martes o miércoles, y pasado eso se omite esa semana. Con menos de 50 visitas no
+  muestra porcentajes. La frase «En una línea» describe lo medido y nunca atribuye una causa.
+- **Mensual, «Estado general»:** el primer lunes del mes (o los dos días siguientes) con el mes anterior completo. Promedios de
+  las auditorías correctas en producción (rendimiento, SEO y accesibilidad, móvil y escritorio) frente al mes anterior, el
+  registro de actuaciones del mes, las páginas nuevas del sitemap ya vigiladas y el estado (por reglas: alertas abiertas, mejora
+  del móvil, lo atendido). No sale si ese mes no hubo auditorías. «Servidor y servicios: supervisados, sin incidencias» solo
+  aparece si el administrador confirmó la revisión de ese mes (hoy es manual).
+- **Cuándo corre:** el worker revisa una vez al día (13:00 UTC, trabajo `client-reports` de la cola `maintenance`) y envía lo
+  que toca. Cada envío queda en `client_report_sends` (un registro por proyecto, tipo y periodo: lo ya enviado no se repite; lo
+  omitido o fallido se reintenta al día siguiente mientras la ventana siga abierta) y en la bitácora de correos. El worker
+  necesita `SMTP_*`, `EMAIL_FROM` y `APP_URL` (sin SMTP lo avisa en los logs y no envía). **El worker no se despliega solo:
+  tras publicar este cambio, pulsa Deploy en EasyPanel.**
+- **En la ficha del proyecto**, tarjeta «Correos al cliente»: registro de actuaciones (`project_actions`; lo que anotes sale en
+  «Lo que atendimos»), confirmación mensual de la revisión del servidor (`server_checks`), pruebas con datos reales («Enviarme el
+  semanal / mensual de prueba»: solo a tu correo, sin dejar rastro) y el historial de envíos.
+- Se envía un correo por cada proyecto en producción del cliente.
 
 ## Visor de auditorías (informe completo, idioma y agentes)
 

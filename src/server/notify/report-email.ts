@@ -1,31 +1,38 @@
-import { EMAIL, EMAIL_TEXT_SIGNATURE, emailBrandBand, emailButton, emailFooter } from "./email-theme";
+import { givenName } from "@/server/domain/client-welcome";
 import { PERIOD_LABEL, type Period } from "@/server/domain/history";
+import { composeClientEmail, voice, type ClientEmail } from "./client-emails";
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-/** Correo que acompaña a los dos informes PDF (resumen e ingeniería). Habla al cliente de "tú" y apunta a su portal. */
+/**
+ * Correo que acompaña a los dos informes PDF (resumen e ingeniería) cuando se envían a mano. Firma tu nombre. Con una
+ * persona habla de «tú»; con varias, de «ustedes».
+ */
 export function buildReportEmail(input: {
   contactName: string | null;
+  names?: string[];
+  clientName?: string;
   projectName: string;
   days: Period;
   portalUrl: string;
-}): { subject: string; text: string; html: string } {
-  const greeting = input.contactName?.trim() ? `Hola ${input.contactName.trim()},` : "Hola,";
+}): ClientEmail {
+  const names = input.names ?? (input.contactName?.trim() ? [givenName(input.contactName)] : []);
+  const T = voice(names);
   const period = PERIOD_LABEL[input.days];
-  const subject = `Informes técnicos web · ${input.projectName}`;
-  const line = `Te enviamos los informes de ${input.projectName} con las auditorías de los últimos ${period}. Los encuentras adjuntos en PDF:`;
-  const files = ["Informe resumen: el estado de tu sitio en pocas páginas, en lenguaje claro.", "Informe de ingeniería: el detalle técnico de cada página, medición por medición."];
-  const portal = "También puedes ver siempre el estado actualizado en tu portal:";
-  const text = [greeting, "", line, ...files.map((f) => `- ${f}`), "", portal, input.portalUrl, "", ...EMAIL_TEXT_SIGNATURE].join("\n");
-  const html =
-    `<div style="font-family:Arial,Helvetica,sans-serif;color:${EMAIL.ink};max-width:560px">` +
-    emailBrandBand(input.portalUrl) +
-    `<p style="margin:16px 0 0">${esc(greeting)}</p>` +
-    `<p>${esc(line)}</p>` +
-    `<ul style="margin:0 0 12px;padding-left:20px">${files.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +
-    `<p>${esc(portal)}</p>` +
-    `<p style="margin:20px 0">${emailButton(esc(input.portalUrl), "Abrir mi portal")}</p>` +
-    emailFooter() +
-    `</div>`;
-  return { subject, text, html };
+  return composeClientEmail({
+    subject: `Informes técnicos web · ${input.projectName}`,
+    preview: `Los informes de ${input.projectName} de los últimos ${period}, en PDF.`,
+    names,
+    clientName: input.clientName ?? "",
+    blocks: [
+      { k: "p", t: `${T("Te adjunto", "Les adjunto")} los informes de **${input.projectName}** con las auditorías de los últimos ${period}, en PDF:` },
+      {
+        k: "list",
+        items: [
+          `**Informe resumen:** el estado de ${T("tu", "su")} sitio en pocas páginas, en lenguaje claro.`,
+          "**Informe de ingeniería:** el detalle técnico de cada página, medición por medición.",
+        ],
+      },
+      { k: "p", t: `${T("También puedes ver", "También pueden ver")} siempre el estado actualizado en ${T("tu", "su")} portal:` },
+      { k: "buttons", items: [{ label: "Abrir el portal", url: input.portalUrl }] },
+    ],
+  });
 }

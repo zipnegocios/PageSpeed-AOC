@@ -68,10 +68,14 @@ export class CcParseError extends Error {}
 
 /**
  * Lee la lista de personas en copia, una por línea. Acepta «Nombre <correo>», «Nombre, correo» y solo «correo».
- * Lanza `CcParseError` con la línea que falla. Quita repetidos (por correo) y respeta el tope.
+ * Lanza `CcParseError` con la línea que falla.
+ *
+ * Dos personas pueden compartir una misma dirección (incluida la del contacto principal): cada una va en su línea y se
+ * nombran las dos en el saludo, pero el correo llega una sola vez a esa dirección. Una línea que repite una dirección ya
+ * usada y no trae nombre no aporta nada y se descarta, igual que una línea idéntica repetida.
  */
 export function parseCcContacts(text: string, exclude: string[] = []): CcContact[] {
-  const skip = new Set(exclude.map((e) => e.trim().toLowerCase()).filter(Boolean));
+  const taken = new Set(exclude.map((e) => e.trim().toLowerCase()).filter(Boolean));
   const seen = new Set<string>();
   const out: CcContact[] = [];
   for (const raw of text.split(/\r?\n/)) {
@@ -94,9 +98,12 @@ export function parseCcContacts(text: string, exclude: string[] = []): CcContact
     }
     email = email.trim().toLowerCase();
     if (!EMAIL_RE.test(email)) throw new CcParseError(`El correo «${email || line}» no es válido.`);
-    if (skip.has(email) || seen.has(email)) continue;
-    seen.add(email);
-    out.push({ name: name.slice(0, 80), email });
+    name = name.slice(0, 80);
+    if (!name && (taken.has(email) || out.some((c) => c.email === email))) continue; // sin nombre, no aporta nada
+    const id = `${email}|${key(name)}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ name, email });
   }
   if (out.length > MAX_CC_CONTACTS) throw new CcParseError(`Máximo ${MAX_CC_CONTACTS} personas en copia.`);
   return out;
@@ -107,10 +114,43 @@ export function formatCcContacts(contacts: CcContact[]): string {
   return contacts.map((c) => (c.name ? `${c.name} <${c.email}>` : c.email)).join("\n");
 }
 
-/** Nombres de pila para el saludo: el contacto principal primero y luego las personas en copia que tengan nombre. */
+/**
+ * Las direcciones a las que va el correo en copia: una vez cada una, sin la del contacto principal (ya va en «Para»).
+ * Dos personas con la misma dirección no la repiten.
+ */
+export function ccAddresses(contacts: CcContact[], primaryEmail: string | null | undefined): string[] {
+  const primary = (primaryEmail ?? "").trim().toLowerCase();
+  const out: string[] = [];
+  for (const c of contacts) {
+    const e = c.email.trim().toLowerCase();
+    if (e && e !== primary && !out.includes(e)) out.push(e);
+  }
+  return out;
+}
+
+/** Segundos nombres frecuentes: «Ana María Osorio» se saluda «Ana María», no «Ana». */
+const SECOND_GIVEN = new Set(
+  ["maria", "jose", "luis", "carlos", "juan", "pablo", "antonio", "fernando", "isabel", "luisa", "paula", "fernanda", "alejandra", "eugenia", "teresa", "elena", "victoria", "cristina", "andrea", "camila", "valentina", "sofia", "lucia", "patricia", "gabriela", "daniela", "carolina", "alberto", "eduardo", "miguel", "angel", "manuel", "rafael", "ricardo", "andres", "felipe", "esteban", "javier", "alejandro", "david", "daniel", "emilio", "enrique", "francisco", "jorge", "ignacio", "nicolas", "sebastian"],
+);
+/** Con solo dos palabras («Ana María») solo se junta si la primera también es de las que suelen ir compuestas. */
+const FIRST_COMPOUND = new Set(["ana", "maria", "jose", "juan", "luis", "carlos", "rosa", "luz", "miguel", "pedro", "marta"]);
+
+/**
+ * El nombre de pila para el saludo. Un nombre compuesto frecuente se respeta: «Ana María Osorio» → «Ana María»;
+ * «Daniel Osorio» → «Daniel». Lo que va entre paréntesis se ignora. Se ve en vivo en el formulario por si hay que ajustarlo.
+ */
+export function givenName(full: string): string {
+  const words = full.replace(/\([^)]*\)/g, " ").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  const second = words[1] ? key(words[1]) : "";
+  if (words.length >= 3 && SECOND_GIVEN.has(second)) return `${words[0]} ${words[1]}`;
+  if (words.length === 2 && SECOND_GIVEN.has(second) && FIRST_COMPOUND.has(key(words[0]!))) return `${words[0]} ${words[1]}`;
+  return words[0]!;
+}
+
+/** Nombres para el saludo: el contacto principal primero y luego las personas en copia con nombre, sin repetir. */
 export function greetingNames(primaryName: string | null | undefined, cc: CcContact[]): string[] {
-  const first = (s: string) => s.trim().split(/\s+/)[0] ?? "";
-  const names = [primaryName ?? "", ...cc.map((c) => c.name)].map(first).filter(Boolean);
+  const names = [primaryName ?? "", ...cc.map((c) => c.name)].map(givenName).filter(Boolean);
   return names.filter((n, i) => names.findIndex((m) => key(m) === key(n)) === i);
 }
 

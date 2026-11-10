@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BRAND_NAME, COPYRIGHT, COPYRIGHT_LONG, LOGO_BOLT_PATH, LOGO_CORNERS_PATH, LOGO_FRAME_PATH, pageTitle } from "@/lib/brand";
+import { buildInviteEmail } from "@/server/notify/invite-email";
 import { buildPinEmail } from "@/server/notify/pin-email";
 import { buildReportEmail } from "@/server/notify/report-email";
 
@@ -37,15 +38,27 @@ describe("marca", () => {
     expect(readFileSync(join(root, "design/brand/logo-glyph.svg"), "utf8")).toContain(`d="${LOGO_BOLT_PATH}"`);
   });
 
-  it("los correos llevan el logo (imagen del propio dominio), el nombre y el copyright", () => {
+  it("los correos al administrador llevan el logo (imagen del propio dominio), el nombre del producto y el copyright", () => {
+    const invite = buildInviteEmail({ kind: "invite", invitedBy: "Gustavo", link: "https://app.test/invitacion/x", expiresAt: new Date("2026-12-01T00:00:00Z") });
+    expect(invite.html).toContain("https://app.test/brand/logo-glyph-email.png");
+    expect(invite.html).toContain("PAGESPEED");
+    expect(invite.html).toContain(COPYRIGHT);
+    expect(invite.text).toContain(COPYRIGHT);
+  });
+
+  it("los correos al cliente van firmados por tu nombre y por zipnegocios, sin el producto ni imágenes", () => {
     const pin = buildPinEmail({ contactName: null, clientName: "Acme", pin: "123456", portalUrl: "https://app.test/c/acme" });
-    expect(pin.html).toContain("https://app.test/brand/logo-glyph-email.png");
-    expect(pin.html).toContain("PAGESPEED");
-    expect(pin.html).toContain(COPYRIGHT);
-    expect(pin.text).toContain(COPYRIGHT);
     const report = buildReportEmail({ contactName: null, projectName: "T", days: 7, portalUrl: "https://app.test/c/acme" });
-    expect(report.html).toContain(COPYRIGHT);
-    expect(report.text).toContain(COPYRIGHT);
+    for (const m of [pin, report]) {
+      expect(m.html).toContain("Gustavo Amarista");
+      expect(m.html).toContain("zipnegocios");
+      expect(m.html).not.toContain("<img");
+      expect(m.html).not.toMatch(/pagespeed/i);
+      expect(m.text).toContain("Gustavo Amarista");
+      expect(m.text).toContain("zipnegocios");
+      expect(m.text).not.toMatch(/pagespeed/i);
+      expect(m.text).not.toContain("©");
+    }
   });
 
   it("ya no queda «AOC» en mayúsculas en el código, los documentos ni la configuración", () => {

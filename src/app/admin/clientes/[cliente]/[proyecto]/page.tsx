@@ -46,6 +46,8 @@ import {
   updateProjectAction,
 } from "@/app/admin/proyectos/actions";
 import { PageAuditCard } from "@/app/admin/_components/page-audit-card";
+import { ClientEmailsCard } from "@/app/admin/_components/client-emails-card";
+import { getEmailsPanel } from "@/server/services/client-reports";
 import { RenameSlugForm } from "@/app/admin/_components/rename-slug-form";
 import { FirstScanBlock } from "./first-scan-block";
 import { SitemapImporter } from "./sitemap-importer";
@@ -87,6 +89,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const client = await getClient(project.clientId);
   const production = project.phase === "production";
   const nextRun = production ? await getNextScheduledRun(id) : null;
+  const emailsPanel = production ? await getEmailsPanel(id) : null;
 
   return (
     <AdminShell
@@ -394,6 +397,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <p className="text-[15px] text-ink-muted">Agrega un correo de contacto en la ficha del cliente para poder enviarle el informe por email.</p>
         )}
       </Card>
+
+      {emailsPanel ? (
+        <ClientEmailsCard projectId={id} panel={emailsPanel} includesServer={project.includesServer} today={now.toISOString().slice(0, 10)} clientHref={clientPath(project.clientSlug)} />
+      ) : null}
 
       <Card title="Umbrales de alerta" description="Puntuación mínima aceptable, por métrica. Si baja de aquí, se abre una alerta (solo en producción).">
         <ActionForm action={setThresholdsAction.bind(null, id)} submitLabel="Guardar umbrales">

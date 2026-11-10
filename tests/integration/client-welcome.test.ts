@@ -64,6 +64,22 @@ describe.skipIf(!dbUrl)("bienvenida al cliente", () => {
     expect(readStoredPin(await clientRow(client.id), deps())).toBe(pin);
   });
 
+  it("dos personas con la misma dirección: se nombran las dos y el correo llega una sola vez", async () => {
+    const client = await clients.createClient({ name: "Contigo Constructions", contactName: "Daniel Osorio", contactEmail: "contact@contigo.test" }, db);
+    const project = await projects.createProject(client.id, { name: "Sitio", baseUrl: "https://contigoconstructions.test" }, db);
+    await db.update(s.projects).set({ phase: "production" }).where(eq(s.projects.id, project.id));
+    const r = await sendClientWelcome(client.id, form({ projectId: project.id, ccText: "Ana María Osorio <contact@contigo.test>" }), {}, db, deps());
+    expect(r).toMatchObject({ to: "contact@contigo.test", cc: [] });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.to).toBe("contact@contigo.test");
+    expect(sent[0]!.cc).toBeUndefined();
+    expect(sent[0]!.text).toContain("Hola Daniel y Ana María,");
+    expect(sent[0]!.text).toContain("No tienen que hacer nada");
+    expect(sent[0]!.text).toContain("Soy Gustavo Amarista (zipnegocios)");
+    // Se conserva a Ana María aunque su dirección sea la del contacto principal.
+    expect((await clientRow(client.id)).ccContacts).toEqual([{ name: "Ana María Osorio", email: "contact@contigo.test" }]);
+  });
+
   it("guarda lo del formulario para los próximos envíos y anota el envío", async () => {
     const { client, project } = await setup();
     await sendClientWelcome(client.id, form({ projectId: project.id, kind: "shop", techLabel: "Shopify", includesServer: false, ccText: "Luis <luis@aurora.test>" }), {}, db, deps());

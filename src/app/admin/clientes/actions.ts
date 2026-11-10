@@ -9,6 +9,7 @@ import { DomainError } from "@/server/domain/errors";
 import { isLogoKind } from "@/server/domain/client-logo";
 import * as clientLogo from "@/server/services/client-logo";
 import * as clients from "@/server/services/clients";
+import { addProjectAction, confirmServerCheck, removeProjectAction, sendClientReport, setReportPreferences } from "@/server/services/client-reports";
 import { sendClientWelcome } from "@/server/services/client-welcome";
 import { generateClientPin } from "@/server/services/portal-pin";
 import * as projects from "@/server/services/projects";
@@ -103,6 +104,53 @@ export async function sendWelcomeAction(clientId: string, _prev: ActionState, fd
     const copy = result.cc.length > 0 ? `, con copia a ${result.cc.join(", ")}` : "";
     const pin = result.newPin ? " Se generó un PIN nuevo y ya vale." : " Lleva el PIN actual.";
     return { ok: `Bienvenida enviada a ${result.to}${copy}.${pin}` };
+  });
+}
+
+export async function setReportPreferencesAction(clientId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    const weekly = fd.get("weekly") === "on";
+    const monthly = fd.get("monthly") === "on";
+    await setReportPreferences(clientId, { weekly, monthly });
+    revalidateAdmin();
+    if (!weekly && !monthly) return { ok: "Correos automáticos apagados para este cliente." };
+    return { ok: `Guardado. ${[weekly ? "Semanal encendido" : null, monthly ? "Mensual encendido" : null].filter(Boolean).join(" · ")}.` };
+  });
+}
+
+export async function addProjectActionAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await addProjectAction(projectId, { date: field(fd, "date"), text: field(fd, "text") });
+    revalidateAdmin();
+    return { ok: "Anotado. Saldrá en el correo mensual del mes en que ocurrió." };
+  });
+}
+
+export async function removeProjectActionAction(projectId: string, actionId: string, _prev: ActionState): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await removeProjectAction(projectId, actionId);
+    revalidateAdmin();
+    return { ok: "Borrada." };
+  });
+}
+
+export async function confirmServerCheckAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  await verifySession();
+  return guarded(async () => {
+    await confirmServerCheck(projectId, field(fd, "month"));
+    revalidateAdmin();
+    return { ok: "Confirmado. El correo mensual podrá decir que el servidor se revisó ese mes." };
+  });
+}
+
+export async function sendReportTestAction(kind: "weekly" | "monthly", projectId: string, _prev: ActionState): Promise<ActionState> {
+  const session = await verifySession();
+  return guarded(async () => {
+    const r = await sendClientReport(kind, projectId, { testTo: session.email });
+    return { ok: `Prueba enviada a ${r.status === "sent" ? r.to : session.email}, con los datos reales del último ${kind === "weekly" ? "periodo semanal" : "mes completo"}. No se envió al cliente.` };
   });
 }
 

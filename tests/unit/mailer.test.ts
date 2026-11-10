@@ -22,6 +22,20 @@ describe("createMailer", () => {
     expect(raw).toContain("From: PageSpeed <n@x.test>");
   });
 
+  it("pone el Reply-To configurado y lo omite si no hay", async () => {
+    const capture = async (replyTo?: string) => {
+      const transport = createTransport({ streamTransport: true, buffer: true });
+      const mailer = createMailer({ host: "h", port: 587, from: "Gustavo Amarista <n@x.test>", replyTo }, transport);
+      let raw = "";
+      const orig = transport.sendMail.bind(transport);
+      transport.sendMail = (async (m: never) => { const info = await orig(m); raw = (info as unknown as { message: Buffer }).message.toString("utf8"); return info; }) as never;
+      await mailer.send({ to: "a@x.test", subject: "S", text: "t", html: "<p>t</p>" });
+      return raw;
+    };
+    expect(await capture("gustavo@x.test")).toContain("Reply-To: gustavo@x.test");
+    expect(await capture()).not.toContain("Reply-To:");
+  });
+
   it("propaga el error del transporte", async () => {
     const transport = createTransport({ jsonTransport: true });
     transport.sendMail = (async () => { throw new Error("rechazado"); }) as never;

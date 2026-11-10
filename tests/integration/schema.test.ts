@@ -56,12 +56,14 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "alert_states",
       "alert_thresholds",
       "audit_logs",
+      "client_report_sends",
       "clients",
       "field_data",
       "mcp_api_keys",
       "notifications",
       "oauth_clients",
       "oauth_codes",
+      "project_actions",
       "projects",
       "routes",
       "seo_ai_referrals_daily",
@@ -73,6 +75,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "seo_search_daily",
       "seo_social_daily",
       "seo_traffic_daily",
+      "server_checks",
       "settings",
     ]);
   });

@@ -10,6 +10,8 @@ export type SmtpConfig = {
   user?: string;
   pass?: string;
   from: string;
+  /** A dónde llegan las respuestas, si no es la dirección del remitente. */
+  replyTo?: string;
 };
 
 /** Correo por SMTP. 465 usa TLS directo; el resto negocia STARTTLS si el servidor lo ofrece. */
@@ -27,7 +29,7 @@ export function createMailer(config: SmtpConfig, transport?: Transporter): Maile
     });
   return {
     async send(message) {
-      await t.sendMail({ from: config.from, ...message });
+      await t.sendMail({ from: config.from, ...(config.replyTo ? { replyTo: config.replyTo } : {}), ...message });
     },
   };
 }

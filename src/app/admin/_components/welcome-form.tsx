@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ActionState } from "@/lib/actions";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/components/field";
-import { CcParseError, greetingNames, parseCcContacts, PROJECT_KIND_LABEL, TECH_SUGGESTIONS } from "@/server/domain/client-welcome";
+import { ccAddresses, CcParseError, greetingNames, parseCcContacts, PROJECT_KIND_LABEL, TECH_SUGGESTIONS } from "@/server/domain/client-welcome";
 
 export type WelcomeProject = {
   id: string;
@@ -47,7 +47,8 @@ export function WelcomeForm({ action, projects, contactName, contactEmail, initi
   try {
     const contacts = parseCcContacts(cc, [contactEmail]);
     const names = greetingNames(contactName, contacts);
-    summary = `Para: ${contactEmail}${contacts.length > 0 ? ` · Copia: ${contacts.map((c) => c.email).join(", ")}` : ""}. Saludo: «${
+    const copy = ccAddresses(contacts, contactEmail);
+    summary = `Para: ${contactEmail}${copy.length > 0 ? ` · Copia: ${copy.join(", ")}` : ""}. Saludo: «${
       names.length === 0 || names.length > 3 ? "Hola equipo de [cliente]" : `Hola ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`}`
     },».`;
   } catch (err) {
@@ -103,7 +104,7 @@ export function WelcomeForm({ action, projects, contactName, contactEmail, initi
         value={cc}
         onChange={(e) => setCc(e.target.value)}
         placeholder={"Luis Vega <luis@empresa.com>\nMaría Soto <maria@empresa.com>"}
-        hint="Una persona por línea. Reciben el mismo correo en copia y se nombran en el saludo. Se guardan para los próximos correos."
+        hint="Una persona por línea. Si alguien comparte tu dirección de contacto (o la de otra persona), escríbela igual con su nombre: se nombran las dos en el saludo y el correo llega una sola vez. Se guarda para los próximos correos."
       />
       <p className="text-[15px] leading-5 text-ink-muted">{summary}</p>
       <CheckboxField

@@ -30,6 +30,8 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().min(1),
+  // A dónde responde el cliente a los correos del servicio (por ejemplo, tu correo de siempre). Vacío: al remitente.
+  EMAIL_REPLY_TO: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.email().optional()),
   // A quién se avisan las alertas. Vacío o ausente: el correo del administrador.
   ALERT_EMAIL: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.email().optional()),
 
@@ -82,6 +84,7 @@ const workerSchema = schema
     SMTP_USER: true,
     SMTP_PASS: true,
     ALERT_EMAIL: true,
+    EMAIL_REPLY_TO: true,
     AUTH_ENCRYPTION_KEY: true,
     CRUX_API_KEY: true,
   })

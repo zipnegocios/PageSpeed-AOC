@@ -67,7 +67,12 @@ export const notificationType = pgEnum("notification_type", [
   "failure",
   "report",
   "welcome",
+  "weekly",
+  "monthly",
 ]);
+// Correos automáticos al cliente y cómo salió cada envío.
+export const reportKind = pgEnum("report_kind", ["weekly", "monthly"]);
+export const reportSendStatus = pgEnum("report_send_status", ["sent", "failed", "skipped"]);
 // Qué es el proyecto para el cliente: se usa en los correos («tu sitio», «tu tienda», «tu aplicación»).
 export const projectKind = pgEnum("project_kind", ["site", "shop", "app"]);
 export const notificationStatus = pgEnum("notification_status", ["sent", "failed"]);
@@ -106,6 +111,9 @@ export const clients = pgTable("clients", {
   ccContacts: jsonb("cc_contacts").$type<Array<{ name: string; email: string }>>().notNull().default(sql`'[]'::jsonb`),
   // Cuándo se envió la última bienvenida; frena el doble envío.
   welcomeSentAt: timestamp("welcome_sent_at", { withTimezone: true }),
+  // Correos automáticos: «Tu semana en la web» (lunes) y «Estado general» (primer lunes del mes). Apagados hasta que se activen.
+  reportWeekly: boolean("report_weekly").notNull().default(false),
+  reportMonthly: boolean("report_monthly").notNull().default(false),
   notes: text("notes"),
   // Logotipo del cliente en R2 (`_logos/<id>/…`): el isotipo (icono) y el logotipo completo. Los objetos no entran en los
   // respaldos: una clave colgante se trata como «sin logotipo». `logoBg` es el color de fondo (#RRGGBB) para logotipos
@@ -159,6 +167,51 @@ export const projects = pgTable(
     ...timestamps,
   },
   (t) => [unique("projects_client_slug_unique").on(t.clientId, t.slug)],
+);
+
+// ------------------------------------------------- correos automáticos al cliente
+/** Lo que se hizo en el proyecto (actualizaciones, ajustes, correcciones): alimenta «Lo que atendimos» del correo mensual. */
+export const projectActions = pgTable(
+  "project_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    happenedOn: date("happened_on", { mode: "string" }).notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("project_actions_project_date_idx").on(t.projectId, t.happenedOn)],
+);
+
+/** El administrador confirma que revisó el servidor ese mes («YYYY-MM»): solo así el correo mensual lo afirma. */
+export const serverChecks = pgTable(
+  "server_checks",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    month: text("month").notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.month] })],
+);
+
+/** Un envío automático por proyecto, tipo y periodo («2026-W45», «2026-10»): evita repetirlo y explica por qué no salió. */
+export const clientReportSends = pgTable(
+  "client_report_sends",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    kind: reportKind("kind").notNull(),
+    periodKey: text("period_key").notNull(),
+    status: reportSendStatus("status").notNull(),
+    detail: text("detail"),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.kind, t.periodKey] })],
 );
 
 // --------------------------------------------------------------- routes

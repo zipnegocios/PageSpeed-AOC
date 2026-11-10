@@ -10,6 +10,9 @@ import {
   BACKUP_CRON,
   BACKUP_JOB,
   BACKUP_SCHEDULER_ID,
+  CLIENT_REPORTS_CRON,
+  CLIENT_REPORTS_JOB,
+  CLIENT_REPORTS_SCHEDULER_ID,
   CRUX_CRON,
   CRUX_JOB,
   CRUX_SCHEDULER_ID,
@@ -31,6 +34,7 @@ import {
 import { createMailer, type Mailer } from "@/server/notify/mailer";
 import { resolveAlertRecipient, sweepNotifications } from "@/server/services/alerts";
 import { runBackup } from "@/server/services/backups";
+import { runClientReports } from "@/server/services/client-reports";
 import { refreshAllFieldData, refreshOneProjectFieldData, type FetchLike } from "@/server/services/crux";
 import type { SeoDeps } from "@/server/services/seo-connections";
 import { reconcileCrawlRuns, runCrawl, scheduleWeeklyCrawls, type CrawlDeps } from "@/server/services/seo-crawl";
@@ -150,7 +154,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     options.mailer !== undefined
       ? options.mailer
       : env.SMTP_HOST && env.EMAIL_FROM
-        ? createMailer({ host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER || undefined, pass: env.SMTP_PASS || undefined, from: env.EMAIL_FROM })
+        ? createMailer({ host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER || undefined, pass: env.SMTP_PASS || undefined, from: env.EMAIL_FROM, replyTo: env.EMAIL_REPLY_TO })
         : null;
   if (!mailer) log.warn("SMTP_HOST o EMAIL_FROM sin definir: las alertas se evalúan pero no se envían por correo");
   if (mailer && env.NODE_ENV === "production" && /localhost|127\.0\.0\.1/.test(env.APP_URL)) {
@@ -189,6 +193,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       }
       throw err;
     }
+  };
+
+  const runClientReportsJob = async () => {
+    if (!mailer) {
+      log.warn("SMTP_HOST o EMAIL_FROM sin definir: no se envían los correos automáticos al cliente");
+      return;
+    }
+    const r = await runClientReports(db, { mailer, appUrl: env.APP_URL }, log);
+    if (r.sent || r.skipped || r.failed) log.info(r, "correos automáticos al cliente");
   };
 
   const runCrux = async (projectId?: string) => {
@@ -254,6 +267,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       }
       if (job.name === NOTIFY_JOB) return runNotify();
       if (job.name === BACKUP_JOB) return runBackupJob();
+      if (job.name === CLIENT_REPORTS_JOB) return runClientReportsJob();
       if (job.name === CRUX_JOB) return runCrux((job.data as { projectId?: string } | undefined)?.projectId);
       log.warn({ name: job.name }, "trabajo de mantenimiento desconocido");
     },
@@ -298,6 +312,15 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
       .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar el respaldo diario")),
     30_000,
     "registro del respaldo diario",
+    log,
+  );
+
+  await withDeadline(
+    maintenance
+      .upsertJobScheduler(CLIENT_REPORTS_SCHEDULER_ID, { pattern: CLIENT_REPORTS_CRON, tz: "UTC" }, { name: CLIENT_REPORTS_JOB, data: {} })
+      .catch((err: Error) => log.error({ err: err.message }, "no se pudo registrar la revisión diaria de correos al cliente")),
+    30_000,
+    "registro de los correos automáticos al cliente",
     log,
   );
 

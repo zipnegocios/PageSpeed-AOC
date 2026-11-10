@@ -4,6 +4,19 @@ Estado: **borrador v2, decisiones de forma cerradas**; falta aprobar los textos 
 
 Tono: de «tú», cálido y breve (igual que los correos actuales). Firma: **zipnegocios** (siempre en minúsculas y sin espacios).
 
+## Cambios posteriores (v3)
+
+- **Firma con tu nombre primero.** Los clientes te reconocen por nombre y apellido, no por la marca. La banda y la firma de
+  todos los correos al cliente dicen «Gustavo Amarista» y, debajo, «zipnegocios · Informes técnicos web». No aparece
+  «PageSpeed», ni logo, ni ©. Este documento conserva los textos originales; los vigentes están en el código
+  (`src/server/notify/client-emails.ts`).
+- **Presentación en la bienvenida.** Primer párrafo: «Soy Gustavo Amarista (zipnegocios), quien se encarga de tu sitio. Te
+  escribo desde esta dirección nueva para enviarte los informes: si no la reconoces, es normal, soy yo.»
+- **Dos personas con la misma dirección.** Se escriben en líneas aparte con la misma dirección: se nombran las dos en el
+  saludo y el correo llega una sola vez. El saludo respeta los nombres compuestos frecuentes («Ana María»).
+- **Remitente.** `EMAIL_FROM` con tu nombre primero y `EMAIL_REPLY_TO` con tu correo de siempre.
+- **El PIN nuevo y el informe enviado a mano** también llegan a todo el equipo.
+
 ## Qué cambió en esta versión
 
 1. **Marca**: «zipnegocios», a secas.
