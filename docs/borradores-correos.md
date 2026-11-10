@@ -74,14 +74,21 @@ Se envía cuando generas el PIN y eliges «enviar al correo». Un solo correo pa
 >
 > Lo pueden instalar como app en el móvil. Si alguien cambia el PIN, les llega a todos.
 >
-> **Por qué esto importa.** [Tres datos verificables con fuente, ver nota N1.]
+> **Por qué esto importa**
+> - **La velocidad se nota en el negocio.** Un estudio de Deloitte y 55, encargado por Google, con 37 marcas y más de 30 millones de sesiones, asoció una mejora de 0,1 segundos en la velocidad móvil con un 9,2 % más de gasto en tiendas online y un 21,6 % más de visitantes que llegan al formulario en sitios que captan clientes.
+> - **Las vulnerabilidades son la puerta de entrada más común.** Según el informe de Verizon de 2026, el 31 % de las brechas de seguridad empieza con una vulnerabilidad de software, por encima de las contraseñas robadas.
+> - **Las versiones caducan.** PHP 8.2 deja de recibir parches de seguridad el 31 de diciembre de 2026, y Node.js 20 los dejó de recibir el 30 de abril de 2026. Mantener al día lo que corre debajo de un sitio es un trabajo continuo, no de una vez.
 >
 > Para cambiar la frecuencia de los correos o añadir a alguien más, respóndanme este correo o escríbanme por WhatsApp.
 >
 > Gustavo Amarista · zipnegocios
 
 **Notas**
-- N1. El bloque «Por qué esto importa» lleva **máximo tres datos con fuente citada**, válidos para cualquier tecnología: por ejemplo los umbrales de Core Web Vitals de Google, el fin de soporte de versiones de lenguajes y plataformas, y cifras de vulnerabilidades en componentes de terceros de un informe anual reconocido. Los investigo y los cito antes de la versión final. No pongo porcentajes sin fuente.
+- N1. **Fuentes de «Por qué esto importa»** (verificadas el 10 de nov de 2026, ver «Fuentes» al final). Reglas de uso:
+  - **Revisar las fechas cada trimestre.** El tercer punto caduca: las fechas de fin de soporte cambian con el tiempo. Si el proyecto no usa PHP ni Node.js (Shopify, por ejemplo), se puede omitir la frase o sustituirla por la de su plataforma.
+  - **El primer punto es una asociación, no una causa.** Lo dice así el texto («asoció»). El estudio lo encargó Google. Se cita por eso.
+  - **El segundo es un dato general de la industria**, no de sitios pequeños. Por eso dice «las brechas de seguridad» y no «tu sitio».
+  - Se descartó una cifra de vulnerabilidades en plugins de WordPress (Patchstack) por ser específica de una plataforma y por no haber podido verificar el informe original.
 - N2. Cuando el panel de Grafana esté en marcha, la línea del servidor pasa a «monitoreo con alertas automáticas». La estructura del correo no cambia.
 - N3. Si un proyecto es de una sola persona, el saludo es «Hola Ana,» y «ustedes» pasa a «tú». Ver «Saludo y destinatarios» en la sección 4.
 - N4. La hoja de vida (diagnóstico, optimización, vigilancia, mantenimiento) es un gráfico que se puede añadir en la fase de diseño.
@@ -250,6 +257,14 @@ Nada de esto toca lo ya construido: las auditorías, el portal y las alertas sig
 - **Trato:** «tú» cuando el destinatario es una sola persona y «ustedes» cuando hay varias.
 - **Lista de copia:** en el correo solo aparecen los nombres. El rol, si se anota, queda como nota interna en el panel.
 
+## Fuentes
+
+- Velocidad y negocio: [Milliseconds make millions (web.dev)](https://web.dev/case-studies/milliseconds-make-millions). Estudio de Deloitte y 55 encargado por Google, 37 marcas, más de 30 millones de sesiones.
+- Vulnerabilidades: [Verizon Data Breach Investigations Report 2026](https://www.verizon.com/business/resources/reports/dbir/). La página del informe afirma que el 31 % de las brechas empieza con vulnerabilidades de software. No indica aquí el número de brechas analizadas.
+- Fin de soporte de versiones: [PHP en endoflife.date](https://endoflife.date/php) y [Node.js en endoflife.date](https://endoflife.date/nodejs).
+- Respaldo adicional, para el portal o para el documento de estrategia: [OWASP Top 10 2021, A06 Componentes vulnerables y desactualizados](https://top10.owasp.org/2021/A06_2021-Vulnerable_and_Outdated_Components/index.html), categoría n.º 6 del Top 10.
+- Para la leyenda de colores del informe: [Core Web Vitals (web.dev)](https://web.dev/articles/vitals). Bueno es LCP hasta 2,5 s, INP hasta 200 ms y CLS hasta 0,1, medidos en el percentil 75.
+
 ## Siguiente paso
 
-Rellenar el bloque «Por qué esto importa» con datos citados con fuente y verificar con datos reales de un cliente cómo llegan las redes sociales (nota N10). Después, la versión visual de los correos y el documento de estrategia.
+Verificar con datos reales de un cliente cómo llegan las redes sociales (nota N10). Después, la versión visual de los correos y el documento de estrategia.
