@@ -10,6 +10,8 @@ import { portalLogoUrl } from "@/lib/ui/components/client-logo";
 import { ScoreRing } from "@/lib/ui/components/score-ring";
 import { clientInitials } from "@/server/domain/client-logo";
 import { averageScores } from "@/server/services/history";
+import { getPortalMeasurements } from "@/server/services/project-measurements";
+import { MeasurementCards } from "../../_components/measurement-cards";
 import { ChevronRight } from "../../_components/portal-icons";
 import { PortalPage } from "../../_components/portal-page";
 import { loadProjectGate } from "../../_lib/project-gate";
@@ -38,6 +40,7 @@ export default async function PortalSummary({ params, searchParams }: { params: 
   const lastAudit = project.latest.reduce<Date | null>((max, l) => (max === null || l.finishedAt > max ? l.finishedAt : max), null);
   const pages = new Set(project.latest.map((l) => l.routeId)).size;
   const open = project.improvements.length;
+  const measurements = await getPortalMeasurements(client.id, project, { days: 28, hasLighthouse: project.latest.length > 0 });
 
   return (
     <PortalPage title="Resumen" subtitle={<span className="font-mono break-all text-[14px]">{project.baseUrl}</span>}>
@@ -71,6 +74,8 @@ export default async function PortalSummary({ params, searchParams }: { params: 
         </ul>
       )}
 
+      <MeasurementCards m={measurements} base={base} />
+
       <ul className="hud divide-y divide-border overflow-hidden rounded-lg">
         {[
           { href: `${base}/mejoras`, label: "Puntos por mejorar", value: open === 0 ? "Todo dentro de la meta" : `${open} ${open === 1 ? "pendiente" : "pendientes"}`, tone: open === 0 ? "text-ok" : "text-danger" },
@@ -87,8 +92,18 @@ export default async function PortalSummary({ params, searchParams }: { params: 
         ))}
       </ul>
 
-      <HistoryPanel projectId={project.id} basePath={base} search={search} description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo." />
-      <FieldDataCard projectId={project.id} basePath={base} search={search} audience="client" />
+      <details className="group flex flex-col gap-3" open={[search.ruta, search.perfil, search.m, search.dias].some((v) => v !== undefined)}>
+        <summary className="press hud flex min-h-14 items-center gap-3 rounded-lg px-4 py-2">
+          <span className="flex-1 text-[17px] font-semibold text-ink">Evolución de las puntuaciones</span>
+          <ChevronRight className="chev shrink-0 text-ink-muted" />
+        </summary>
+        <div className="mt-3">
+          <HistoryPanel projectId={project.id} basePath={base} search={search} description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo." />
+        </div>
+      </details>
+      <section id="experiencia-real" className="scroll-mt-20">
+        <FieldDataCard projectId={project.id} basePath={base} search={search} audience="client" />
+      </section>
     </PortalPage>
   );
 }

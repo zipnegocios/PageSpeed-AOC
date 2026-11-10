@@ -8,6 +8,7 @@ import { formatCount, formatDayMedium, formatPercent, formatPosition, percentDel
 import { cx } from "@/lib/ui/cx";
 import { Delta } from "@/lib/ui/components/delta";
 import { channelLabel, SEO_PERIODS, SEO_PERIOD_LABEL } from "@/server/domain/seo-data";
+import { SOURCE_GROUPS, type SourceGroup } from "@/server/domain/seo-sources";
 import type { PortalHealthGroup, PortalHealthIssue, PortalTraffic } from "@/server/services/portal-traffic";
 import { ChevronRight } from "./portal-icons";
 
@@ -17,6 +18,21 @@ export const parseTrafficSection = (raw: string | string[] | undefined): Traffic
   const v = Array.isArray(raw) ? raw[0] : raw;
   return TRAFFIC_SECTIONS.find((s) => s === v) ?? null;
 };
+
+/** Grupos de fuentes con desglose propio (las redes y la IA tienen su tarjeta aparte; «Directo» no tiene detalle que mostrar). */
+const DETAIL_GROUPS: readonly SourceGroup[] = SOURCE_GROUPS.filter((g) => g !== "direct" && g !== "social" && g !== "ai");
+const GROUP_TITLE: Record<SourceGroup, string> = {
+  search: "Buscadores",
+  social: "Redes sociales",
+  direct: "Directo o sin identificar",
+  referral: "Otros sitios que te enlazan",
+  ai: "Asistentes de IA",
+  email: "Correo electrónico",
+  paid: "Anuncios",
+  other: "Otras fuentes",
+};
+const DIRECT_NOTE =
+  "«Directo o sin identificar» incluye a quien escribe tu dirección, usa un marcador o llega desde aplicaciones que no informan de dónde vienen (por ejemplo, mensajes privados). Para saber más, comparte tus enlaces con parámetros UTM.";
 
 const share = (value: number, total: number) => (total > 0 ? formatPercent(value / total) : "—");
 
@@ -110,21 +126,45 @@ function Visits({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
   const socialTotal = social?.totals.sessions ?? 0;
   const socialPages: Row[] = (social?.topPages ?? []).map((p) => ({ key: p.page, label: t.titles[p.page] ?? p.page, value: p.sessions }));
   const socialDelta = social ? percentDelta(social.totals.sessions, social.previousTotals.sessions) : null;
+  const src = d.sources;
+  const groupRows: Row[] = (src?.groups ?? []).map((g) => ({ key: g.group, label: g.label, value: g.sessions })).sort((a, b) => b.value - a.value);
+  const srcDelta = src ? percentDelta(src.totals.sessions, src.previousTotals.sessions) : null;
+  const directShare = src?.groups.find((g) => g.group === "direct")?.sessions ?? 0;
+  const itemsOf = (g: SourceGroup): Row[] => (src?.items ?? []).filter((x) => x.group === g).map((x) => ({ key: `${x.group}:${x.key}`, label: x.label, value: x.sessions }));
   return (
     <>
       {tr ? <SeoChart title="Sesiones por día" unit="sesiones" series={tr.daily.map((p) => ({ date: p.date, value: p.sessions }))} tone={2} /> : null}
-      {channels.length > 0 ? (
+      {src ? (
+        <>
+          <Fold title="De dónde llegan" headline={headlineOf(groupRows, src.totals.sessions, "visitas")} open>
+            <p className="text-[14px] leading-5 text-ink-muted">Todas las visitas del periodo repartidas por su origen: suman el 100 %.</p>
+            {srcDelta ? <Delta change={srcDelta} /> : null}
+            <Bars rows={groupRows} total={src.totals.sessions} unit="sesiones" />
+            {directShare > 0 ? <p className="text-[13px] leading-5 text-ink-muted">{DIRECT_NOTE}</p> : null}
+          </Fold>
+          {DETAIL_GROUPS.map((g) => {
+            const rows = itemsOf(g);
+            if (rows.length === 0) return null;
+            const groupTotal = src.groups.find((x) => x.group === g)?.sessions ?? 0;
+            return (
+              <Fold key={g} title={GROUP_TITLE[g]} headline={`${rows[0]!.label} ${share(rows[0]!.value, groupTotal)} · ${formatCount(groupTotal)} sesiones`}>
+                <Bars rows={rows} total={groupTotal} unit="sesiones" />
+              </Fold>
+            );
+          })}
+        </>
+      ) : channels.length > 0 ? (
         <Fold title="Canales de origen" headline={headlineOf(channels, total, "visitas")} open>
           <Bars rows={channels} total={total} unit="sesiones" />
         </Fold>
       ) : null}
       <Fold title="Redes sociales" headline={networks[0] ? `${networks[0].label} ${share(networks[0].value, socialTotal)} · ${formatCount(socialTotal)} sesiones` : "Sin visitas en este periodo"} open={networks.length > 0}>
         {networks.length === 0 ? (
-          <p className="text-[14px] leading-5 text-ink-muted">Todavía no hay visitas desde redes sociales en este periodo. Cuando lleguen de Facebook, Instagram, LinkedIn u otras, aparecerán aquí con su red.</p>
+          <p className="text-[14px] leading-5 text-ink-muted">Todavía no hay visitas desde redes sociales en este periodo. Cuando lleguen de Facebook, Instagram, LinkedIn, TikTok, WhatsApp u otras, aparecerán aquí con su red.</p>
         ) : (
           <>
             <p className="text-[14px] leading-5 text-ink-muted">
-              Las redes que más visitas te traen. Es un mínimo: los mensajes privados (WhatsApp, Telegram) y algunas aplicaciones llegan sin referido y se cuentan como tráfico directo.
+              Las redes que más visitas te traen. Es un mínimo: los mensajes privados (WhatsApp, Telegram) y algunas aplicaciones llegan sin referido y se cuentan como «Directo o sin identificar».
             </p>
             {socialDelta ? <Delta change={socialDelta} /> : null}
             <Bars rows={networks} total={socialTotal} unit="sesiones" />
@@ -166,6 +206,7 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
   const devices: Row[] = s.devices.map((x) => ({ key: x.device, label: x.label, value: x.clicks }));
   const languages: Row[] = (d.languages ?? []).map((x) => ({ key: x.lang, label: x.label, value: x.clicks }));
   const total = s.totals.clicks;
+  const queries: Row[] = (s.topQueries ?? []).map((x) => ({ key: x.query, label: x.query, value: x.clicks }));
   return (
     <>
       <ul className="grid grid-cols-2 gap-3">
@@ -173,6 +214,12 @@ function Google({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
         <Kpi label="Posición media" value={formatPosition(s.totals.position)} delta={positionDelta(s.totals.position, p.position)} hint="Menos es mejor" />
       </ul>
       <SeoChart title="Clics por día" unit="clics" series={s.daily.map((x) => ({ date: x.date, value: x.clicks }))} tone={1} />
+      {queries.length > 0 ? (
+        <Fold title="Con qué buscan" headline={`«${queries[0]!.label}» · ${formatCount(queries[0]!.value)} clics`} open>
+          <p className="text-[14px] leading-5 text-ink-muted">Las búsquedas en Google que más visitas te trajeron en este periodo. Google no entrega todas: las poco frecuentes se ocultan por privacidad.</p>
+          <Bars rows={queries} total={total} unit="clics" />
+        </Fold>
+      ) : null}
       {pages.length > 0 ? (
         <Fold title="Páginas con más clics" headline={`${pages[0]!.label} · ${formatCount(pages[0]!.value)} clics`} open>
           <Bars rows={pages} total={total} unit="clics" />

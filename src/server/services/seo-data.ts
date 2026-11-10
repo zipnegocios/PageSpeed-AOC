@@ -85,6 +85,8 @@ export type SeoDashboard = {
     groups: Array<{ group: SourceGroup; label: string; sessions: number; previousSessions: number }>;
     /** Las fuentes concretas con más sesiones (cualquier grupo): Google, Instagram, un dominio… */
     top: Array<{ group: SourceGroup; key: string; label: string; sessions: number }>;
+    /** Las fuentes de cada grupo (hasta 10 por grupo), para desplegar el detalle: cada red, cada buscador, cada dominio. */
+    items: Array<{ group: SourceGroup; key: string; label: string; sessions: number }>;
   } | null;
   /** Visitas que llegan desde redes sociales (GA4), por red. Null si no hay filas en el periodo. */
   social: {
@@ -114,6 +116,7 @@ const TOP_AI_PAGES = 5;
 const TOP_SOCIAL_NETWORKS = 12;
 const TOP_SOCIAL_PAGES = 5;
 const TOP_SOURCES = 15;
+const TOP_PER_GROUP = 10;
 const TOP_QUERIES = 10;
 
 const searchTotals = (row: data.SearchTotalsRow): SearchTotals => ({
@@ -176,15 +179,16 @@ async function loadTraffic(db: Database, projectId: string, range: DateRange, pr
 
 async function loadSources(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["sources"]> {
   const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
-  const [current, before, groups, previousGroups, top] = await Promise.all([
+  const [current, before, groups, previousGroups, perGroup] = await Promise.all([
     data.sourceTotals(db, projectId, scope(range)),
     data.sourceTotals(db, projectId, scope(prev)),
     data.sourceByGroup(db, projectId, scope(range)),
     data.sourceByGroup(db, projectId, scope(prev)),
-    data.sourceTop(db, projectId, scope(range), TOP_SOURCES),
+    Promise.all(SOURCE_GROUPS.map((g) => data.sourceTop(db, projectId, scope(range), TOP_PER_GROUP, g))),
   ]);
   if (current.rows === 0) return null;
   const known = new Set<string>(SOURCE_GROUPS);
+  const items = perGroup.flat().filter((t) => known.has(t.group)).map((t) => ({ group: t.group as SourceGroup, key: t.key, label: sourceLabel(t.group as SourceGroup, t.key), sessions: t.sessions })).sort((a, b) => b.sessions - a.sessions || a.label.localeCompare(b.label, "es"));
   const before2 = new Map(previousGroups.map((g) => [g.group, g.sessions]));
   return {
     range,
@@ -192,7 +196,8 @@ async function loadSources(db: Database, projectId: string, range: DateRange, pr
     totals: { sessions: current.sessions, users: current.users },
     previousTotals: { sessions: before.sessions, users: before.users },
     groups: groups.filter((g) => known.has(g.group)).map((g) => ({ group: g.group as SourceGroup, label: SOURCE_GROUP_LABEL[g.group as SourceGroup], sessions: g.sessions, previousSessions: before2.get(g.group) ?? 0 })),
-    top: top.filter((t) => known.has(t.group)).map((t) => ({ group: t.group as SourceGroup, key: t.key, label: sourceLabel(t.group as SourceGroup, t.key), sessions: t.sessions })),
+    top: items.slice(0, TOP_SOURCES),
+    items,
   };
 }
 
