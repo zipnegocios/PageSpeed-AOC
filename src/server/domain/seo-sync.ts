@@ -1,4 +1,4 @@
-import { networkOf } from "./seo-social";
+import { classifySource } from "./seo-sources";
 import { pagePath } from "@/server/seo/urls";
 
 /**
@@ -43,7 +43,8 @@ export function planSyncWindows(syncedThrough: string | null, kind: SyncKind, no
 export type SearchRow = { date: string; page: string; country: string; device: string; clicks: number; impressions: number; positionSum: number };
 export type TrafficRow = { date: string; page: string; country: string; channel: string; sessions: number; users: number };
 export type AiRow = { date: string; source: string; page: string; sessions: number; users: number };
-export type SocialRow = { date: string; network: string; page: string; sessions: number; users: number };
+export type SourceRow = { date: string; grp: string; source: string; page: string; sessions: number; users: number };
+export type QueryRow = { date: string; query: string; clicks: number; impressions: number; positionSum: number };
 
 type GscRecordLike = { keys: Record<string, string>; clicks: number; impressions: number; position: number };
 type Ga4RowLike = { dims: Record<string, string>; metrics: Record<string, number> };
@@ -105,19 +106,46 @@ export function aggregateAi(rows: Ga4RowLike[]): AiRow[] {
   return [...out.values()];
 }
 
-/** Reduce las filas de GA4 por fuente a sesiones por red social, día y página de entrada (las que no son sociales se descartan). */
-export function aggregateSocial(rows: Ga4RowLike[]): SocialRow[] {
-  const out = new Map<string, SocialRow>();
+/**
+ * Reduce las filas de GA4 por fuente y grupo de canal al **reparto completo**: cada fila va a un solo grupo y una sola fuente
+ * (`classifySource`), con la fecha y la página normalizadas. La suma de todo es el total de sesiones.
+ */
+export function aggregateSources(rows: Ga4RowLike[]): SourceRow[] {
+  const out = new Map<string, SourceRow>();
   for (const r of rows) {
-    const network = networkOf(r.dims.sessionSource ?? "", r.dims.sessionDefaultChannelGroup ?? "");
-    if (!network) continue;
+    const { group, key } = classifySource(r.dims.sessionSource ?? "", r.dims.sessionDefaultChannelGroup ?? "");
     const date = ga4Date(r.dims.date ?? "");
     const page = pagePath(r.dims.pagePath ?? "");
-    const key = `${date}|${network}|${page}`;
-    const row = out.get(key) ?? { date, network, page, sessions: 0, users: 0 };
+    const id = `${date}|${group}|${key}|${page}`;
+    const row = out.get(id) ?? { date, grp: group, source: key, page, sessions: 0, users: 0 };
     row.sessions += r.metrics.sessions ?? 0;
     row.users += r.metrics.totalUsers ?? 0;
-    out.set(key, row);
+    out.set(id, row);
   }
   return [...out.values()];
+}
+
+/** Las consultas con más clics que se guardan de cada día. */
+export const QUERIES_PER_DAY = 50;
+
+/**
+ * Reduce las filas de Search Console por día y consulta: la consulta se normaliza (minúsculas, espacios) y de cada día se
+ * guardan las `QUERIES_PER_DAY` con más clics (a igualdad, más impresiones). La posición se guarda × impresiones.
+ */
+export function aggregateQueries(records: GscRecordLike[]): QueryRow[] {
+  const byKey = new Map<string, QueryRow>();
+  for (const r of records) {
+    const date = r.keys.date ?? "";
+    const query = (r.keys.query ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+    if (!date || !query) continue;
+    const id = `${date}|${query}`;
+    const row = byKey.get(id) ?? { date, query, clicks: 0, impressions: 0, positionSum: 0 };
+    row.clicks += r.clicks;
+    row.impressions += r.impressions;
+    row.positionSum += r.position * r.impressions;
+    byKey.set(id, row);
+  }
+  const perDay = new Map<string, QueryRow[]>();
+  for (const row of byKey.values()) perDay.set(row.date, [...(perDay.get(row.date) ?? []), row]);
+  return [...perDay.values()].flatMap((list) => list.sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions || a.query.localeCompare(b.query)).slice(0, QUERIES_PER_DAY));
 }

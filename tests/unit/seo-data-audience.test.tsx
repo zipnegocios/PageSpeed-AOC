@@ -25,10 +25,10 @@ const withData: SeoDashboard = {
     daily: [{ date: "2026-06-27", clicks: 5, impressions: 50 }],
     topPages: [{ page: "/es/precios", clicks: 50, impressions: 900, ctr: 0.05, position: 4 }],
     countries: [],
-    devices: [],
+    devices: [], topQueries: [],
   },
   traffic: null,
-  ai: null, social: null,
+  ai: null, sources: null, social: null,
 };
 
 const render = (audience: "admin" | "client", d: SeoDashboard = withData) =>

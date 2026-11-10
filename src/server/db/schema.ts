@@ -539,23 +539,47 @@ export const seoAiReferralsDaily = pgTable(
   ],
 );
 
-// -------------------------------------------------- seo_social_daily
-// GA4: sesiones que llegan desde redes sociales, por día, red (normalizada: facebook, instagram, linkedin…, other) y página de entrada.
-export const seoSocialDaily = pgTable(
-  "seo_social_daily",
+// -------------------------------------------------- seo_source_daily
+// GA4: de dónde llegan las sesiones, **repartidas por completo** (cada sesión en un solo grupo: search, social, direct, referral, ai,
+// email, paid, other). `source` es la fuente concreta dentro del grupo: el buscador, la red (facebook, instagram…), el dominio del otro
+// sitio, el asistente de IA o «direct». Los porcentajes suman el 100 % en portal, PDF y correos (ver `domain/seo-sources.ts`).
+export const seoSourceDaily = pgTable(
+  "seo_source_daily",
   {
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     date: date("date", { mode: "string" }).notNull(),
-    network: text("network").notNull(),
+    grp: text("grp").notNull(),
+    source: text("source").notNull(),
     page: text("page").notNull(),
     sessions: integer("sessions").notNull().default(0),
     users: integer("users").notNull().default(0),
   },
   (t) => [
-    primaryKey({ columns: [t.projectId, t.date, t.network, t.page] }),
-    index("seo_social_daily_project_date_idx").on(t.projectId, t.date),
+    primaryKey({ columns: [t.projectId, t.date, t.grp, t.source, t.page] }),
+    index("seo_source_daily_project_date_idx").on(t.projectId, t.date),
+  ],
+);
+
+// -------------------------------------------------- seo_query_daily
+// Search Console: las consultas con más clics de cada día (con qué buscan), sin página ni país. La posición se guarda × impresiones
+// para poder promediar al sumar días.
+export const seoQueryDaily = pgTable(
+  "seo_query_daily",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: date("date", { mode: "string" }).notNull(),
+    query: text("query").notNull(),
+    clicks: integer("clicks").notNull().default(0),
+    impressions: integer("impressions").notNull().default(0),
+    positionSum: doublePrecision("position_sum").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.date, t.query] }),
+    index("seo_query_daily_project_date_idx").on(t.projectId, t.date),
   ],
 );
 

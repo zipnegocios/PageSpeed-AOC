@@ -155,6 +155,20 @@
       "when": 1794289239506,
       "tag": "0021_correos_automaticos",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794291553578,
+      "tag": "0022_fuentes_completas",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794291554509,
+      "tag": "0023_retirar_redes_sociales",
+      "breakpoints": true
     }
   ]
 }

@@ -66,13 +66,13 @@ describe.skipIf(!dbUrl)("correos automáticos al cliente", () => {
       row("2026-10-30", "Referral", 75),
       row("2026-10-30", "Organic Social", 280),
     ]);
-    await db.insert(s.seoSocialDaily).values([
-      { projectId, date: "2026-11-05", network: "instagram", page: "/", sessions: 140, users: 100 },
-      { projectId, date: "2026-11-05", network: "linkedin", page: "/", sessions: 85, users: 60 },
-      { projectId, date: "2026-11-06", network: "tiktok", page: "/", sessions: 40, users: 30 },
-      { projectId, date: "2026-11-06", network: "other", page: "/", sessions: 65, users: 50 },
-      { projectId, date: "2026-10-29", network: "instagram", page: "/", sessions: 128, users: 90 },
-      { projectId, date: "2026-10-29", network: "linkedin", page: "/", sessions: 65, users: 40 },
+    await db.insert(s.seoSourceDaily).values([
+      { projectId, date: "2026-11-05", grp: "social", source: "instagram", page: "/", sessions: 140, users: 100 },
+      { projectId, date: "2026-11-05", grp: "social", source: "linkedin", page: "/", sessions: 85, users: 60 },
+      { projectId, date: "2026-11-06", grp: "social", source: "tiktok", page: "/", sessions: 40, users: 30 },
+      { projectId, date: "2026-11-06", grp: "social", source: "other", page: "/", sessions: 65, users: 50 },
+      { projectId, date: "2026-10-29", grp: "social", source: "instagram", page: "/", sessions: 128, users: 90 },
+      { projectId, date: "2026-10-29", grp: "social", source: "linkedin", page: "/", sessions: 65, users: 40 },
     ]);
     await db.insert(s.seoSearchDaily).values([
       { projectId, date: "2026-11-04", page: "/", country: "col", device: "MOBILE", clicks: 310, impressions: 9800, positionSum: 0 },

@@ -36,7 +36,7 @@ const days = (from: string, to: string) => {
 };
 
 /** Google simulado: cada prueba cambia solo lo que necesita. */
-type Fake = { clicks: number; ga4Status: number; gscStatus: number; calls: Array<{ kind: "gsc" | "ga4-traffic" | "ga4-ai" | "ga4-social"; from: string; to: string }> };
+type Fake = { clicks: number; ga4Status: number; gscStatus: number; calls: Array<{ kind: "gsc" | "gsc-queries" | "ga4-traffic" | "ga4-ai" | "ga4-sources"; from: string; to: string }> };
 const fresh = (): Fake => ({ clicks: 10, ga4Status: 200, gscStatus: 200, calls: [] });
 let fake = fresh();
 
@@ -46,9 +46,14 @@ const fetchImpl: FetchLike = async (url, init) => {
 
   if (url.includes("searchAnalytics/query")) {
     const b = body as { startDate: string; endDate: string; startRow: number; dimensions: string[] };
-    fake.calls.push({ kind: "gsc", from: b.startDate, to: b.endDate });
+    const isQueries = b.dimensions.includes("query");
+    fake.calls.push({ kind: isQueries ? "gsc-queries" : "gsc", from: b.startDate, to: b.endDate });
     if (fake.gscStatus !== 200) return json({ error: { message: "x" } }, fake.gscStatus);
     if (b.startRow > 0) return json({ rows: [] });
+    if (b.dimensions.includes("query")) {
+      // Con qué buscan: dos consultas por día (una con mayúsculas y espacios, que se normaliza) y una con más clics.
+      return json({ rows: days(b.startDate, b.endDate).flatMap((d) => [{ keys: [d, "Ingeniería  Civil"], clicks: 7, impressions: 100, ctr: 0.07, position: 3 }, { keys: [d, "grúa torre"], clicks: 2, impressions: 40, ctr: 0.05, position: 5 }]) });
+    }
     const rows = days(b.startDate, b.endDate).flatMap((d) => [
       { keys: [d, "https://acme.test/es/precios", "col", "MOBILE"], clicks: fake.clicks, impressions: 100, ctr: 0.1, position: 4 },
       { keys: [d, "https://acme.test/es/precios/?utm=1", "col", "MOBILE"], clicks: 5, impressions: 50, ctr: 0.1, position: 6 },
@@ -60,20 +65,22 @@ const fetchImpl: FetchLike = async (url, init) => {
   if (url.includes(":runReport")) {
     const b = body as { dateRanges: Array<{ startDate: string; endDate: string }>; dimensions: Array<{ name: string }>; dimensionFilter?: unknown };
     const range = b.dateRanges[0]!;
-    const isSocial = Boolean((b.dimensionFilter as { orGroup?: unknown } | undefined)?.orGroup);
-    fake.calls.push({ kind: isSocial ? "ga4-social" : b.dimensionFilter ? "ga4-ai" : "ga4-traffic", from: range.startDate, to: range.endDate });
+    const isSources = !b.dimensionFilter && b.dimensions.some((x) => x.name === "sessionSource");
+    fake.calls.push({ kind: isSources ? "ga4-sources" : b.dimensionFilter ? "ga4-ai" : "ga4-traffic", from: range.startDate, to: range.endDate });
     if (fake.ga4Status !== 200) return json({ error: { message: "x" } }, fake.ga4Status);
     const ymd = (d: string) => d.replaceAll("-", "");
     const rows = days(range.startDate, range.endDate).flatMap((d) =>
-      isSocial
+      isSources
         ? [
-            // fecha, fuente, grupo de canal, página: dos fuentes de Facebook se suman, una red desconocida va a «Otras redes» y un
-            // falso positivo del filtro amplio (cart.com, un referido) se descarta.
+            // fecha, fuente, grupo de canal, página: el reparto completo. Dos fuentes de Facebook se suman, una red desconocida va a
+            // «Otras redes», un referido conserva su dominio, Google es un buscador y «(direct)» es directo.
             { dimensionValues: [{ value: ymd(d) }, { value: "l.instagram.com" }, { value: "Organic Social" }, { value: "/es/blog" }], metricValues: [{ value: "4" }, { value: "3" }] },
             { dimensionValues: [{ value: ymd(d) }, { value: "m.facebook.com" }, { value: "Organic Social" }, { value: "/" }], metricValues: [{ value: "1" }, { value: "1" }] },
             { dimensionValues: [{ value: ymd(d) }, { value: "lm.facebook.com" }, { value: "Organic Social" }, { value: "/" }], metricValues: [{ value: "1" }, { value: "1" }] },
             { dimensionValues: [{ value: ymd(d) }, { value: "mi-red.example" }, { value: "Organic Social" }, { value: "/" }], metricValues: [{ value: "2" }, { value: "2" }] },
             { dimensionValues: [{ value: ymd(d) }, { value: "cart.com" }, { value: "Referral" }, { value: "/" }], metricValues: [{ value: "9" }, { value: "9" }] },
+            { dimensionValues: [{ value: ymd(d) }, { value: "google" }, { value: "Organic Search" }, { value: "/es/precios" }], metricValues: [{ value: "6" }, { value: "5" }] },
+            { dimensionValues: [{ value: ymd(d) }, { value: "(direct)" }, { value: "Direct" }, { value: "/" }], metricValues: [{ value: "3" }, { value: "3" }] },
           ]
         : b.dimensionFilter
         ? [{ dimensionValues: [{ value: ymd(d) }, { value: "chatgpt.com" }, { value: "/es/precios" }], metricValues: [{ value: "3" }, { value: "3" }] }]
@@ -129,7 +136,7 @@ describe.skipIf(!(dbUrl && redisUrl))("descarga de datos de Search Console y GA4
   }
   const integration = async (projectId: string, kind: "gsc" | "ga4") => (await db.select().from(s.seoIntegrations).where(and(eq(s.seoIntegrations.projectId, projectId), eq(s.seoIntegrations.kind, kind))))[0]!;
   const searchRows = (projectId: string) => db.select().from(s.seoSearchDaily).where(eq(s.seoSearchDaily.projectId, projectId)).orderBy(asc(s.seoSearchDaily.date), asc(s.seoSearchDaily.page));
-  const count = async (table: typeof s.seoSearchDaily | typeof s.seoTrafficDaily | typeof s.seoAiReferralsDaily | typeof s.seoSocialDaily, projectId: string) =>
+  const count = async (table: typeof s.seoSearchDaily | typeof s.seoTrafficDaily | typeof s.seoAiReferralsDaily | typeof s.seoSourceDaily | typeof s.seoQueryDaily, projectId: string) =>
     Number((await db.select({ n: sql<number>`count(*)` }).from(table).where(eq(table.projectId, projectId)))[0]!.n);
 
   describe("primera descarga", () => {
@@ -155,14 +162,21 @@ describe.skipIf(!(dbUrl && redisUrl))("descarga de datos de Search Console y GA4
       expect(fake.calls.filter((c) => c.kind === "ga4-traffic").at(-1)).toEqual({ kind: "ga4-traffic", from: "2026-10-11", to: "2026-11-09" });
       expect(await count(s.seoTrafficDaily, project.id)).toBe(180);
       expect(await count(s.seoAiReferralsDaily, project.id)).toBe(90);
-      // Redes sociales: Instagram, Facebook (sus dos fuentes se suman) y «Otras redes»; lo que no es social se descarta.
-      expect(await count(s.seoSocialDaily, project.id)).toBe(270);
-      const social = await db.select().from(s.seoSocialDaily).where(and(eq(s.seoSocialDaily.projectId, project.id), eq(s.seoSocialDaily.date, "2026-11-09")));
-      expect(social.map((r) => [r.network, r.page, r.sessions, r.users]).sort()).toEqual([
-        ["facebook", "/", 2, 2],
-        ["instagram", "/es/blog", 4, 3],
-        ["other", "/", 2, 2],
+      // De dónde llegan: reparto completo (6 fuentes por día); lo que ya se descarga no se duplica.
+      expect(await count(s.seoSourceDaily, project.id)).toBe(540);
+      const sources = await db.select().from(s.seoSourceDaily).where(and(eq(s.seoSourceDaily.projectId, project.id), eq(s.seoSourceDaily.date, "2026-11-09")));
+      expect(sources.map((r) => [r.grp, r.source, r.page, r.sessions, r.users]).sort()).toEqual([
+        ["direct", "direct", "/", 3, 3],
+        ["referral", "cart.com", "/", 9, 9],
+        ["search", "google", "/es/precios", 6, 5],
+        ["social", "facebook", "/", 2, 2], // m.facebook.com y lm.facebook.com se suman
+        ["social", "instagram", "/es/blog", 4, 3],
+        ["social", "other", "/", 2, 2],
       ]);
+      // Con qué buscan: la consulta se normaliza (minúsculas, un solo espacio) y se guarda por día.
+      expect(await count(s.seoQueryDaily, project.id)).toBe(180);
+      const q = await db.select().from(s.seoQueryDaily).where(and(eq(s.seoQueryDaily.projectId, project.id), eq(s.seoQueryDaily.date, "2026-11-07")));
+      expect(q.map((r) => [r.query, r.clicks, r.impressions, r.positionSum]).sort()).toEqual([["grúa torre", 2, 40, 200], ["ingeniería civil", 7, 100, 300]]);
       const traffic = await db.select().from(s.seoTrafficDaily).where(and(eq(s.seoTrafficDaily.projectId, project.id), eq(s.seoTrafficDaily.date, "2026-11-09")));
       expect(traffic.map((t) => [t.page, t.country, t.channel, t.sessions, t.users]).sort()).toEqual([
         ["/", "Venezuela", "Direct", 2, 2],
@@ -189,14 +203,21 @@ describe.skipIf(!(dbUrl && redisUrl))("descarga de datos de Search Console y GA4
       expect(await count(s.seoSearchDaily, project.id)).toBe(180);
       expect(await count(s.seoTrafficDaily, project.id)).toBe(180);
       expect(await count(s.seoAiReferralsDaily, project.id)).toBe(90);
-      // Redes sociales: Instagram, Facebook (sus dos fuentes se suman) y «Otras redes»; lo que no es social se descarta.
-      expect(await count(s.seoSocialDaily, project.id)).toBe(270);
-      const social = await db.select().from(s.seoSocialDaily).where(and(eq(s.seoSocialDaily.projectId, project.id), eq(s.seoSocialDaily.date, "2026-11-09")));
-      expect(social.map((r) => [r.network, r.page, r.sessions, r.users]).sort()).toEqual([
-        ["facebook", "/", 2, 2],
-        ["instagram", "/es/blog", 4, 3],
-        ["other", "/", 2, 2],
+      // De dónde llegan: reparto completo (6 fuentes por día); lo que ya se descarga no se duplica.
+      expect(await count(s.seoSourceDaily, project.id)).toBe(540);
+      const sources = await db.select().from(s.seoSourceDaily).where(and(eq(s.seoSourceDaily.projectId, project.id), eq(s.seoSourceDaily.date, "2026-11-09")));
+      expect(sources.map((r) => [r.grp, r.source, r.page, r.sessions, r.users]).sort()).toEqual([
+        ["direct", "direct", "/", 3, 3],
+        ["referral", "cart.com", "/", 9, 9],
+        ["search", "google", "/es/precios", 6, 5],
+        ["social", "facebook", "/", 2, 2], // m.facebook.com y lm.facebook.com se suman
+        ["social", "instagram", "/es/blog", 4, 3],
+        ["social", "other", "/", 2, 2],
       ]);
+      // Con qué buscan: la consulta se normaliza (minúsculas, un solo espacio) y se guarda por día.
+      expect(await count(s.seoQueryDaily, project.id)).toBe(180);
+      const q = await db.select().from(s.seoQueryDaily).where(and(eq(s.seoQueryDaily.projectId, project.id), eq(s.seoQueryDaily.date, "2026-11-07")));
+      expect(q.map((r) => [r.query, r.clicks, r.impressions, r.positionSum]).sort()).toEqual([["grúa torre", 2, 40, 200], ["ingeniería civil", 7, 100, 300]]);
     });
 
     it("al día siguiente avanza una fecha y suma solo el día nuevo", async () => {
@@ -272,8 +293,8 @@ describe.skipIf(!(dbUrl && redisUrl))("descarga de datos de Search Console y GA4
       const { project } = await setup({ connect: ["gsc"] });
       let n = 0;
       const flaky: typeof fetchImpl = async (url, init) => {
-        // 400 no se reintenta: la tercera ventana falla de verdad y las dos primeras ya quedaron guardadas.
-        if (url.includes("searchAnalytics/query") && ++n >= 3) return json({ error: { message: "x" } }, 400);
+        // 400 no se reintenta: la tercera ventana falla de verdad y las dos primeras ya quedaron guardadas (cada ventana pide páginas y consultas: 2 peticiones).
+        if (url.includes("searchAnalytics/query") && ++n >= 5) return json({ error: { message: "x" } }, 400);
         return fetchImpl(url, init);
       };
       const r = await syncProjectSeoData(project.id, db, { ...deps(), fetchImpl: flaky, sleep: async () => undefined });
