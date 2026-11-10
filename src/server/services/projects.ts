@@ -235,3 +235,9 @@ export async function getNextScheduledRun(projectId: string, deps: SchedulerDeps
     return null;
   }
 }
+
+/** «En mejora inicial»: los valores son el punto de partida. Lo explican el portal, los PDF y el correo mensual hasta que se apague. */
+export async function setProjectInitialImprovement(id: string, on: boolean, db: Database = getDb()): Promise<void> {
+  assertUuid(id, "Proyecto");
+  if (!(await repo.setInitialImprovement(db, id, on))) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+}

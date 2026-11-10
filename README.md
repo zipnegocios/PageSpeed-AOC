@@ -148,10 +148,25 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 Un solo correo que explica el servicio y da el acceso al portal (link y PIN), firmado por zipnegocios. Se envía desde la
 ficha del cliente, tarjeta **Bienvenida** (`services/client-welcome.ts`, plantilla en `notify/client-emails.ts`).
 
-- **Qué pide el formulario:** el proyecto del que habla (solo en producción), qué es (sitio, tienda o aplicación), la
-  tecnología (texto libre, con sugerencias), si el plan incluye supervisar servidor, servicios y APIs, y las personas en
-  copia (una por línea, «Nombre <correo>»). Todo se guarda (`projects.kind/tech_label/includes_server`,
-  `clients.cc_contacts`) y se rellena solo en los envíos siguientes.
+- **Varios productos, un solo correo.** Un cliente puede tener varios productos a la vez (un sitio, una tienda, una app móvil, una
+  plataforma de e-learning, un CRM, un chatbot…). En la tarjeta «Bienvenida» marcas los proyectos en producción que entran y, para
+  cada uno, escribes con tus palabras **qué es** y **en qué tecnología** está (texto libre y varios valores; las sugerencias, más de 90
+  tecnologías y los tipos de solución más comunes, solo ayudan: `SOLUTION_SUGGESTIONS` y `TECH_SUGGESTIONS` en `domain/client-welcome.ts`) y
+  **qué incluye tu servicio** (casillas: rendimiento web, visitas y visibilidad, servidor y APIs, dependencias e integraciones,
+  dominio/DNS/certificados, seguridad y actualizaciones). El correo **solo promete lo que está marcado** (una app móvil sin parte web no
+  promete velocidad de página ni el correo semanal). Todo se guarda por proyecto (`projects.solutions/techs/services`, migración 0026) y se
+  rellena solo la próxima vez. Un solo PIN y un solo correo para todos los productos; la bitácora lo anota en el primero.
+- **Texto:** el asunto, la presentación y el cierre hablan de **«activos digitales»** (son del cliente y son digitales); lo específico (qué
+  es cada producto y en qué está hecho) va en una lista al empezar. Sin adjetivos con género, así que sirve para cualquier tipo de
+  producto. «Con mi equipo revisamos cada aspecto…» describe el alcance según los servicios marcados, y el objetivo: detectar fallas
+  antes que el usuario y decidir con criterio técnico y comercial cómo evolucionar.
+- **Para que el cliente no se alarme:** la bienvenida lleva un recuadro visible, «Si ves números bajos, no te alarmes» (punto de
+  partida, corrección progresiva en las próximas semanas, evolución en el informe mensual), y repite «Recuerda» junto al PIN. Funciona
+  igual si los valores resultan buenos. Ver «Mejora inicial» abajo.
+- **«Por qué esto importa»:** cuatro ideas con fuente (velocidad y negocio, vulnerabilidades y componentes desactualizados, todo lo que
+  sostiene un activo digital caduca —lenguajes, dependencias, APIs, integraciones, servidor, dominios, certificados, enrutamiento— y la
+  observabilidad en todas las capas como lo que sostiene el acompañamiento mensual). La nota de fin de soporte (PHP o Node.js) sale de
+  cualquiera de las tecnologías del producto y queda solo como ejemplo; caduca sola (ver `domain/client-welcome.ts`, revisar cada trimestre).
 - **Destinatarios:** va **Para** el correo de contacto del cliente y **CC** a las personas en copia; el saludo nombra a todas
   por su nombre de pila («Hola Ana, Luis y María,»; los compuestos frecuentes se respetan: «Ana María Osorio» → «Ana María»).
   Con una persona habla de «tú»; con varias, de «ustedes». **Dos personas pueden compartir una dirección** (incluida la del
@@ -184,6 +199,19 @@ ficha del cliente, tarjeta **Bienvenida** (`services/client-welcome.ts`, plantil
   envía los cuatro correos del servicio (bienvenida, estado mensual, semana en la web e informe manual). Ver
   `scripts/send-test-emails.ts` para las opciones.
 - El semanal y el mensual automáticos se encienden aparte (ver «Correos automáticos al cliente»).
+
+## Mejora inicial (clientes que empiezan con valores bajos)
+
+Un proyecto se marca **«en mejora inicial»** (`projects.initial_improvement`, en la tarjeta «Bienvenida» al enviarla o en la tarjeta «Mejora
+inicial» de la ficha del proyecto) cuando sus valores son el punto de partida y se van a corregir de forma progresiva. Mientras esté marcado:
+
+- el **portal** muestra al principio del proyecto «Estamos en la fase de mejora inicial: los valores son el punto de partida, no un problema
+  de tu negocio» (`c/_components/initial-improvement-notice.tsx`);
+- los **PDF** (resumen e ingeniería) llevan una nota en la portada (`ReportHeader` en `report/pdf-common.tsx`);
+- el **correo mensual** cambia el «Estado del mes» por «Seguimos en la fase de mejora inicial» (sin «hay puntos en revisión» ni «en orden»).
+
+Se apaga a mano cuando los valores se estabilizan. Las alertas internas siguen abriéndose por cada métrica bajo el umbral: al empezar con un
+cliente así conviene bajar los umbrales del proyecto y subirlos conforme mejora.
 
 ## Correos automáticos al cliente
 
@@ -439,7 +467,13 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 
 - La cuenta **propietaria** se crea al primer arranque con `ADMIN_EMAIL` / `ADMIN_PASSWORD` (solo se leen cuando no existe ninguna; cambiarlas después no agrega ni cambia a nadie).
 - Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Qué ve cada persona lo decide el modelo de acceso de abajo. Si el correo no sale, el enlace se copia desde la pantalla.
-- **La invitación por correo** lista por secciones numeradas todo lo que se puede hacer en la plataforma (clientes y proyectos, auditorías y alertas, SEO, lo que recibe el cliente, lo que anota cada responsable, agentes MCP, lo que está en camino y lo exclusivo de la cuenta propietaria) y pide completar nombre, apellido y WhatsApp en «Mi perfil», que es lo que ven los clientes. El listado vive en `STAFF_GUIDE` (`notify/invite-email.ts`): se actualiza ahí cuando cambia lo que hace el panel.
+- **La invitación por correo** la escribe una persona a otra: sale a nombre de quien invita (nombre visible y `Reply-To` suyos), saluda por el nombre
+  de la persona (el que se prepara al invitar), habla en primera persona («Soy Gustavo Amarista y te invito a PageSpeed…»), da los cuatro
+  pasos para empezar (contraseña, perfil con WhatsApp, leer el alcance, primer cliente) y lista por secciones numeradas todo lo que se puede
+  hacer: clientes y proyectos (con el acceso por persona), **los dos modos de uso (desarrollo y producción)**, auditorías y alertas, SEO, lo que
+  recibe el cliente, lo que anota cada responsable, **agentes de IA (MCP) en desarrollo —desarrollo guiado por especificaciones acelerado con IA— y
+  en producción**, lo que está en camino y lo exclusivo del propietario. El listado vive en `STAFF_GUIDE` (`notify/invite-email.ts`): se actualiza ahí
+  cuando cambia lo que hace el panel. El correo de contraseña nueva usa el mismo tono, sin el listado.
 - Al invitar se prepara **el perfil completo** de la persona: nombre, apellido y foto (todo opcional) y cómo entra: **enlace por
   correo** (la cuenta nace con esos datos al aceptarlo) o **contraseña provisional** (la cuenta se crea en el acto, sin correo; la
   contraseña se muestra una sola vez y la persona puede cambiarla en su perfil, con un aviso mientras siga siendo provisional).

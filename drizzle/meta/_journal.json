@@ -183,6 +183,20 @@
       "when": 1794296292109,
       "tag": "0025_acceso_equipo",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794298277840,
+      "tag": "0026_productos_libres",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794298289512,
+      "tag": "0027_retirar_tipo_y_servidor",
+      "breakpoints": true
     }
   ]
 }

@@ -3,58 +3,135 @@
  * de las personas en copia. Lógica pura.
  */
 
-export type ProjectKindValue = "site" | "shop" | "app";
-export const PROJECT_KINDS: ProjectKindValue[] = ["site", "shop", "app"];
-
-/** Cómo lo llama el correo: «tu sitio», «tu tienda», «tu aplicación». */
-export const PROJECT_KIND_LABEL: Record<ProjectKindValue, "sitio" | "tienda" | "aplicación"> = {
-  site: "sitio",
-  shop: "tienda",
-  app: "aplicación",
-};
-
-export function isProjectKind(value: unknown): value is ProjectKindValue {
-  return typeof value === "string" && (PROJECT_KINDS as string[]).includes(value);
-}
-
-type Runtime = "php" | "node" | "none";
-
-/** Sugerencias del formulario. El campo es libre: lo que no esté aquí se acepta y simplemente no lleva nota de versiones. */
-export const TECH_SUGGESTIONS: Array<{ label: string; runtime: Runtime }> = [
-  { label: "WordPress", runtime: "php" },
-  { label: "PrestaShop", runtime: "php" },
-  { label: "Joomla", runtime: "php" },
-  { label: "Laravel", runtime: "php" },
-  { label: "Shopify", runtime: "none" },
-  { label: "Next.js", runtime: "node" },
-  { label: "Express", runtime: "node" },
-  { label: "Angular", runtime: "none" },
-  { label: "HTML y CSS", runtime: "none" },
-];
+// ----------------------------------------------------------------- productos
 
 /** Normaliza para comparar: sin acentos, en minúsculas y sin espacios sobrantes. */
-const key = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const key = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-function runtimeOf(techLabel: string): Runtime {
-  const k = key(techLabel);
-  return TECH_SUGGESTIONS.find((t) => key(t.label) === k)?.runtime ?? "none";
+/**
+ * Qué es cada producto del cliente. Es texto libre (un cliente puede tener un marketplace, una app móvil, un chatbot…);
+ * estas sugerencias solo ayudan a escribirlo, agrupadas para mostrarlas por familias.
+ */
+export const SOLUTION_SUGGESTIONS: ReadonlyArray<{ group: string; items: string[] }> = [
+  { group: "Web", items: ["sitio web corporativo", "landing page", "blog o sitio de contenidos", "portafolio", "directorio o clasificados", "comunidad o red social"] },
+  { group: "Comercio", items: ["tienda online (e-commerce)", "marketplace", "plataforma de pedidos o delivery", "pasarela de pagos o checkout", "facturación electrónica"] },
+  { group: "Educación y servicios", items: ["plataforma de e-learning", "plataforma de reservas o citas", "plataforma de eventos o ticketing", "portal de clientes o intranet"] },
+  { group: "Aplicaciones", items: ["aplicación web (SaaS)", "aplicación móvil iOS", "aplicación móvil Android", "aplicación móvil multiplataforma", "PWA (app instalable)", "software a medida"] },
+  { group: "Gestión y datos", items: ["CRM", "ERP", "dashboard o reportes (BI)", "API o integración"] },
+  { group: "IA y automatización", items: ["chatbot", "asistente de IA", "automatización de procesos"] },
+];
+
+/** Tecnologías sugeridas, por familia. El campo es libre: lo que no esté aquí se acepta igual. */
+export const TECH_SUGGESTIONS: ReadonlyArray<{ group: string; items: string[] }> = [
+  { group: "CMS y comercio", items: ["WordPress", "WooCommerce", "Shopify", "PrestaShop", "Joomla", "Drupal", "Magento", "Wix", "Squarespace", "Webflow", "Odoo", "Strapi", "Ghost"] },
+  { group: "Front-end", items: ["HTML y CSS", "JavaScript", "TypeScript", "React", "Next.js", "Vue", "Nuxt", "Angular", "Svelte", "Astro", "Tailwind CSS"] },
+  { group: "Back-end", items: ["Node.js", "Express", "NestJS", "PHP", "Laravel", "Symfony", "Python", "Django", "FastAPI", "Flask", "Ruby on Rails", "Java", "Spring Boot", ".NET", "Go", "Rust"] },
+  { group: "Móvil", items: ["Swift (iOS)", "Kotlin (Android)", "Flutter", "React Native", "Expo", "Ionic", "Capacitor"] },
+  { group: "Datos", items: ["PostgreSQL", "MySQL", "MariaDB", "MongoDB", "Redis", "SQLite", "Firebase", "Supabase", "Elasticsearch"] },
+  { group: "Nube e infraestructura", items: ["AWS", "Google Cloud", "Azure", "Cloudflare", "Vercel", "Netlify", "Docker", "Kubernetes", "VPS", "Nginx", "EasyPanel"] },
+  { group: "IA y automatización", items: ["OpenAI", "Claude", "LangChain", "Dialogflow", "n8n", "Make", "Zapier", "WhatsApp Business API", "Twilio"] },
+  { group: "Aprendizaje, CRM y pagos", items: ["Moodle", "LearnDash", "HubSpot", "Salesforce", "Zoho", "Stripe", "PayPal", "Mercado Pago", "Wompi", "PayU"] },
+];
+
+export const MAX_PRODUCT_TAGS = 12;
+export const MAX_TAG_LENGTH = 60;
+
+/**
+ * Limpia una lista de etiquetas escrita a mano: recorta, quita vacías y repetidas (sin distinguir mayúsculas), y valida el
+ * tope. Devuelve la lista y, si algo no cuadra, el mensaje.
+ */
+export function cleanTags(raw: unknown, label: string): { tags: string[]; error?: string } {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : [];
+  const tags: string[] = [];
+  for (const item of list) {
+    if (typeof item !== "string") continue;
+    const t = item.replace(/\s+/g, " ").trim();
+    if (!t) continue;
+    if (t.length > MAX_TAG_LENGTH) return { tags: [], error: `${label}: cada elemento admite hasta ${MAX_TAG_LENGTH} caracteres.` };
+    if (/[<>]/.test(t)) return { tags: [], error: `${label}: no uses los signos < ni >.` };
+    if (!tags.some((x) => key(x) === key(t))) tags.push(t);
+  }
+  if (tags.length > MAX_PRODUCT_TAGS) return { tags: [], error: `${label}: máximo ${MAX_PRODUCT_TAGS} elementos.` };
+  return { tags };
 }
+
+// ------------------------------------------------------------------ servicios
+
+/** Qué incluye el acompañamiento en cada producto. El correo solo promete lo que está marcado. */
+export const SERVICE_KEYS = ["web", "seo", "server", "deps", "domain", "security"] as const;
+export type ServiceKey = (typeof SERVICE_KEYS)[number];
+
+export const SERVICE_LABEL: Record<ServiceKey, string> = {
+  web: "Rendimiento web",
+  seo: "Visitas y visibilidad",
+  server: "Servidor, servicios y APIs",
+  deps: "Dependencias e integraciones",
+  domain: "Dominio, DNS y certificados",
+  security: "Seguridad y actualizaciones",
+};
+
+/** Lo que se marca por defecto en un producto nuevo (lo que la plataforma mide hoy, más la seguridad que tú supervisas). */
+export const DEFAULT_SERVICES: ServiceKey[] = ["web", "seo", "security"];
+
+export function isServiceKey(value: unknown): value is ServiceKey {
+  return typeof value === "string" && (SERVICE_KEYS as readonly string[]).includes(value);
+}
+
+/** Deja solo servicios conocidos, sin repetir y en el orden de siempre. */
+export function cleanServices(raw: unknown): ServiceKey[] {
+  const set = new Set(Array.isArray(raw) ? raw.filter(isServiceKey) : []);
+  return SERVICE_KEYS.filter((k) => set.has(k));
+}
+
+/** Los servicios que cubre al menos uno de los productos. */
+export function unionServices(products: Array<{ services: readonly string[] }>): Set<ServiceKey> {
+  const out = new Set<ServiceKey>();
+  for (const p of products) for (const k of p.services) if (isServiceKey(k)) out.add(k);
+  return out;
+}
+
+// ------------------------------------------------------------ fin de soporte
+
+type Runtime = "php" | "node";
+
+/** Tecnologías cuyo fin de soporte se cita en la bienvenida. Las demás se aceptan y simplemente no llevan esa nota. */
+const RUNTIME_OF: Record<string, Runtime> = {
+  wordpress: "php",
+  woocommerce: "php",
+  prestashop: "php",
+  joomla: "php",
+  drupal: "php",
+  magento: "php",
+  laravel: "php",
+  symfony: "php",
+  php: "php",
+  "next.js": "node",
+  express: "node",
+  nestjs: "node",
+  nuxt: "node",
+  "node.js": "node",
+};
 
 /**
  * Datos de fin de soporte que se citan en la bienvenida. Cada uno caduca: pasada su fecha `until` se omite, para no
  * mandar un dato viejo. Fuentes: endoflife.date/php y endoflife.date/nodejs. REVISAR CADA TRIMESTRE.
  */
-const END_OF_SUPPORT: Record<Exclude<Runtime, "none">, { note: string; until: string }> = {
+const END_OF_SUPPORT: Record<Runtime, { note: string; until: string }> = {
   php: { note: "PHP 8.2 deja de recibir parches de seguridad el 31 de diciembre de 2026.", until: "2026-12-31" },
   node: { note: "Node.js 20 dejó de recibir parches de seguridad el 30 de abril de 2026.", until: "2027-04-30" },
 };
 
-/** La nota de fin de soporte que corresponde a la tecnología, o null si no aplica o ya caducó. */
-export function endOfSupportNote(techLabel: string, now: Date): string | null {
-  const runtime = runtimeOf(techLabel);
-  if (runtime === "none") return null;
-  const entry = END_OF_SUPPORT[runtime];
-  return now.toISOString().slice(0, 10) <= entry.until ? entry.note : null;
+/** La nota de fin de soporte que corresponde a las tecnologías del producto, o null si no aplica o ya caducó. */
+export function endOfSupportNote(techs: string[] | string, now: Date): string | null {
+  const list = Array.isArray(techs) ? techs : [techs];
+  const today = now.toISOString().slice(0, 10);
+  for (const t of list) {
+    const runtime = RUNTIME_OF[key(t)];
+    if (!runtime) continue;
+    const entry = END_OF_SUPPORT[runtime];
+    if (today <= entry.until) return entry.note;
+  }
+  return null;
 }
 
 // ------------------------------------------------------------ personas en copia

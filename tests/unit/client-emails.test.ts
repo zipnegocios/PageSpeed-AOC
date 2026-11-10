@@ -5,6 +5,7 @@ import {
   buildMonthlyEmail,
   buildWeeklyEmail,
   buildWelcomeEmail,
+  welcomeOpening,
   formatCount,
   formatPct,
   formatPoints,
@@ -84,17 +85,23 @@ describe("formato", () => {
 });
 
 describe("bienvenida", () => {
-  const input = { kind: "sitio" as const, techLabel: "WordPress", includesServer: true, eolNote: "PHP 8.2 deja de recibir parches el 31 de diciembre de 2026.", pin: "123456" };
+  const wp = { site: "cafeaurora.com", solutions: ["sitio web"], techs: ["WordPress"], services: ["web", "seo", "server", "security"] };
+  const input = { products: [wp], eolNote: "PHP 8.2 deja de recibir parches el 31 de diciembre de 2026.", pin: "123456" };
 
-  it("habla de «ustedes» con varias personas y de «tú» con una", () => {
+  it("habla de «ustedes» con varias personas y de «tú» con una, y de «activos digitales», no de «sitio»", () => {
     const team = buildWelcomeEmail({ ...base, ...input });
     expect(team.text).toContain("Hola Ana, Luis y María,");
     expect(team.text).toContain("No tienen que hacer nada");
-    expect(team.subject).toBe("Su sitio ahora tiene seguimiento técnico permanente");
+    expect(team.subject).toBe("Sus activos digitales ahora tienen acompañamiento técnico de punta a punta");
     const solo = buildWelcomeEmail({ ...one, ...input });
     expect(solo.text).toContain("Hola Ana,");
     expect(solo.text).toContain("No tienes que hacer nada");
-    expect(solo.subject).toBe("Tu sitio ahora tiene seguimiento técnico permanente");
+    expect(solo.subject).toBe("Tus activos digitales ahora tienen acompañamiento técnico de punta a punta");
+    for (const m of [team, solo]) {
+      expect(m.subject).not.toMatch(/sitio/i);
+      expect(m.text).not.toContain("quien se encarga de su sitio");
+      expect(m.text).not.toContain("Es el mismo seguimiento para cualquier tecnología");
+    }
   });
   it("lleva el PIN, el portal y la firma con tu nombre primero, no la de PageSpeed", () => {
     const m = buildWelcomeEmail({ ...base, ...input });
@@ -111,50 +118,76 @@ describe("bienvenida", () => {
   });
   it("se presenta: el cliente no conoce esta dirección y reconoce a la persona", () => {
     const team = buildWelcomeEmail({ ...base, ...input });
-    expect(team.text).toContain("Soy Gustavo Amarista (zipnegocios), quien se encarga de su sitio. Les escribo desde esta dirección nueva");
+    expect(team.text).toContain("Soy Gustavo Amarista (zipnegocios), quien se encarga de sus activos digitales. Les escribo desde esta dirección nueva");
     expect(team.text).toContain("si no la reconocen, es normal, soy yo");
     const solo = buildWelcomeEmail({ ...one, ...input });
-    expect(solo.text).toContain("quien se encarga de tu sitio. Te escribo desde esta dirección nueva");
+    expect(solo.text).toContain("quien se encarga de tus activos digitales. Te escribo desde esta dirección nueva");
     expect(solo.text).toContain("si no la reconoces, es normal, soy yo");
   });
-  it("sin servidor en el plan no promete servidor; sin nota de versiones omite ese dato", () => {
-    const m = buildWelcomeEmail({ ...base, ...input, includesServer: false, eolNote: null, kind: "tienda", techLabel: "Shopify" });
-    expect(m.text).not.toContain("Servidor, servicios y APIs");
-    expect(m.text).not.toContain("Las versiones caducan");
-    expect(m.text).not.toContain("endoflife");
-    expect(m.text).toContain("tienda hecha en Shopify");
-    const wp = buildWelcomeEmail({ ...base, ...input });
-    expect(wp.text).toContain("Servidor, servicios y APIs");
-    expect(wp.text).toContain("Las versiones caducan");
+  it("lo general va arriba y lo específico en la lista de productos: qué es cada uno y en qué está hecho", () => {
+    const m = buildWelcomeEmail({
+      ...base,
+      products: [wp, { site: "app.cafeaurora.com", solutions: ["aplicación móvil iOS", "chatbot"], techs: ["Swift (iOS)", "Firebase"], services: ["server", "security"] }],
+      eolNote: null,
+      pin: "123456",
+    });
+    expect(m.text).toContain("Desde hoy sus activos digitales tienen un acompañamiento técnico de punta a punta:");
+    expect(m.text).toContain("- cafeaurora.com · sitio web en WordPress");
+    expect(m.text).toContain("- app.cafeaurora.com · aplicación móvil iOS y chatbot en Swift (iOS) y Firebase");
+    expect(m.text).toContain("Con mi equipo revisamos cada aspecto de cada uno");
+  });
+  it("lo que cubre y lo que se promete depende de los servicios marcados", () => {
+    const only = (services: string[]) => buildWelcomeEmail({ ...base, products: [{ ...wp, services }], eolNote: null, pin: "123456" }).text;
+    const web = only(["web"]);
+    expect(web).toContain("Velocidad y calidad de cada página");
+    expect(web).not.toContain("Servidor, servicios y APIs");
+    expect(web).not.toContain("Dependencias e integraciones");
+    expect(web).not.toContain("Cada lunes");
+    expect(web).toContain("**Un correo al mes**".replace(/\*/g, ""));
+    const infra = only(["server", "deps", "domain", "security"]);
+    for (const t of ["Servidor, servicios y APIs", "Dependencias e integraciones", "Dominio, DNS y certificados", "Seguridad y actualizaciones"]) expect(infra).toContain(t);
+    expect(infra).not.toContain("Velocidad y calidad de cada página");
+    expect(only(["seo"])).toContain("Cada lunes");
+    expect(only(["seo"])).toContain("Un correo por semana y uno al mes");
+  });
+  it("el recuadro «Si ves números bajos, no te alarmes»: visible, antes de la tabla, con las tres etapas y repetido junto al PIN", () => {
+    const m = buildWelcomeEmail({ ...base, ...input });
+    expect(m.text).toContain("SI VES NÚMEROS BAJOS, NO TE ALARMES");
+    expect(m.text).toContain("punto de partida");
+    expect(m.text).toMatch(/1\. Hoy:[\s\S]*2\. Las próximas semanas: voy corrigiendo de forma progresiva[\s\S]*3\. Cada mes:/);
+    expect(m.text).toContain("si sus valores ya están bien, perfecto".replace("si", "Y si"));
+    expect(m.text.indexOf("SI VES NÚMEROS BAJOS")).toBeLessThan(m.text.indexOf("Esto es lo que van a recibir"));
+    expect(m.text).toContain("Recuerda: si en el portal ven valores por debajo de la meta");
+    expect(m.html).toContain("Si ves números bajos, no te alarmes");
+    const solo = buildWelcomeEmail({ ...one, ...input });
+    expect(solo.text).toContain("Y si tus valores ya están bien, perfecto: sigue tranquilo");
+  });
+  it("«Por qué esto importa»: cuatro ideas, con las capas y la observabilidad; PHP solo como ejemplo", () => {
+    const m = buildWelcomeEmail({ ...base, ...input });
+    for (const t of ["La velocidad se nota en el negocio", "Las vulnerabilidades son la puerta de entrada más común", "Todo lo que sostiene un activo digital caduca", "Por eso hace falta observabilidad en todas las capas", "librerías y dependencias", "dominios, certificados y enrutamiento", "OWASP", "sostiene este acompañamiento mensual"]) expect(m.text).toContain(t);
+    expect(m.text).toContain("(por ejemplo, PHP 8.2 deja de recibir parches el 31 de diciembre de 2026)");
+    expect(m.text).toContain("endoflife.date");
+    const generic = buildWelcomeEmail({ ...base, ...input, eolNote: null });
+    expect(generic.text).toContain("Todo lo que sostiene un activo digital caduca");
+    expect(generic.text).not.toContain("por ejemplo");
+    expect(generic.text).not.toContain("endoflife");
+    expect(m.text).not.toContain("vigilancia");
   });
   it("escapa el HTML de los datos que vienen de fuera", () => {
-    const m = buildWelcomeEmail({ ...base, ...input, site: "<b>x</b>.com" });
+    const m = buildWelcomeEmail({ ...base, ...input, products: [{ ...wp, site: "<b>x</b>.com", solutions: ["<i>tienda</i>"] }] });
     expect(m.html).not.toContain("<b>x</b>.com");
+    expect(m.html).not.toContain("<i>tienda</i>");
     expect(m.html).toContain("&lt;b&gt;x&lt;/b&gt;.com");
   });
-});
-
-describe("mensual: tráfico, Google y experiencia real", () => {
-  it("añade visitas con sus orígenes, visibilidad en Google y la evaluación de los visitantes, y los dos PDF", () => {
-    const m = buildMonthlyEmail({
-      ...monthly,
-      traffic: { visits: 9394, deltaPct: 4, sources: [{ label: "Instagram", visits: 1500, deltaPct: 10 }, { label: "Directo o sin identificar", visits: 800, deltaPct: null }] },
-      search: { clicks: 4689, clicksDeltaPct: 17, impressions: 140670, position: 7, queries: [{ query: "ingeniería civil", clicks: 320 }] },
-      field: { verdict: "failed", items: [{ label: "LCP", value: "2.9 s", word: "mejorable" }] },
-      reportUrl: "https://app.example.com/r1",
-      engineeringUrl: "https://app.example.com/r2",
-    });
-    for (const t of ["VISITAS DEL MES", "9.394", "Instagram: 1.500", "VISIBILIDAD EN GOOGLE", "Posición media: 7", "«ingeniería civil» (320 clics)", "EXPERIENCIA REAL DE TUS VISITANTES", "por mejorar", "LCP 2.9 s (mejorable)", "https://app.example.com/r1", "https://app.example.com/r2"]) expect(m.text).toContain(t);
-  });
-  it("sin esos datos el correo del mes queda como antes", () => {
-    const m = buildMonthlyEmail(monthly);
-    for (const t of ["VISITAS DEL MES", "VISIBILIDAD EN GOOGLE", "EXPERIENCIA REAL"]) expect(m.text).not.toContain(t);
+  it("la apertura se puede pedir sola (la vista previa del formulario)", () => {
+    const blocks = welcomeOpening({ names: ["Ana"], products: [wp], sender: DEFAULT_SENDER });
+    expect(blocks.map((b) => b.k)).toEqual(["p", "p", "list", "p", "p"]);
   });
 });
 
 describe("quién firma: el responsable del cliente", () => {
   const luis: ClientSender = { ...DEFAULT_SENDER, name: "Luis Porteles", whatsapp: "+1 555 010 0000", email: "luis@example.com" };
-  const input = { kind: "sitio" as const, techLabel: "WordPress", includesServer: true, eolNote: null, pin: "123456" };
+  const input = { products: [{ site: "cafeaurora.com", solutions: ["sitio web"], techs: ["WordPress"], services: ["web", "seo", "server", "security"] }], eolNote: null, pin: "123456" };
 
   it("la bienvenida, la banda, la firma y el pie llevan el nombre y el WhatsApp de Luis, y nada de Gustavo", () => {
     const m = buildWelcomeEmail({ ...base, ...input, sender: luis });
@@ -164,7 +197,7 @@ describe("quién firma: el responsable del cliente", () => {
       expect(out).not.toContain("Gustavo");
       expect(out).not.toContain("316 469");
     }
-    expect(m.text).toContain("Soy Luis Porteles (zipnegocios), quien se encarga de su sitio.");
+    expect(m.text).toContain("Soy Luis Porteles (zipnegocios), quien se encarga de sus activos digitales.");
     expect(m.html.indexOf("<img")).toBeLessThan(m.html.indexOf("Luis Porteles"));
   });
   it("los demás correos también: semanal, mensual e informe a mano", () => {
@@ -203,6 +236,16 @@ describe("mensual", () => {
     expect(buildMonthlyEmail(monthly).text).not.toContain("Servidor y servicios");
     expect(buildMonthlyEmail({ ...monthly, serverConfirmed: true }).text).toContain("Servidor y servicios: supervisados");
   });
+  it("en mejora inicial el estado del mes es sereno: punto de partida, sin «puntos en revisión» ni «en orden»", () => {
+    const m = buildMonthlyEmail({ ...monthly, tone: "attention", statusLine: "Hay 3 puntos en revisión; los explico en el portal.", initialImprovement: true });
+    expect(m.text).toContain("SEGUIMOS EN LA FASE DE MEJORA INICIAL");
+    expect(m.text).toContain("punto de partida");
+    expect(m.text).not.toContain("puntos en revisión");
+    expect(m.text).not.toContain("Estado del mes:");
+    expect(m.subject).toBe("cafeaurora.com: resumen de octubre. Rendimiento móvil 78 (+5)");
+    expect(buildMonthlyEmail({ ...monthly, initialImprovement: true }).subject).toContain("resumen de octubre");
+    expect(buildMonthlyEmail({ ...monthly, initialImprovement: false }).text).toContain("Estado del mes:");
+  });
   it("muestra la palabra de cada puntuación junto al número", () => {
     const html = buildMonthlyEmail(monthly).html;
     expect(html).toContain("Mejorable");
@@ -212,8 +255,8 @@ describe("mensual", () => {
 
 describe("bienvenida: qué se mide", () => {
   it("nombra todo lo que se mide: velocidad, experiencia real, visitas y redes por nombre, Google y salud SEO, y los dos PDF", () => {
-    const m = buildWelcomeEmail({ ...base, kind: "sitio", techLabel: "WordPress", includesServer: false, eolNote: null, pin: "123456" });
-    for (const t of ["Velocidad y calidad de cada página", "Experiencia real", "Instagram, WhatsApp, Facebook, TikTok, LinkedIn", "Visibilidad en Google", "Salud SEO", "dos informes en PDF"]) expect(m.text).toContain(t);
+    const m = buildWelcomeEmail({ ...base, products: [{ site: "cafeaurora.com", solutions: ["sitio web"], techs: ["WordPress"], services: ["web", "seo", "security"] }], eolNote: null, pin: "123456" });
+    for (const t of ["Velocidad y calidad de cada página", "Experiencia real", "Instagram, WhatsApp, Facebook, TikTok, LinkedIn", "visibilidad en Google", "Salud SEO", "dos informes en PDF"]) expect(m.text).toContain(t);
   });
 });
 

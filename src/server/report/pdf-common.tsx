@@ -180,6 +180,13 @@ export function ReportHeader({ data, eyebrow, extra }: { data: ReportData; eyebr
       <Text style={s.meta}>
         Periodo: {periodText} ({data.days === 365 ? "1 año" : `${data.days} días`}) · Generado el {dateTimeFmt.format(data.generatedAt)} UTC
       </Text>
+      {data.initialImprovement ? (
+        <View style={{ marginTop: 10, padding: 8, borderLeftWidth: 3, borderLeftColor: C.primary, backgroundColor: C.sunken }}>
+          <Text style={[s.small, { color: C.ink, fontSize: 10.5 }]}>
+            Mejora inicial: los valores de este informe son el punto de partida, no un problema de tu negocio. Se va a corregir de forma progresiva y los informes siguientes muestran cómo evolucionan.
+          </Text>
+        </View>
+      ) : null}
       {extra}
     </View>
   );

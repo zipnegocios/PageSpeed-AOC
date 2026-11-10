@@ -73,8 +73,6 @@ export const notificationType = pgEnum("notification_type", [
 // Correos automáticos al cliente y cómo salió cada envío.
 export const reportKind = pgEnum("report_kind", ["weekly", "monthly"]);
 export const reportSendStatus = pgEnum("report_send_status", ["sent", "failed", "skipped"]);
-// Qué es el proyecto para el cliente: se usa en los correos («tu sitio», «tu tienda», «tu aplicación»).
-export const projectKind = pgEnum("project_kind", ["site", "shop", "app"]);
 export const notificationStatus = pgEnum("notification_status", ["sent", "failed"]);
 
 // -------------------------------------------------------------- clients
@@ -161,11 +159,13 @@ export const projects = pgTable(
     authConfigEnc: bytea("auth_config_enc"),
     // El cliente ve «Tráfico y búsqueda» en su portal solo si el administrador lo activa (por defecto, oculto).
     seoClientVisible: boolean("seo_client_visible").notNull().default(false),
-    // Para los correos al cliente: qué es (sitio, tienda, aplicación), en qué tecnología está hecho (texto libre) y si el
-    // plan incluye la supervisión de servidor, servicios y APIs.
-    kind: projectKind("kind").notNull().default("site"),
-    techLabel: text("tech_label"),
-    includesServer: boolean("includes_server").notNull().default(false),
+    // Para los correos al cliente. Texto libre con sugerencias: qué es el producto (puede ser más de una cosa), en qué está hecho y qué
+    // servicios incluye el acompañamiento (web, seo, server, deps, domain, security).
+    solutions: text("solutions").array().notNull().default(sql`'{}'::text[]`),
+    techs: text("techs").array().notNull().default(sql`'{}'::text[]`),
+    services: text("services").array().notNull().default(sql`'{web,seo,security}'::text[]`),
+    // «En mejora inicial»: los valores son el punto de partida. Mientras esté activo, el portal, los PDF y el correo mensual lo explican.
+    initialImprovement: boolean("initial_improvement").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },

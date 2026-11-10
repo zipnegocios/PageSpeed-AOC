@@ -45,6 +45,7 @@ import {
   toggleRouteAuthAction,
   updateRouteLabelAction,
   setPhaseAction,
+  setInitialImprovementAction,
   setThresholdsAction,
   toggleRouteAction,
   updateProjectAction,
@@ -197,6 +198,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <option value="development">Desarrollo</option>
             <option value="production">Producción</option>
           </SelectField>
+        </ActionForm>
+      </Card>
+
+      <Card
+        title="Mejora inicial"
+        description="Para un cliente que empieza con valores bajos: el portal, los PDF y el correo mensual explican que son el punto de partida y que se va a corregir de forma progresiva, para que no se alarme. Se apaga a mano cuando los valores se estabilicen."
+      >
+        <ActionForm action={setInitialImprovementAction.bind(null, id)} submitLabel="Guardar" pendingLabel="Guardando…" variant="secondary" className="max-w-xl">
+          <CheckboxField label="Este proyecto está en mejora inicial" id="initialImprovement" defaultChecked={project.initialImprovement} />
         </ActionForm>
       </Card>
 
@@ -407,7 +417,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       </Card>
 
       {emailsPanel ? (
-        <ClientEmailsCard projectId={id} panel={emailsPanel} includesServer={project.includesServer} today={now.toISOString().slice(0, 10)} clientHref={clientPath(project.clientSlug)} />
+        <ClientEmailsCard projectId={id} panel={emailsPanel} includesServer={project.services.includes("server")} today={now.toISOString().slice(0, 10)} clientHref={clientPath(project.clientSlug)} />
       ) : null}
 
       <Card title="Umbrales de alerta" description="Puntuación mínima aceptable, por métrica. Si baja de aquí, se abre una alerta (solo en producción).">

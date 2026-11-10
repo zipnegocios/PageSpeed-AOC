@@ -35,6 +35,16 @@ export async function updateProjectAction(id: string, _prev: ActionState, fd: Fo
   });
 }
 
+export async function setInitialImprovementAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
+  return guarded(async () => {
+    await requireProjectAccess(id);
+    const on = fd.get("initialImprovement") === "on";
+    await projects.setProjectInitialImprovement(id, on);
+    refresh(id);
+    return { ok: on ? "En mejora inicial. El portal, los PDF y el correo mensual explican que los valores son el punto de partida." : "Fuera de la mejora inicial. El portal y los informes dejan de mostrar el aviso." };
+  });
+}
+
 export async function setPhaseAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
   return guarded(async () => {
     await requireProjectAccess(id);
