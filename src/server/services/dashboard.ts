@@ -1,3 +1,4 @@
+import type { Scope } from "@/server/domain/access";
 import type { ClientLogoInfo } from "@/server/domain/client-logo";
 import { getDb, type Database } from "@/server/db/client";
 import { average, type Change } from "@/server/domain/history";
@@ -77,8 +78,8 @@ function trafficOf(s: { current: number; previous: number; rows: number } | unde
  * La flota: todos los proyectos vigentes con sus últimas puntuaciones, miniatura de rendimiento, alertas y pendientes.
  * Son 7 consultas en total (las del tráfico incluidas) sea cual sea el número de proyectos (sin una consulta por proyecto).
  */
-export async function getFleet(db: Database = getDb(), now: Date = new Date()): Promise<FleetProject[]> {
-  const list = await listAllProjects(db);
+export async function getFleet(db: Database = getDb(), now: Date = new Date(), scope?: Scope): Promise<FleetProject[]> {
+  const list = await listAllProjects(db, scope);
   const ids = list.map((p) => p.id);
   const since = new Date(now.getTime() - SPARKLINE_DAYS * 86_400_000);
   // El tráfico de toda la flota: dos consultas, sin una por proyecto. Termina ayer (GA4 cierra el día con retraso).
@@ -89,7 +90,7 @@ export async function getFleet(db: Database = getDb(), now: Date = new Date()): 
     getLatestScoresMany(ids, db),
     listDailyPerformance(db, ids, since),
     repo.listPendingCounts(db, ids),
-    listOpenAlerts(undefined, db).catch(() => []),
+    listOpenAlerts(undefined, db, scope).catch(() => []),
     seoData.fleetSessions(db, ids, cur, prev),
     seoData.fleetTopSources(db, ids, cur),
   ]);
@@ -195,8 +196,8 @@ export function groupAuditsByPage(rows: RecentAudit[]): PageFeedEntry[] {
 }
 
 /** Las páginas con actividad más reciente de todos los proyectos, cada una con sus dos dispositivos. */
-export async function listRecentPagesGlobal(limit = 10, db: Database = getDb()): Promise<PageFeedEntry[]> {
+export async function listRecentPagesGlobal(limit = 10, db: Database = getDb(), scope?: Scope): Promise<PageFeedEntry[]> {
   const wanted = Math.min(Math.max(limit, 1), 30);
-  const rows = await repo.listRecentAuditsGlobal(db, wanted * 6);
+  const rows = await repo.listRecentAuditsGlobal(db, wanted * 6, scope);
   return groupAuditsByPage(rows).slice(0, wanted);
 }

@@ -68,3 +68,14 @@ export async function getClientSharing(actor: Actor, clientId: string, db: Datab
     projectShared,
   };
 }
+
+/** Lo mismo que `getClientSharing`, partiendo de un proyecto (el cliente se resuelve aquí: el que llegue en la petición no se usa). */
+export async function getProjectSharing(actor: Actor, projectId: string, db: Database = getDb()): Promise<ClientSharing | null> {
+  let project;
+  try {
+    project = await assertManageProject(db, actor, projectId);
+  } catch {
+    return null;
+  }
+  return getClientSharing(actor, project.clientId, db);
+}

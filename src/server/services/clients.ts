@@ -1,3 +1,4 @@
+import type { Scope } from "@/server/domain/access";
 import { getDb, type Database } from "@/server/db/client";
 import { generateMagicToken } from "@/server/auth/magic-token";
 import { DomainError } from "@/server/domain/errors";
@@ -8,8 +9,9 @@ import { assertUuid, isUniqueViolation, isUuid, parseInput, uniqueSlug } from ".
 
 export type { Client, ClientWithCount } from "@/server/repositories/clients";
 
-export function listClients(db: Database = getDb()) {
-  return repo.listClients(db);
+/** Los clientes vigentes; con `scope`, solo los que la persona ve (ver `domain/access.ts`). */
+export function listClients(db: Database = getDb(), scope?: Scope) {
+  return repo.listClients(db, scope);
 }
 
 export async function getClient(id: string, db: Database = getDb()) {

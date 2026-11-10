@@ -1,6 +1,6 @@
+import { requireAuditAccess } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import { PROFILE_LABEL, formatDate, formatDuration, formatSeconds, isPending } from "@/lib/audit-format";
-import { verifySession } from "@/lib/auth/session";
 import { clientPath, projectPath } from "@/lib/urls";
 import { orNotFound } from "@/lib/not-found";
 import { Alert } from "@/lib/ui/components/alert";
@@ -75,9 +75,9 @@ function FailedChecksCard({ categories }: { categories: CategoryChecks[] | null 
 const TRIGGER_LABEL = { manual: "Manual", scheduled: "Programada", mcp: "Agente (MCP)" } as const;
 
 export default async function AuditPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<ViewerSearch> }) {
-  await verifySession();
   const { id } = await params;
   const search = await searchParams;
+  await orNotFound(requireAuditAccess(id));
   const audit = await orNotFound(getAudit(id));
   const siblings = await getSiblingAudits(id);
   // El selector de dispositivo conserva la pestaña del visor (Resumen, Rendimiento…).

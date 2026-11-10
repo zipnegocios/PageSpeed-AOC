@@ -1,5 +1,5 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
-import { verifySession } from "@/lib/auth/session";
 import { Card } from "@/lib/ui/components/card";
 import { listOpenAlerts, listRecentNotifications } from "@/server/services/alerts";
 import { AdminShell } from "../_components/admin-shell";
@@ -9,8 +9,8 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Alertas"), robots: { index: false, follow: false } };
 
 export default async function AlertsPage() {
-  await verifySession();
-  const [alerts, notifications] = await Promise.all([listOpenAlerts(), listRecentNotifications(30)]);
+  const { scope } = await requireScope();
+  const [alerts, notifications] = await Promise.all([listOpenAlerts(undefined, undefined, scope), listRecentNotifications(30, undefined, undefined, scope)]);
 
   return (
     <AdminShell title="Alertas" crumbs={[{ label: "Panel", href: "/admin" }]}>

@@ -1,3 +1,4 @@
+import { requireProjectAccess } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -8,7 +9,6 @@ import { ClientVisibilityCard } from "@/app/admin/seo/_components/client-visibil
 import { CrawlSection } from "@/app/admin/seo/_components/crawl-section";
 import { ConnectionCard } from "@/app/admin/seo/_components/connection-card";
 import { MarketsCard } from "@/app/admin/seo/_components/markets-card";
-import { verifySession } from "@/lib/auth/session";
 import { pageTitle } from "@/lib/brand";
 import { orNotFound } from "@/lib/not-found";
 import { clientPath, projectPath } from "@/lib/urls";
@@ -27,13 +27,13 @@ export const metadata: Metadata = { title: pageTitle("SEO del proyecto"), robots
 export const dynamic = "force-dynamic";
 
 export default async function ProjectSeoPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<{ periodo?: string | string[]; idioma?: string | string[]; hallazgo?: string | string[] }> }) {
-  await verifySession();
   const { cliente, proyecto } = await params;
   const query = await searchParams;
   const periodo = Array.isArray(query.periodo) ? query.periodo[0] : query.periodo;
   const idioma = Array.isArray(query.idioma) ? query.idioma[0] : query.idioma;
   const hallazgo = Array.isArray(query.hallazgo) ? query.hallazgo[0] : query.hallazgo;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
+  await orNotFound(requireProjectAccess(project.id));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (cliente !== project.clientSlug || proyecto !== project.slug) redirect(`${projectPath(project.clientSlug, project.slug)}/seo`);
   const [connections, google] = await Promise.all([getConnections(project.id), getGoogleAccount()]);

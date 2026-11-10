@@ -26,7 +26,7 @@ const CALLBACK = "https://claude.ai/api/mcp/auth_callback";
 
 describe.skipIf(!dbUrl)("OAuth para conectores de claude.ai", () => {
   const { db, pool } = createDb(dbUrl ?? "", 4);
-  const admin = { id: "11111111-1111-4111-8111-111111111111" };
+  const admin = { id: "11111111-1111-4111-8111-111111111111", role: "owner" as const };
   let deps: McpDeps;
 
   // Se cargan después de fijar APP_URL: los metadatos salen de ahí.
@@ -57,7 +57,9 @@ describe.skipIf(!dbUrl)("OAuth para conectores de claude.ai", () => {
     await pool.end();
   });
   beforeEach(async () => {
-    await db.execute(sql`truncate clients, mcp_api_keys, oauth_clients, oauth_codes restart identity cascade`);
+    await db.execute(sql`truncate clients, mcp_api_keys, oauth_clients, oauth_codes, admin_users restart identity cascade`);
+    // Quien autoriza existe de verdad: la conexión queda ligada a su cuenta.
+    await db.insert(s.adminUsers).values({ id: admin.id, email: "owner@zip.test", passwordHash: "x", role: "owner" });
     deps = { appOrigin: APP, ip: "9.9.9.9", limits: createLimits() };
     oauthLimiters.register.reset("7.7.7.7");
     oauthLimiters.token.reset("7.7.7.7");

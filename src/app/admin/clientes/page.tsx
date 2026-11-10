@@ -1,6 +1,6 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { verifySession } from "@/lib/auth/session";
 import { clientPath } from "@/lib/urls";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
@@ -16,8 +16,8 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Clientes"), robots: { index: false, follow: false } };
 
 export default async function ClientsPage() {
-  await verifySession();
-  const clients = await listClients();
+  const { scope } = await requireScope();
+  const clients = await listClients(undefined, scope);
 
   return (
     <AdminShell title="Clientes" crumbs={[{ label: "Panel", href: "/admin" }]}>

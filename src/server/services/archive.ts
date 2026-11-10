@@ -10,12 +10,13 @@ export type { ArchivedClient, ArchivedProject } from "@/server/repositories/arch
 
 type Deps = { r2?: Pick<R2Store, "listObjects" | "deleteObjects">; maintenance?: Queue; lighthouse?: Queue };
 
-export function listArchivedClients(db: Database = getDb()) {
-  return repo.listArchivedClients(db);
+/** `by`: solo lo que esa persona puede restaurar o borrar (el propietario, todo; un miembro, sus clientes). */
+export function listArchivedClients(db: Database = getDb(), by?: repo.ManageBy) {
+  return repo.listArchivedClients(db, by);
 }
 
-export function listArchivedProjects(db: Database = getDb()) {
-  return repo.listArchivedProjects(db);
+export function listArchivedProjects(db: Database = getDb(), by?: repo.ManageBy) {
+  return repo.listArchivedProjects(db, by);
 }
 
 /** El nombre escrito debe ser idéntico al guardado (solo se ignoran espacios en los bordes). */

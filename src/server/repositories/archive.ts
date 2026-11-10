@@ -22,24 +22,28 @@ export type ArchivedProject = {
   clientSlug: string;
 };
 
-export async function listArchivedClients(db: Database): Promise<ArchivedClient[]> {
+/** Con `manageBy`, solo lo que esa persona puede restaurar o borrar: el propietario, todo; un miembro, los clientes de los que es responsable. */
+export type ManageBy = { id: string; role: "owner" | "admin" } | undefined;
+const managed = (by: ManageBy) => (!by || by.role === "owner" ? undefined : eq(clients.ownerId, by.id));
+
+export async function listArchivedClients(db: Database, by?: ManageBy): Promise<ArchivedClient[]> {
   const rows = await db
     .select({ client: clients, projectCount: count(projects.id) })
     .from(clients)
     .leftJoin(projects, eq(projects.clientId, clients.id))
-    .where(isNotNull(clients.deletedAt))
+    .where(and(isNotNull(clients.deletedAt), managed(by)))
     .groupBy(clients.id)
     .orderBy(desc(clients.deletedAt));
   return rows.map((r) => ({ id: r.client.id, name: r.client.name, slug: r.client.slug, archivedAt: r.client.deletedAt as Date, projectCount: r.projectCount }));
 }
 
 /** Proyectos archivados de clientes vigentes (los de un cliente archivado viajan con su cliente). */
-export async function listArchivedProjects(db: Database): Promise<ArchivedProject[]> {
+export async function listArchivedProjects(db: Database, by?: ManageBy): Promise<ArchivedProject[]> {
   const rows = await db
     .select({ project: projects, clientName: clients.name, clientSlug: clients.slug })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))
-    .where(and(isNotNull(projects.deletedAt), isNull(clients.deletedAt)))
+    .where(and(isNotNull(projects.deletedAt), isNull(clients.deletedAt), managed(by)))
     .orderBy(asc(sql`lower(${clients.name})`), desc(projects.deletedAt));
   return rows.map((r) => ({
     id: r.project.id,

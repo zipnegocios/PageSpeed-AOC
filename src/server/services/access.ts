@@ -1,5 +1,5 @@
 import type { Database } from "@/server/db/client";
-import { buildScope, canManage, canViewProject, clientLevel, type Actor, type Scope } from "@/server/domain/access";
+import { buildScope, canManage, canViewProject, clientLevel, type Actor, type ClientLevel, type Scope } from "@/server/domain/access";
 import { DomainError } from "@/server/domain/errors";
 import * as archive from "@/server/repositories/archive";
 import * as audits from "@/server/repositories/audits";
@@ -31,6 +31,14 @@ export async function assertProjectAccess(db: Database, actor: Actor, projectId:
   if (!project) throw notFound("Proyecto");
   if (actor.role !== "owner" && !canViewProject(await loadScope(db, actor), project)) throw notFound("Proyecto");
   return project;
+}
+
+/** Cómo ve la persona un cliente: entero, solo algunos proyectos suyos, o nada. Para decidir qué partes de la ficha muestra. */
+export async function getClientLevel(db: Database, actor: Actor, clientId: string): Promise<ClientLevel | null> {
+  if (actor.role === "owner") return "full";
+  const scope = await loadScope(db, actor);
+  const projects = scope.all ? [] : (await projectsRepo.listProjectsForClient(db, clientId)).map((p) => p.id);
+  return clientLevel(scope, clientId, projects);
 }
 
 /** El cliente, solo si la persona lo ve. `level: "full"` exige verlo entero (no solo algún proyecto suyo). */

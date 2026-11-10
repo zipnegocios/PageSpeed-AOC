@@ -13,6 +13,7 @@ export async function insertApiKey(
     allAccess: boolean;
     clientIds: string[];
     projectIds: string[];
+    createdBy?: string | null;
     oauthClientId?: string;
     expiresAt?: Date;
     refreshHash?: string;
@@ -24,8 +25,9 @@ export async function insertApiKey(
   return row;
 }
 
-export function listApiKeys(db: Database): Promise<ApiKeyRow[]> {
-  return db.select().from(mcpApiKeys).orderBy(desc(mcpApiKeys.createdAt));
+/** Con `createdBy`, solo las claves de esa persona (un miembro no ve las de los demás). */
+export function listApiKeys(db: Database, createdBy?: string): Promise<ApiKeyRow[]> {
+  return db.select().from(mcpApiKeys).where(createdBy ? eq(mcpApiKeys.createdBy, createdBy) : undefined).orderBy(desc(mcpApiKeys.createdAt));
 }
 
 export async function findActiveByHash(db: Database, keyHash: string): Promise<ApiKeyRow | undefined> {

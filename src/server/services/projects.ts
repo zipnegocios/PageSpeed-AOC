@@ -1,3 +1,4 @@
+import type { Scope } from "@/server/domain/access";
 import { and, eq } from "drizzle-orm";
 import type { Queue } from "bullmq";
 import { getDb, type Database } from "@/server/db/client";
@@ -78,8 +79,8 @@ export function parseAllowedHosts(text: string | undefined, baseUrl: string): st
   return [...hosts];
 }
 
-export function listAllProjects(db: Database = getDb()) {
-  return repo.listAllProjects(db);
+export function listAllProjects(db: Database = getDb(), scope?: Scope) {
+  return repo.listAllProjects(db, scope);
 }
 
 export function listProjects(clientId: string, db: Database = getDb()) {

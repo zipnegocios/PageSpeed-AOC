@@ -1,5 +1,5 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
-import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
@@ -13,8 +13,9 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Archivados"), robots: { index: false, follow: false } };
 
 export default async function ArchivedPage() {
-  await verifySession();
-  const [clients, projects] = await Promise.all([listArchivedClients(), listArchivedProjects()]);
+  const { session } = await requireScope();
+  // Restaurar y borrar son de gestión: cada quien ve solo los archivados que puede gestionar.
+  const [clients, projects] = await Promise.all([listArchivedClients(undefined, session), listArchivedProjects(undefined, session)]);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   return (

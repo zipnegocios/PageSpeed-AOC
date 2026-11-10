@@ -6,6 +6,7 @@ import { DomainError } from "@/server/domain/errors";
 import { ACCESS_TTL_MS, CODE_TTL_MS, REFRESH_TTL_MS, isAllowedRedirectUri, isCodeChallenge, sha256, verifyPkce } from "@/server/domain/oauth";
 import * as keys from "@/server/repositories/api-keys";
 import * as repo from "@/server/repositories/oauth";
+import * as admins from "@/server/repositories/admin-users";
 import { resolveKeyFields } from "./api-keys";
 
 export type OauthDeps = { now?: () => Date };
@@ -79,10 +80,10 @@ export async function validateAuthorizeRequest(query: Record<string, string | un
 }
 
 /** Quien autoriza elige permisos y alcance (los mismos campos que «Nueva clave»); devuelve la dirección a la que volver con el código. */
-export async function authorize(admin: { id: string }, request: AuthorizeRequest, rawFields: unknown, db: Database = getDb(), deps: OauthDeps = {}): Promise<string> {
+export async function authorize(admin: { id: string; role: "owner" | "admin" }, request: AuthorizeRequest, rawFields: unknown, db: Database = getDb(), deps: OauthDeps = {}): Promise<string> {
   const now = nowOf(deps);
   const date = new Intl.DateTimeFormat("es", { dateStyle: "medium", timeZone: "UTC" }).format(now);
-  const { fields } = await resolveKeyFields({ ...(rawFields as object), name: `${request.clientName.slice(0, 36)} · ${date}` }, db);
+  const { fields } = await resolveKeyFields({ ...(rawFields as object), name: `${request.clientName.slice(0, 36)} · ${date}` }, db, admin);
   const code = randomBytes(32).toString("base64url");
   await repo.purgeCodes(db, new Date(now.getTime() - DAY));
   await repo.insertCode(db, {
@@ -132,7 +133,10 @@ export async function exchangeCode(
 
   const access = generateApiKey();
   const refresh = newRefreshToken();
+  // La conexión queda ligada a quien la autorizó si es un miembro: nunca verá más que él.
+  const approver = row.adminId ? await admins.findAdminById(db, row.adminId) : undefined;
   await keys.insertApiKey(db, {
+    createdBy: row.adminId && (!approver || approver.role !== "owner") ? row.adminId : null,
     name: row.keyName,
     keyHash: hashApiKey(access),
     scopes: row.scopes,

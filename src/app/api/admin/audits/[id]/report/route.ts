@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth/session";
+import { apiAuditAccess } from "@/lib/auth/access";
 import { isDomainError } from "@/server/domain/errors";
 import { getAuditReportFile } from "@/server/services/audits";
 
@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 
 /** Descarga el JSON completo de una auditoría. Solo para el administrador. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) {
-    return Response.json({ error: "No autorizado" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  }
   const { id } = await params;
+  // 401 sin sesión; 404 si la persona no ve el proyecto de esta auditoría (igual que si no existiera).
+  const denied = await apiAuditAccess(id);
+  if (denied instanceof Response) return denied;
   try {
     const { filename, json } = await getAuditReportFile(id);
     // El nombre sale de la clave de R2 (solo letras, números, guiones y puntos), pero se sanea igual.

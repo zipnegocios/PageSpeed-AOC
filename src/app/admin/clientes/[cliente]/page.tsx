@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { formatDate } from "@/lib/audit-format";
 import { appUrl, orNotFound } from "@/lib/not-found";
 import { clientPath, projectPath } from "@/lib/urls";
-import { verifySession } from "@/lib/auth/session";
+import { clientLevelOf, requireScope } from "@/lib/auth/access";
+import { ShareForm } from "@/app/admin/_components/share-form";
+import { canManage, canViewProject } from "@/server/domain/access";
+import { getClientSharing } from "@/server/services/team-access";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
@@ -28,6 +31,8 @@ import {
   renameClientSlugAction,
   generateAndEmailPinAction,
   generatePinAction,
+  saveClientSharesAction,
+  saveProjectSharesAction,
   sendWelcomeAction,
   setClientStatusAction,
   setReportPreferencesAction,
@@ -38,13 +43,20 @@ import { pageTitle } from "@/lib/brand";
 export const metadata: Metadata = { title: pageTitle("Cliente"), robots: { index: false, follow: false } };
 
 export default async function ClientPage({ params }: { params: Promise<{ cliente: string }> }) {
-  await verifySession();
+  const { session, scope } = await requireScope();
   const { cliente } = await params;
   const client = await orNotFound(getClientByRef(cliente));
+  // Quien no ve el cliente recibe el mismo 404 que si no existiera.
+  const level = await clientLevelOf(client.id);
+  if (!level) notFound();
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (cliente !== client.slug) redirect(clientPath(client.slug));
   const id = client.id;
-  const projects = await listProjects(id);
+  const full = level === "full";
+  const manage = canManage(session, client);
+  // Con un cliente compartido solo por proyectos, la persona ve el cliente como contenedor: nombre y esos proyectos, nada más.
+  const projects = (await listProjects(id)).filter((p) => canViewProject(scope, { id: p.id, clientId: id }));
+  const sharing = manage ? await getClientSharing(session, id) : null;
   const responsibles = await listResponsibles();
   // Sin responsable (clientes anteriores) firma la cuenta propietaria.
   const responsible = responsibles.find((r) => r.id === client.ownerId) ?? responsibles.find((r) => r.role === "owner") ?? responsibles[0] ?? null;
@@ -85,6 +97,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             ))}
           </ul>
         )}
+        {full ? (
         <details open={projects.length === 0} className="rounded-sm border border-border p-4">
           <summary className="cursor-pointer text-[19px] font-semibold text-ink">Nuevo proyecto</summary>
           <ActionForm action={createProjectAction.bind(null, id)} submitLabel="Crear proyecto" pendingLabel="Creando…" className="mt-4">
@@ -103,8 +116,11 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             <Field label="URL del sitemap (opcional)" id="sitemapUrl" type="url" placeholder="Por defecto: /sitemap.xml" autoComplete="off" />
           </ActionForm>
         </details>
+        ) : null}
       </Card>
 
+      {full ? (
+        <>
       <Card title="Logotipo" description="Dos versiones del logotipo del cliente. Se ven en su portal, en el panel y en los informes en PDF.">
         <ClientLogoUploader clientId={id} name={client.name} icon={Boolean(logo?.icon)} full={Boolean(logo?.full)} bg={client.logoBg} v={logo?.v ?? 0} />
       </Card>
@@ -113,6 +129,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
         title="Responsable"
         description="Quien atiende a este cliente. Firma todos los correos que recibe, le llegan las alertas de sus proyectos y es el contacto de su portal. Quien crea el cliente queda como responsable."
       >
+        {manage ? (
         <ActionForm action={assignClientOwnerAction.bind(null, id)} submitLabel="Cambiar responsable" pendingLabel="Guardando…" variant="secondary" className="max-w-xl">
           <SelectField label="Responsable" id="ownerId" defaultValue={responsible?.id ?? ""}>
             {responsibles.map((r) => (
@@ -124,6 +141,11 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             ))}
           </SelectField>
         </ActionForm>
+        ) : responsible ? (
+          <p className="text-ink">
+            Responsable: <strong>{responsible.name}</strong> <span className="text-[15px] text-ink-muted">· solo el responsable o el propietario pueden cambiarlo.</span>
+          </p>
+        ) : null}
         {responsible ? (
           <div className="flex flex-col gap-2 text-[15px] leading-5 text-ink-muted">
             <p>
@@ -135,6 +157,30 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
           </div>
         ) : null}
       </Card>
+
+      {manage && sharing ? (
+        <Card title="Compartir con el equipo" description="Quien marques ve este cliente y todos sus proyectos, también los que crees después, y los opera igual que tú. No puede compartirlo, cambiar el responsable ni archivarlo. El propietario siempre lo ve.">
+          <ShareForm
+            members={sharing.candidates}
+            checked={sharing.clientShared}
+            action={saveClientSharesAction.bind(null, id)}
+            emptyText="Todavía no hay más personas en el equipo. Invítalas desde Equipo (solo el propietario)."
+          />
+          {sharing.candidates.length > 0 && projects.length > 0 ? (
+            <details className="rounded-sm border border-border p-4">
+              <summary className="cursor-pointer text-[19px] font-semibold text-ink">Compartir solo algunos proyectos</summary>
+              <div className="mt-3 flex flex-col gap-5">
+                {projects.map((p) => (
+                  <div key={p.id} className="flex flex-col gap-2">
+                    <p className="text-[17px] font-semibold break-words text-ink">{p.name}</p>
+                    <ShareForm members={sharing.candidates} checked={sharing.projectShared[p.id] ?? []} action={saveProjectSharesAction.bind(null, p.id)} emptyText="" />
+                  </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Card
         title="Bienvenida"
@@ -245,11 +291,13 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
                 : "El cliente verá una pantalla para renovar el servicio en lugar de sus resultados."}
             </span>
           </p>
-          <ActionForm
-            action={setClientStatusAction.bind(null, id, active ? "suspended" : "active")}
-            submitLabel={active ? "Suspender cliente" : "Reactivar cliente"}
-            variant={active ? "secondary" : "primary"}
-          />
+          {manage ? (
+            <ActionForm
+              action={setClientStatusAction.bind(null, id, active ? "suspended" : "active")}
+              submitLabel={active ? "Suspender cliente" : "Reactivar cliente"}
+              variant={active ? "secondary" : "primary"}
+            />
+          ) : null}
         </div>
       </Card>
 
@@ -269,11 +317,15 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
         <RenameSlugForm action={renameClientSlugAction.bind(null, id)} current={client.slug} what="cliente" aliases={client.slugAliases} />
       </Card>
 
+      {manage ? (
       <Card title="Archivar cliente" description="Lo oculta del panel, detiene sus auditorías y desactiva su link del portal. No borra nada: lo encuentras en Archivados, donde puedes restaurarlo o eliminarlo para siempre.">
         <div>
           <ActionForm action={archiveClientAction.bind(null, id)} submitLabel="Archivar cliente" variant="secondary" pendingLabel="Archivando…" />
         </div>
       </Card>
+      ) : null}
+        </>
+      ) : null}
     </AdminShell>
   );
 }

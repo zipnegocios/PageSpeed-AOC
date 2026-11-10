@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth/session";
+import { apiAuditAccess } from "@/lib/auth/access";
 import { isDomainError } from "@/server/domain/errors";
 import { REPORT_HEADERS, parseLocale } from "@/server/report/lighthouse-report";
 import { getOfficialReportHtml } from "@/server/services/audit-lhr";
@@ -9,10 +9,9 @@ export const runtime = "nodejs";
 
 /** Informe oficial de Lighthouse de una auditoría, para el marco aislado del panel. Solo administrador. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) {
-    return Response.json({ error: "No autorizado" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  }
   const { id } = await params;
+  const denied = await apiAuditAccess(id);
+  if (denied instanceof Response) return denied;
   try {
     const audit = await getAudit(id);
     const html = await getOfficialReportHtml(audit, parseLocale(new URL(req.url).searchParams.get("lang")));

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { field, guarded, type ActionState } from "@/lib/actions";
-import { verifySession } from "@/lib/auth/session";
+import { requireManageClient, requireManageProject, requireProjectAccess, requireRouteAccess } from "@/lib/auth/access";
 import { clientPath, projectPath } from "@/lib/urls";
 import { parsePeriod } from "@/server/domain/history";
 import { MAX_WAITING_JOBS, requestAudit, requestFirstScan } from "@/server/services/audits";
@@ -21,8 +21,8 @@ import * as thresholds from "@/server/services/thresholds";
 const refresh = (_projectId?: string) => revalidatePath("/admin", "layout");
 
 export async function updateProjectAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     await projects.updateProject(id, {
       name: field(fd, "name"),
       baseUrl: field(fd, "baseUrl"),
@@ -36,8 +36,8 @@ export async function updateProjectAction(id: string, _prev: ActionState, fd: Fo
 }
 
 export async function setPhaseAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     const { suppressedAlerts, project, scheduler } = await projects.setProjectPhase(id, field(fd, "phase"));
     refresh(id);
     const label = project.phase === "production" ? "producción" : "desarrollo";
@@ -51,8 +51,8 @@ export async function setPhaseAction(id: string, _prev: ActionState, fd: FormDat
 }
 
 export async function setThresholdsAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     await thresholds.setThresholds(
       id,
       METRICS.map((metric) => ({
@@ -67,8 +67,8 @@ export async function setThresholdsAction(id: string, _prev: ActionState, fd: Fo
 }
 
 export async function addRouteAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     const route = await routes.addRoute(id, {
       path: field(fd, "path"),
       label: field(fd, "label"),
@@ -85,24 +85,24 @@ export async function toggleRouteAction(
   monitored: boolean,
   _prev: ActionState,
 ): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireRouteAccess(routeId);
     await routes.setRouteMonitored(routeId, monitored);
     refresh(projectId);
   });
 }
 
 export async function removeRouteAction(projectId: string, routeId: string, _prev: ActionState): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireRouteAccess(routeId);
     await routes.removeRoute(routeId);
     refresh(projectId);
   });
 }
 
 export async function discoverRoutesAction(id: string, _prev: ActionState): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     const found = await discoverRoutes(id);
     refresh(id);
     const notes = [
@@ -121,8 +121,8 @@ export async function discoverRoutesAction(id: string, _prev: ActionState): Prom
 }
 
 export async function importRoutesAction(id: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     const result = await importRoutes(
       id,
       fd.getAll("path").map((p) => String(p)),
@@ -133,8 +133,8 @@ export async function importRoutesAction(id: string, _prev: ActionState, fd: For
 }
 
 export async function renameProjectSlugAction(id: string, clientSlug: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(id);
     const project = await projects.renameProjectSlug(id, field(fd, "slug"));
     refresh();
     redirect(projectPath(clientSlug, project.slug));
@@ -142,8 +142,9 @@ export async function renameProjectSlugAction(id: string, clientSlug: string, _p
 }
 
 export async function archiveProjectAction(id: string, clientId: string, _prev: ActionState): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireManageProject(id);
+    await requireManageClient(clientId);
     const client = await clients.getClient(clientId);
     await projects.archiveProject(id);
     refresh();
@@ -161,8 +162,8 @@ export async function requestAuditAction(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
-  const session = await verifySession();
   return guarded(async () => {
+    const session = await requireRouteAccess(routeId);
     const profile = field(fd, "profile");
     const result = await requestAudit({
       routeId,
@@ -183,8 +184,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * una auditoría correcta ni pendiente, así que se puede pulsar otra vez cuando la cola avance.
  */
 export async function firstScanAction(projectId: string, _prev: ActionState): Promise<ActionState> {
-  const session = await verifySession();
   return guarded(async () => {
+    const session = await requireProjectAccess(projectId);
     const r = await requestFirstScan(projectId, session.email);
     refresh(projectId);
     const head =
@@ -207,8 +208,8 @@ export async function firstScanAction(projectId: string, _prev: ActionState): Pr
 }
 
 export async function sendReportAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(projectId);
     const { to } = await sendProjectReport(projectId, parsePeriod(field(fd, "dias")));
     refresh(projectId);
     return { ok: `Informes enviados (resumen e ingeniería) a ${to}.` };
@@ -216,8 +217,8 @@ export async function sendReportAction(projectId: string, _prev: ActionState, fd
 }
 
 export async function toggleRouteAuthAction(projectId: string, routeId: string, requiresAuth: boolean, _prev: ActionState): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireRouteAccess(routeId);
     await routes.updateRouteDetails(routeId, { requiresAuth });
     refresh(projectId);
   });
@@ -225,8 +226,8 @@ export async function toggleRouteAuthAction(projectId: string, routeId: string, 
 
 /** El nombre que verá el cliente en su portal para esta página (vacío = el título del rastreo o, a falta, la ruta). */
 export async function updateRouteLabelAction(projectId: string, routeId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireRouteAccess(routeId);
     await routes.updateRouteDetails(routeId, { label: field(fd, "label").slice(0, 120) });
     refresh(projectId);
     return { ok: "Nombre guardado." };
@@ -234,8 +235,8 @@ export async function updateRouteLabelAction(projectId: string, routeId: string,
 }
 
 export async function saveFormAuthAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(projectId);
     await setProjectAuth(projectId, {
       strategy: "form",
       loginUrl: field(fd, "loginUrl"),
@@ -252,8 +253,8 @@ export async function saveFormAuthAction(projectId: string, _prev: ActionState, 
 }
 
 export async function saveCookieAuthAction(projectId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(projectId);
     await setProjectAuth(projectId, { strategy: "cookie", cookies: field(fd, "cookies") });
     refresh(projectId);
     return { ok: "Cookies guardadas (cifradas). Marca como «Requiere sesión» las rutas privadas." };
@@ -261,8 +262,8 @@ export async function saveCookieAuthAction(projectId: string, _prev: ActionState
 }
 
 export async function clearAuthAction(projectId: string, _prev: ActionState): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(projectId);
     await clearProjectAuth(projectId);
     refresh(projectId);
     return { ok: "Acceso eliminado. Las rutas que requieren sesión fallarán hasta configurar uno nuevo." };
@@ -270,8 +271,8 @@ export async function clearAuthAction(projectId: string, _prev: ActionState): Pr
 }
 
 export async function refreshFieldDataAction(projectId: string, _prev: ActionState): Promise<ActionState> {
-  await verifySession();
   return guarded(async () => {
+    await requireProjectAccess(projectId);
     const { queued } = await requestFieldDataRefresh(projectId);
     refresh(projectId);
     return { ok: queued ? "Actualización pedida al worker. Los datos aparecerán en unos minutos." : "Ya hay una actualización en curso o esperando al worker." };

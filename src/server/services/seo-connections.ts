@@ -1,3 +1,4 @@
+import type { Scope } from "@/server/domain/access";
 import { getDb, type Database } from "@/server/db/client";
 import { decryptJson, encryptJson } from "@/server/crypto/secret-box";
 import { DomainError } from "@/server/domain/errors";
@@ -264,8 +265,8 @@ async function checkCloudflare(row: repo.SeoIntegration, deps: SeoDeps): Promise
 export type SeoOverviewRow = ProjectListing & { connections: Record<SeoKind, "pending" | "ok" | "error" | null> };
 
 /** Todos los proyectos con el estado de cada conexión, para la pantalla general de SEO. */
-export async function getSeoOverview(db: Database = getDb()): Promise<SeoOverviewRow[]> {
-  const [projects, integrations] = await Promise.all([listAllProjects(db), repo.listAll(db)]);
+export async function getSeoOverview(db: Database = getDb(), scope?: Scope): Promise<SeoOverviewRow[]> {
+  const [projects, integrations] = await Promise.all([listAllProjects(db, scope), repo.listAll(db)]);
   const byProject = new Map<string, Record<SeoKind, "pending" | "ok" | "error" | null>>();
   for (const i of integrations) {
     const entry = byProject.get(i.projectId) ?? { gsc: null, ga4: null, cloudflare: null };

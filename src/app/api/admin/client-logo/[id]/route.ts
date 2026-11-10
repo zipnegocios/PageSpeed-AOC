@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth/session";
+import { apiClientAccess } from "@/lib/auth/access";
 import { isLogoKind } from "@/server/domain/client-logo";
 import { readClientLogo } from "@/server/services/client-logo";
 import { isUuid } from "@/server/services/shared";
@@ -8,10 +8,12 @@ export const runtime = "nodejs";
 
 /** El logotipo de un cliente para el panel (`?k=icon|full`). Solo con sesión de administrador; `?v=` lo versiona. */
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
-  if (!(await getSession())) return new Response(null, { status: 401 });
   const { id } = await ctx.params;
   const kind = new URL(req.url).searchParams.get("k");
   if (!isUuid(id) || !isLogoKind(kind)) return new Response(null, { status: 404 });
+  // El logotipo de un cliente lo ve quien ve el cliente, aunque solo tenga algún proyecto suyo compartido.
+  const denied = await apiClientAccess(id, "any");
+  if (denied instanceof Response) return denied;
   const logo = await readClientLogo(id, kind).catch(() => null);
   if (!logo) return new Response(null, { status: 404 });
   return new Response(new Uint8Array(logo.bytes), {

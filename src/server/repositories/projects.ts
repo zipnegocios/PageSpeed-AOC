@@ -1,3 +1,5 @@
+import type { Scope } from "@/server/domain/access";
+import { scopeWhere } from "./scope";
 import { and, asc, count, eq, isNull, or, sql } from "drizzle-orm";
 import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
 import type { Database } from "@/server/db/client";
@@ -100,7 +102,7 @@ export async function listProductionProjects(db: Database): Promise<ProductionPr
 
 export type ProductionProjectInfo = ProductionProject & { name: string; slug: string; clientId: string; clientName: string; clientSlug: string };
 
-export async function listProductionProjectsInfo(db: Database): Promise<ProductionProjectInfo[]> {
+export async function listProductionProjectsInfo(db: Database, scope?: Scope): Promise<ProductionProjectInfo[]> {
   return db
     .select({
       id: projects.id,
@@ -113,7 +115,7 @@ export async function listProductionProjectsInfo(db: Database): Promise<Producti
     })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))
-    .where(and(eq(projects.phase, "production"), live(), isNull(clients.deletedAt)))
+    .where(and(eq(projects.phase, "production"), live(), isNull(clients.deletedAt), scopeWhere(scope, projects.id, projects.clientId)))
     .orderBy(asc(clients.name), asc(projects.name));
 }
 
@@ -131,8 +133,8 @@ export type ProjectListing = {
   clientLogo: ClientLogoInfo | null;
 };
 
-/** Todos los proyectos vigentes con su cliente, para listados. */
-export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
+/** Todos los proyectos vigentes con su cliente, para listados. Con `scope`, solo los que ese alcance permite. */
+export async function listAllProjects(db: Database, scope?: Scope): Promise<ProjectListing[]> {
   const rows = await db
     .select({
       id: projects.id,
@@ -151,7 +153,7 @@ export async function listAllProjects(db: Database): Promise<ProjectListing[]> {
     })
     .from(projects)
     .innerJoin(clients, eq(clients.id, projects.clientId))
-    .where(and(isNull(projects.deletedAt), isNull(clients.deletedAt)))
+    .where(and(isNull(projects.deletedAt), isNull(clients.deletedAt), scopeWhere(scope, projects.id, projects.clientId)))
     .orderBy(asc(sql`lower(${clients.name})`), asc(sql`lower(${projects.name})`));
   return rows.map(({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt, ...p }) => ({ ...p, clientLogo: logoInfo({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt }) }));
 }

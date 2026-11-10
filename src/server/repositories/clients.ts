@@ -1,19 +1,31 @@
-import { and, asc, count, eq, isNull, or, sql } from "drizzle-orm";
+import type { Scope } from "@/server/domain/access";
+import { scopeWhere } from "./scope";
+import { and, asc, count, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { clients, projects } from "@/server/db/schema";
+
+/** Un cliente es visible si está en la lista de clientes del alcance o si tiene al menos un proyecto visible (el join de proyectos ya viene filtrado). */
+function visibleClients(scope: Scope | undefined): SQL | undefined {
+  if (!scope || scope.all) return undefined;
+  return scope.clientIds.length > 0 ? or(inArray(clients.id, scope.clientIds), isNotNull(projects.id)) : isNotNull(projects.id);
+}
 
 export type Client = typeof clients.$inferSelect;
 export type ClientWithCount = Client & { projectCount: number };
 
-export async function listClients(db: Database): Promise<ClientWithCount[]> {
+/**
+ * Los clientes vigentes con su número de proyectos. Con `scope`, los que la persona ve: los suyos y los compartidos enteros, y los que
+ * solo tienen algún proyecto compartido (de ellos, el recuento cuenta solo los proyectos que ve).
+ */
+export async function listClients(db: Database, scope?: Scope): Promise<ClientWithCount[]> {
   const rows = await db
     .select({
       client: clients,
       projectCount: count(projects.id),
     })
     .from(clients)
-    .leftJoin(projects, and(eq(projects.clientId, clients.id), isNull(projects.deletedAt)))
-    .where(isNull(clients.deletedAt))
+    .leftJoin(projects, and(eq(projects.clientId, clients.id), isNull(projects.deletedAt), scopeWhere(scope, projects.id, projects.clientId)))
+    .where(and(isNull(clients.deletedAt), visibleClients(scope)))
     .groupBy(clients.id)
     .orderBy(asc(sql`lower(${clients.name})`));
   return rows.map((r) => ({ ...r.client, projectCount: r.projectCount }));

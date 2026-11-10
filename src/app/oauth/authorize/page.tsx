@@ -1,3 +1,4 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { PortalShell } from "@/app/c/_components/portal-shell";
@@ -45,7 +46,9 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     );
   }
 
-  const [clients, projects] = await Promise.all([listClients(), listAllProjects()]);
+  // Un miembro solo puede dar acceso a lo que él ve.
+  const { scope } = await requireScope();
+  const [clients, projects] = await Promise.all([listClients(undefined, scope), listAllProjects(undefined, scope)]);
   const scopeClients = clients.map((c) => ({ id: c.id, name: c.name, projects: projects.filter((p) => p.clientId === c.id).map((p) => ({ id: p.id, name: p.name })) }));
   const presets = PRESET_IDS.map((id) => ({ id, label: PRESETS[id].label, description: PRESETS[id].description }));
 

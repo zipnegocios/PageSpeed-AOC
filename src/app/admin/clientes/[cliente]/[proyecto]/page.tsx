@@ -1,8 +1,12 @@
+import { requireProjectAccess, requireScope } from "@/lib/auth/access";
+import { ShareForm } from "@/app/admin/_components/share-form";
+import { canManage } from "@/server/domain/access";
+import { getProjectSharing } from "@/server/services/team-access";
+import { saveProjectSharesAction } from "@/app/admin/clientes/actions";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { orNotFound } from "@/lib/not-found";
 import { clientPath, projectPath } from "@/lib/urls";
-import { verifySession } from "@/lib/auth/session";
 import { ActionForm } from "@/lib/ui/components/action-form";
 import { Badge } from "@/lib/ui/components/badge";
 import { Alert } from "@/lib/ui/components/alert";
@@ -65,10 +69,12 @@ const METRIC_LABELS = {
 const dateFormat = new Intl.DateTimeFormat("es", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ cliente: string; proyecto: string }>; searchParams: Promise<HistorySearch> }) {
-  await verifySession();
+  const { session } = await requireScope();
   const { cliente, proyecto } = await params;
   const search = await searchParams;
   const project = await orNotFound(getProjectByRef(cliente, proyecto));
+  // Quien no ve el proyecto recibe el mismo 404 que si no existiera.
+  await orNotFound(requireProjectAccess(project.id));
   // Un enlace antiguo con UUID se lleva a la dirección legible.
   if (cliente !== project.clientSlug || proyecto !== project.slug) redirect(projectPath(project.clientSlug, project.slug));
   const id = project.id;
@@ -87,6 +93,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   ]);
   const authKey = authKeyStatus();
   const client = await getClient(project.clientId);
+  const manage = canManage(session, client);
+  const sharing = manage ? await getProjectSharing(session, id) : null;
   const production = project.phase === "production";
   const nextRun = production ? await getNextScheduledRun(id) : null;
   const emailsPanel = production ? await getEmailsPanel(id) : null;
@@ -457,11 +465,19 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <RenameSlugForm action={renameProjectSlugAction.bind(null, id, project.clientSlug)} current={project.slug} what="proyecto" aliases={project.slugAliases} />
       </Card>
 
+      {manage && sharing && sharing.candidates.length > 0 ? (
+        <Card title="Compartir este proyecto" description="Quien marques ve este proyecto y lo opera igual que tú; del cliente solo ve el nombre. No puede compartirlo ni archivarlo. Para compartir el cliente entero, usa su ficha.">
+          <ShareForm members={sharing.candidates} checked={sharing.projectShared[id] ?? []} action={saveProjectSharesAction.bind(null, id)} emptyText="" />
+        </Card>
+      ) : null}
+
+      {manage ? (
       <Card title="Archivar proyecto" description="Lo oculta del panel y detiene sus auditorías. No borra nada: lo encuentras en Archivados, donde puedes restaurarlo o eliminarlo para siempre.">
         <div>
           <ActionForm action={archiveProjectAction.bind(null, id, project.clientId)} submitLabel="Archivar proyecto" variant="secondary" pendingLabel="Archivando…" />
         </div>
       </Card>
+      ) : null}
     </AdminShell>
   );
 }

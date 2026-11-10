@@ -1,3 +1,4 @@
+import type { Scope } from "@/server/domain/access";
 import { projectPath } from "@/lib/urls";
 import { eq } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
@@ -323,9 +324,9 @@ function toView(r: repo.OpenAlertRow): AlertView {
   };
 }
 
-export async function listOpenAlerts(projectId?: string, db: Database = getDb()): Promise<AlertView[]> {
+export async function listOpenAlerts(projectId?: string, db: Database = getDb(), scope?: Scope): Promise<AlertView[]> {
   if (projectId) assertUuid(projectId, "Proyecto");
-  return (await repo.listOpenAlerts(db, { projectId })).map(toView);
+  return (await repo.listOpenAlerts(db, { projectId, scope })).map(toView);
 }
 
 /** Lo que el portal necesita de cada alerta abierta: la condición exacta (rubro, valor y meta), sin datos internos. */
@@ -353,9 +354,9 @@ export async function listOpenAlertConditions(projectId: string, db: Database = 
   }));
 }
 
-export function listRecentNotifications(limit = 20, projectId?: string, db: Database = getDb()) {
+export function listRecentNotifications(limit = 20, projectId?: string, db: Database = getDb(), scope?: Scope) {
   if (projectId) assertUuid(projectId, "Proyecto");
-  return repo.listRecentNotifications(db, Math.min(Math.max(limit, 1), 100), projectId);
+  return repo.listRecentNotifications(db, Math.min(Math.max(limit, 1), 100), projectId, scope);
 }
 
 /** Enlace de WhatsApp para avisar al cliente de las alertas abiertas del proyecto. null si no hay teléfono o alertas. */

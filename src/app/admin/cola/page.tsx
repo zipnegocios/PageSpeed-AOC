@@ -1,7 +1,7 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
-import { verifySession } from "@/lib/auth/session";
 import { projectPath } from "@/lib/urls";
 import { Alert } from "@/lib/ui/components/alert";
 import { Badge } from "@/lib/ui/components/badge";
@@ -19,8 +19,10 @@ export const metadata: Metadata = { title: pageTitle("Cola"), robots: { index: f
 const FREQUENCY = { weekly: "Semanal", daily: "Diaria" } as const;
 
 export default async function QueuePage() {
-  await verifySession();
-  const [status, backups] = await Promise.all([getQueueStatus(), getBackupStatus()]);
+  const { session, scope } = await requireScope();
+  // Los respaldos y los contadores de la cola son del sistema entero: solo el propietario.
+  const isOwner = session.role === "owner";
+  const [status, backups] = await Promise.all([getQueueStatus({ scope }), isOwner ? getBackupStatus() : Promise.resolve(null)]);
   const busy = (status.counts?.active ?? 0) + (status.counts?.waiting ?? 0) > 0;
 
   const stats = status.counts
@@ -83,6 +85,7 @@ export default async function QueuePage() {
         )}
       </Card>
 
+      {isOwner && backups ? (
       <Card title="Respaldos" description="Cada día (03:17 UTC) el worker copia la base de datos a R2, fuera de las carpetas de los clientes. Se conservan 30 días y siempre los 5 más recientes.">
         <div className="flex flex-wrap items-center gap-3">
           <Badge tone={backups.stale ? "danger" : "ok"}>{backups.stale ? "Sin respaldo reciente" : "Al día"}</Badge>
@@ -113,6 +116,7 @@ export default async function QueuePage() {
         ) : null}
         <ActionForm action={requestBackupAction} submitLabel="Respaldar ahora" pendingLabel="Pidiendo…" variant="secondary" />
       </Card>
+      ) : null}
 
       <Card title="Últimos fallos" description="Las 10 auditorías más recientes que terminaron en error.">
         {status.recentFailures.length === 0 ? (

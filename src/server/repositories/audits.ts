@@ -1,3 +1,5 @@
+import type { Scope } from "@/server/domain/access";
+import { scopeWhere } from "./scope";
 import type { AuditImprovements } from "@/server/domain/improvements";
 import { and, desc, eq, getTableColumns, inArray, isNotNull, lt, lte, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
@@ -181,13 +183,14 @@ export async function deleteQueuedScheduled(db: Database, projectId: string): Pr
 
 export type FailedAudit = AuditWithRoute & { projectName: string };
 
-export async function listRecentFailures(db: Database, limit: number): Promise<FailedAudit[]> {
+export async function listRecentFailures(db: Database, limit: number, scope?: Scope): Promise<FailedAudit[]> {
   const rows = await db
     .select({ audit: auditLogs, routePath: routes.path, projectName: projects.name })
     .from(auditLogs)
     .innerJoin(routes, eq(routes.id, auditLogs.routeId))
     .innerJoin(projects, eq(projects.id, auditLogs.projectId))
-    .where(eq(auditLogs.status, "failed"))
+    .innerJoin(clients, eq(clients.id, projects.clientId))
+    .where(and(eq(auditLogs.status, "failed"), scopeWhere(scope, projects.id, projects.clientId)))
     .orderBy(desc(auditLogs.finishedAt))
     .limit(limit);
   return rows.map((r) => ({ ...r.audit, routePath: r.routePath, projectName: r.projectName }));

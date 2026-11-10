@@ -1,6 +1,6 @@
+import { requireAuditAccess } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import { PROFILE_LABEL } from "@/lib/audit-format";
-import { verifySession } from "@/lib/auth/session";
 import { clientPath, projectPath } from "@/lib/urls";
 import { getLocale } from "@/lib/locale";
 import { orNotFound } from "@/lib/not-found";
@@ -15,8 +15,8 @@ export const metadata: Metadata = { title: pageTitle("Informe de Lighthouse"), r
 export const dynamic = "force-dynamic";
 
 export default async function AuditReportPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifySession();
   const { id } = await params;
+  await orNotFound(requireAuditAccess(id));
   const audit = await orNotFound(getAudit(id));
   const siblings = await getSiblingAudits(id);
   const locale = await getLocale();

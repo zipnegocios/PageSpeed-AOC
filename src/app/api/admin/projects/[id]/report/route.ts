@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth/session";
+import { apiProjectAccess } from "@/lib/auth/access";
 import { isDomainError } from "@/server/domain/errors";
 import { parsePeriod } from "@/server/domain/history";
 import { parseReportKind } from "@/server/domain/report-outline";
@@ -9,10 +9,10 @@ export const runtime = "nodejs";
 
 /** Informe del proyecto en PDF (`?tipo=resumen|ingenieria`, `?dias=`). Solo para el administrador. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) {
-    return Response.json({ error: "No autorizado" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  }
   const { id } = await params;
+  // Antes de la caché del PDF (se guarda por proyecto): quien no ve el proyecto no llega a ella.
+  const denied = await apiProjectAccess(id);
+  if (denied instanceof Response) return denied;
   const q = new URL(req.url).searchParams;
   const days = parsePeriod(q.get("dias"));
   const kind = parseReportKind(q.get("tipo"));

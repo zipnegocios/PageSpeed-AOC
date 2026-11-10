@@ -1,3 +1,5 @@
+import type { Scope } from "@/server/domain/access";
+import { scopeWhere } from "./scope";
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
 import { adminUsers, alertStates, alertThresholds, auditLogs, clients, notifications, projects, routes } from "@/server/db/schema";
@@ -43,7 +45,7 @@ const openAlertColumns = {
 };
 
 /** Alertas abiertas de proyectos en producción (las de desarrollo están suprimidas). */
-export function listOpenAlerts(db: Database, filter: { projectId?: string } = {}): Promise<OpenAlertRow[]> {
+export function listOpenAlerts(db: Database, filter: { projectId?: string; scope?: Scope } = {}): Promise<OpenAlertRow[]> {
   return db
     .select(openAlertColumns)
     .from(alertStates)
@@ -58,6 +60,7 @@ export function listOpenAlerts(db: Database, filter: { projectId?: string } = {}
         isNull(projects.deletedAt),
         isNull(clients.deletedAt),
         filter.projectId ? eq(alertStates.projectId, filter.projectId) : undefined,
+        scopeWhere(filter.scope, projects.id, projects.clientId),
       ),
     )
     .orderBy(asc(clients.name), asc(projects.name), asc(routes.path), asc(alertStates.openedAt));
@@ -122,13 +125,13 @@ export async function markNotified(db: Database, ids: string[], at: Date): Promi
 
 export type NotificationRow = Notification & { projectName: string; clientName: string };
 
-export function listRecentNotifications(db: Database, limit: number, projectId?: string): Promise<NotificationRow[]> {
+export function listRecentNotifications(db: Database, limit: number, projectId?: string, scope?: Scope): Promise<NotificationRow[]> {
   return db
     .select({ n: notifications, projectName: projects.name, clientName: clients.name })
     .from(notifications)
     .innerJoin(projects, eq(projects.id, notifications.projectId))
     .innerJoin(clients, eq(clients.id, notifications.clientId))
-    .where(projectId ? eq(notifications.projectId, projectId) : undefined)
+    .where(and(projectId ? eq(notifications.projectId, projectId) : undefined, scopeWhere(scope, projects.id, projects.clientId)))
     .orderBy(desc(notifications.sentAt))
     .limit(limit)
     .then((rows) => rows.map((r) => ({ ...r.n, projectName: r.projectName, clientName: r.clientName })));

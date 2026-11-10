@@ -1,5 +1,5 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
-import { verifySession } from "@/lib/auth/session";
 import { normalize } from "@/lib/project-search";
 import { Panel } from "@/lib/ui/components/panel";
 import { ProjectCard } from "@/lib/ui/components/project-card";
@@ -15,10 +15,10 @@ type Phase = (typeof PHASES)[number];
 
 /** Todos los proyectos en un solo lugar, sin pasar por los clientes: buscar, filtrar por fase y abrir. */
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; fase?: string }> }) {
-  await verifySession();
+  const { scope } = await requireScope();
   const { q = "", fase } = await searchParams;
   const phase: Phase = (PHASES as readonly string[]).includes(fase ?? "") ? (fase as Phase) : "todos";
-  const all = await getFleet();
+  const all = await getFleet(undefined, undefined, scope);
   const words = normalize(q).split(/\s+/).filter(Boolean);
   const shown = all
     .filter((p) => phase === "todos" || (phase === "produccion" ? p.phase === "production" : p.phase === "development"))

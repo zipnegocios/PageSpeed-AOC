@@ -1,3 +1,4 @@
+import { requireScope } from "@/lib/auth/access";
 import Link from "next/link";
 import { formatDate, PROFILE_LABEL } from "@/lib/audit-format";
 import { Badge } from "@/lib/ui/components/badge";
@@ -17,7 +18,7 @@ export type PhaseFilter = "todos" | "produccion" | "desarrollo";
 
 /** Cifras de toda la flota + una tarjeta por proyecto. Comparten datos, así que se piden una sola vez. */
 export async function FleetSection({ phase }: { phase: PhaseFilter }) {
-  const all = await getFleet().catch(() => null);
+  const all = await requireScope().then(({ scope }) => getFleet(undefined, undefined, scope)).catch(() => null);
   if (all === null) {
     return (
       <Panel title="Flota" span={4}>
@@ -112,7 +113,7 @@ export async function FleetSection({ phase }: { phase: PhaseFilter }) {
 }
 
 export async function RecentAuditsPanel() {
-  const pages = await listRecentPagesGlobal(10).catch(() => null);
+  const pages = await requireScope().then(({ scope }) => listRecentPagesGlobal(10, undefined, scope)).catch(() => null);
   return (
     <Panel id="auditorias" tag="AUD.03 // RECIENTES" title="Auditorías recientes" description="Por página, con móvil y escritorio juntos. Un clic abre la auditoría." span={2}>
       {pages === null ? <p className="text-ink-muted">No se pudieron leer las auditorías.</p> : <AuditFeed pages={pages} now={new Date()} />}
@@ -121,7 +122,7 @@ export async function RecentAuditsPanel() {
 }
 
 export async function AlertsPanel() {
-  const alerts = await listOpenAlerts().catch(() => null);
+  const alerts = await requireScope().then(({ scope }) => listOpenAlerts(undefined, undefined, scope)).catch(() => null);
   return (
     <Panel
       id="alertas"
@@ -149,7 +150,7 @@ export async function AlertsPanel() {
 
 /** Estado del worker y la cola + últimos fallos, con una sola lectura de la cola. */
 export async function OpsSection() {
-  const status = await getQueueStatus().catch(() => null);
+  const status = await requireScope().then(({ scope }) => getQueueStatus({ scope })).catch(() => null);
   const stats = status?.counts
     ? ([
         ["En curso", status.counts.active],

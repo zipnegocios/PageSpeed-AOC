@@ -1,3 +1,5 @@
+import type { Scope } from "@/server/domain/access";
+import { scopeWhere } from "./scope";
 import { and, desc, inArray, isNull, sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
@@ -23,7 +25,7 @@ export type RecentAuditRow = {
 };
 
 /** Las últimas auditorías de todos los proyectos vigentes (de clientes no archivados), de la más reciente a la más antigua. */
-export async function listRecentAuditsGlobal(db: Database, limit: number): Promise<RecentAuditRow[]> {
+export async function listRecentAuditsGlobal(db: Database, limit: number, scope?: Scope): Promise<RecentAuditRow[]> {
   return db
     .select({
       id: auditLogs.id,
@@ -47,7 +49,7 @@ export async function listRecentAuditsGlobal(db: Database, limit: number): Promi
     .innerJoin(routes, eq(routes.id, auditLogs.routeId))
     .innerJoin(projects, eq(projects.id, auditLogs.projectId))
     .innerJoin(clients, eq(clients.id, projects.clientId))
-    .where(and(isNull(projects.deletedAt), isNull(clients.deletedAt)))
+    .where(and(isNull(projects.deletedAt), isNull(clients.deletedAt), scopeWhere(scope, projects.id, projects.clientId)))
     .orderBy(desc(auditLogs.queuedAt))
     .limit(limit);
 }

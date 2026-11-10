@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth/session";
+import { apiAuditAccess } from "@/lib/auth/access";
 import { isDomainError } from "@/server/domain/errors";
 import { fullPageImage } from "@/server/domain/lhr-view";
 import { loadAuditLhr } from "@/server/services/audit-lhr";
@@ -9,8 +9,9 @@ export const runtime = "nodejs";
 
 /** Captura de página completa de una auditoría (para las evidencias del visor). Solo administrador. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSession())) return new Response("No autorizado", { status: 401, headers: { "Cache-Control": "no-store" } });
   const { id } = await params;
+  const denied = await apiAuditAccess(id);
+  if (denied instanceof Response) return denied;
   try {
     const lhr = await loadAuditLhr(await getAudit(id));
     const image = lhr ? fullPageImage(lhr) : null;

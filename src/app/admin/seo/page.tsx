@@ -1,6 +1,6 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { verifySession } from "@/lib/auth/session";
 import { pageTitle } from "@/lib/brand";
 import { projectPath } from "@/lib/urls";
 import { ActionForm } from "@/lib/ui/components/action-form";
@@ -31,8 +31,10 @@ const ext = (href: string, text: string) => (
 );
 
 export default async function SeoPage() {
-  await verifySession();
-  const [google, overview] = await Promise.all([getGoogleAccount(), getSeoOverview()]);
+  const { session, scope } = await requireScope();
+  // La cuenta de servicio de Google es de todo el sistema: solo el propietario la ve y la cambia.
+  const isOwner = session.role === "owner";
+  const [google, overview] = await Promise.all([getGoogleAccount(), getSeoOverview(undefined, scope)]);
   const keyStatus = authKeyStatus();
 
   return (
@@ -41,6 +43,7 @@ export default async function SeoPage() {
       subtitle="Cómo se encuentra y se usa cada sitio: búsqueda, visitas y presencia en asistentes de IA."
       crumbs={[{ label: "Panel", href: "/admin" }]}
     >
+      {isOwner ? (
       <Card
         title="Cuenta de servicio de Google"
         description="Se configura una sola vez para todo el panel. Con ella se leen Search Console y GA4 de los clientes que te den acceso."
@@ -120,6 +123,7 @@ export default async function SeoPage() {
 
         {google.configured && google.source === "panel" ? <ActionForm action={clearGoogleAccountAction} submitLabel="Quitar la cuenta" pendingLabel="Quitando…" variant="ghost" /> : null}
       </Card>
+      ) : null}
 
       <Card title={`Proyectos (${overview.length})`} description="Estado de las conexiones de cada proyecto. Entra en uno para conectarlo.">
         {overview.length === 0 ? (

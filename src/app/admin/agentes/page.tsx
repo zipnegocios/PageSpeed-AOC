@@ -1,7 +1,7 @@
+import { requireScope } from "@/lib/auth/access";
 import type { Metadata } from "next";
 import { appUrl } from "@/lib/not-found";
 import { formatDate } from "@/lib/audit-format";
-import { verifySession } from "@/lib/auth/session";
 import { Card } from "@/lib/ui/components/card";
 import { CopyButton } from "@/lib/ui/components/copy-button";
 import { accessSummary, type KeyAccess } from "@/server/domain/mcp-access";
@@ -46,8 +46,9 @@ function rowOf(k: ApiKeyView): KeyRowData {
 }
 
 export default async function AgentsPage() {
-  await verifySession();
-  const [keys, clients, projects] = await Promise.all([listApiKeys(), listClients(), listAllProjects()]);
+  const { session, scope } = await requireScope();
+  // Cada miembro ve sus claves y elige solo entre lo que ve; el propietario, todas.
+  const [keys, clients, projects] = await Promise.all([listApiKeys(undefined, session), listClients(undefined, scope), listAllProjects(undefined, scope)]);
   const scopeClients = clients.map((c) => ({ id: c.id, name: c.name, projects: projects.filter((p) => p.clientId === c.id).map((p) => ({ id: p.id, name: p.name })) }));
   const endpoint = `${appUrl()}/api/mcp`;
   const cli = `claude mcp add --transport http pagespeed ${endpoint} --header "Authorization: Bearer TU_CLAVE"`;

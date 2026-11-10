@@ -2,11 +2,14 @@ import { z } from "zod";
 import { getDb, type Database } from "@/server/db/client";
 import { generateApiKey, hashApiKey, isPlausibleApiKey } from "@/server/auth/api-key";
 import { DomainError } from "@/server/domain/errors";
+import { intersectAccess, type Actor, type Scope } from "@/server/domain/access";
 import { accessFromRow, type KeyAccess } from "@/server/domain/mcp-access";
 import { PRESET_IDS, presetOf, scopesForPreset, type PresetId, type ToolName } from "@/server/domain/mcp-scopes";
+import * as admins from "@/server/repositories/admin-users";
 import * as repo from "@/server/repositories/api-keys";
 import { listClients } from "@/server/repositories/clients";
 import { listAllProjects } from "@/server/repositories/projects";
+import { loadScope } from "./access";
 import { assertUuid, parseInput } from "./shared";
 
 const keyFieldsInput = z
@@ -48,8 +51,8 @@ export type ApiKeyView = {
 
 type Names = { clients: Map<string, string>; projects: Map<string, { name: string; clientName: string }> };
 
-async function loadNames(db: Database): Promise<Names> {
-  const [clients, projects] = await Promise.all([listClients(db), listAllProjects(db)]);
+async function loadNames(db: Database, scope?: Scope): Promise<Names> {
+  const [clients, projects] = await Promise.all([listClients(db, scope), listAllProjects(db, scope)]);
   return {
     clients: new Map(clients.map((c) => [c.id, c.name])),
     projects: new Map(projects.map((p) => [p.id, { name: p.name, clientName: p.clientName }])),
@@ -74,10 +77,14 @@ const toView = (r: repo.ApiKeyRow, names: Names): ApiKeyView => ({
   },
 });
 
-/** Valida los campos de una clave y deja el alcance listo para guardar (ids que existen, sin proyectos redundantes). */
-export async function resolveKeyFields(raw: unknown, db: Database) {
+/**
+ * Valida los campos de una clave y deja el alcance listo para guardar (ids que existen, sin proyectos redundantes). Con un miembro
+ * (`actor`), solo puede elegir lo que él ve; «acceso total» en su clave significa «todo lo que yo vea», también lo que se le comparta después.
+ */
+export async function resolveKeyFields(raw: unknown, db: Database, actor?: Actor) {
   const input = parseInput(keyFieldsInput, raw);
-  const names = await loadNames(db);
+  const scope = actor && actor.role !== "owner" ? await loadScope(db, actor) : undefined;
+  const names = await loadNames(db, scope);
 
   const all = input.access === "all";
   const clientIds = all ? [] : [...new Set(input.clientIds)];
@@ -86,7 +93,7 @@ export async function resolveKeyFields(raw: unknown, db: Database) {
     throw new DomainError("INVALID", "Alguno de los clientes o proyectos elegidos ya no existe. Recarga la página e inténtalo de nuevo.");
   }
   // Un proyecto de un cliente ya elegido es redundante: se guarda solo el cliente.
-  const listing = await listAllProjects(db);
+  const listing = await listAllProjects(db, scope);
   const clientOf = new Map(listing.map((p) => [p.id, p.clientId]));
   const keptProjects = projectIds.filter((id) => !clientIds.includes(clientOf.get(id) ?? ""));
 
@@ -97,10 +104,11 @@ export async function resolveKeyFields(raw: unknown, db: Database) {
 }
 
 /** Crea una clave. La clave en claro solo existe en este resultado: en la base se guarda su hash. */
-export async function createApiKey(raw: unknown, db: Database = getDb()): Promise<{ key: string; view: ApiKeyView }> {
-  const { names, fields } = await resolveKeyFields(raw, db);
+export async function createApiKey(raw: unknown, db: Database = getDb(), actor?: Actor): Promise<{ key: string; view: ApiKeyView }> {
+  const { names, fields } = await resolveKeyFields(raw, db, actor);
   const key = generateApiKey();
-  const row = await repo.insertApiKey(db, { ...fields, keyHash: hashApiKey(key) });
+  // La clave de un miembro queda ligada a él (nunca ve más que él); la del propietario, sin recorte.
+  const row = await repo.insertApiKey(db, { ...fields, keyHash: hashApiKey(key), createdBy: actor && actor.role !== "owner" ? actor.id : null });
   return { key, view: toView(row, names) };
 }
 
@@ -108,9 +116,9 @@ export async function createApiKey(raw: unknown, db: Database = getDb()): Promis
  * Cambia el nombre, los permisos y el alcance de una clave activa. La clave en sí no cambia; los cambios valen desde la
  * siguiente llamada del agente (la autenticación lee la fila en cada petición).
  */
-export async function updateApiKey(id: string, raw: unknown, db: Database = getDb()): Promise<ApiKeyView> {
+export async function updateApiKey(id: string, raw: unknown, db: Database = getDb(), actor?: Actor): Promise<ApiKeyView> {
   assertUuid(id, "Clave");
-  const { names, fields } = await resolveKeyFields(raw, db);
+  const { names, fields } = await resolveKeyFields(raw, db, actor);
   const row = await repo.updateKey(db, id, fields);
   if (!row) throw new DomainError("NOT_FOUND", "La clave no existe o ya está revocada: no se puede editar.");
   return toView(row, names);
@@ -136,8 +144,16 @@ export async function deleteApiKey(id: string, db: Database = getDb()): Promise<
   throw new DomainError("CONFLICT", "La clave sigue activa. Revócala primero y después podrás eliminarla.");
 }
 
-export async function listApiKeys(db: Database = getDb()): Promise<ApiKeyView[]> {
-  const [rows, names] = await Promise.all([repo.listApiKeys(db), loadNames(db)]);
+/** Un miembro ve y gestiona solo sus claves; el propietario, todas. */
+export async function assertKeyAccess(db: Database, actor: Actor, keyId: string): Promise<void> {
+  assertUuid(keyId, "Clave");
+  const row = await repo.findKey(db, keyId);
+  if (!row || (actor.role !== "owner" && row.createdBy !== actor.id)) throw new DomainError("NOT_FOUND", "La clave no existe.");
+}
+
+export async function listApiKeys(db: Database = getDb(), actor?: Actor): Promise<ApiKeyView[]> {
+  const member = actor && actor.role !== "owner" ? actor : undefined;
+  const [rows, names] = await Promise.all([repo.listApiKeys(db, member?.id), loadNames(db, member ? await loadScope(db, member) : undefined)]);
   return rows.map((r) => toView(r, names));
 }
 
@@ -155,6 +171,13 @@ export async function authenticateApiKey(key: string, db: Database = getDb(), no
   if (!row) return null;
   // Las conexiones OAuth tienen token de acceso con vigencia: vencido, se pide uno nuevo con el de refresco.
   if (row.expiresAt && row.expiresAt.getTime() <= now.getTime()) return null;
+  let access = accessFromRow(row);
+  if (row.createdBy) {
+    // Una clave de un miembro nunca ve más que él, ni siquiera si lo que ve cambió después de crearla. Sin la persona, sin acceso.
+    const creator = await admins.findAdminById(db, row.createdBy);
+    if (!creator) return null;
+    if (creator.role !== "owner") access = intersectAccess(access, await loadScope(db, { id: creator.id, role: "admin" }));
+  }
   await repo.touchKey(db, row.id, now, 60_000).catch(() => undefined);
-  return { id: row.id, name: row.name, scopes: row.scopes as ToolName[], access: accessFromRow(row) };
+  return { id: row.id, name: row.name, scopes: row.scopes as ToolName[], access };
 }

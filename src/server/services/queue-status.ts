@@ -1,3 +1,4 @@
+import type { Scope } from "@/server/domain/access";
 import type { Queue } from "bullmq";
 import type { Redis } from "ioredis";
 import { getDb, type Database } from "@/server/db/client";
@@ -31,11 +32,13 @@ export type QueueStatus = {
   recentFailures: FailedAudit[];
 };
 
-export type QueueStatusDeps = { db?: Database; redis?: Redis; lighthouse?: Queue; maintenance?: Queue };
+/** `scope`: lo que la persona ve. Con un alcance limitado, los fallos y las agendas se filtran y los contadores de la cola (que son de todo el sistema) no se muestran. */
+export type QueueStatusDeps = { db?: Database; redis?: Redis; lighthouse?: Queue; maintenance?: Queue; scope?: Scope };
 
 export async function getQueueStatus(deps: QueueStatusDeps = {}): Promise<QueueStatus> {
   const db = deps.db ?? getDb();
-  const [recentFailures, production] = await Promise.all([listRecentFailures(db, 10), listProductionProjectsInfo(db)]);
+  const [recentFailures, production] = await Promise.all([listRecentFailures(db, 10, deps.scope), listProductionProjectsInfo(db, deps.scope)]);
+  const showCounts = !deps.scope || deps.scope.all;
 
   try {
     const redis = deps.redis ?? getRedis();
@@ -48,7 +51,9 @@ export async function getQueueStatus(deps: QueueStatusDeps = {}): Promise<QueueS
     return {
       redis: true,
       worker: { online: beat !== null, chrome: beat ? beat.chrome : null, lastBeatAt: beat ? new Date(beat.at) : null },
-      counts: {
+      counts: !showCounts
+        ? null
+        : {
         waiting: (raw.waiting ?? 0) + (raw.prioritized ?? 0),
         active: raw.active ?? 0,
         delayed: raw.delayed ?? 0,
