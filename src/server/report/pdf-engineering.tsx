@@ -14,6 +14,8 @@ import { FieldBlock, Reason, SearchBlock, TrafficBlock } from "./pdf-measures";
 
 /** Cuántas páginas (las más débiles) se detallan en cada apartado; el resto se resume. */
 export const ENGINEERING_MAX_PAGES = 30;
+/** Cuántas causas se enumeran por rubro y página; el portal las tiene todas (hasta 50). */
+export const MAX_ITEMS_IN_PDF = 15;
 const CATEGORY_LABEL: Record<ImprovementCategory, string> = { performance: "Rendimiento", accessibility: "Accesibilidad", "best-practices": "Buenas prácticas", seo: "SEO" };
 const METRIC_LABEL: Record<string, string> = { performance: "Rendimiento", seo: "SEO", accessibility: "Accesibilidad", best_practices: "Buenas prácticas" };
 const TONE_COLOR = { ok: C.ok, warning: C.warning, danger: C.danger } as const;
@@ -112,12 +114,13 @@ function Items({ detail, category }: { detail: Detail; category: ImprovementCate
   if (items.length === 0) return <Text style={[s.small, { marginLeft: 8 }]}>Sin puntos por mejorar.</Text>;
   return (
     <View>
-      {items.map((it) => (
+      {items.slice(0, MAX_ITEMS_IN_PDF).map((it, i) => (
         <Text key={it.id} style={{ fontSize: 9.5, marginLeft: 8 }}>
-          – {plainImprovement(it)}
+          {i + 1}. {plainImprovement(it)}
           {formatImpact(it.impact) ? <Text style={{ color: C.muted }}> ({pdfImpact(formatImpact(it.impact))})</Text> : null}
         </Text>
       ))}
+      {items.length > MAX_ITEMS_IN_PDF ? <Text style={[s.small, { marginLeft: 8 }]}>… y {items.length - MAX_ITEMS_IN_PDF} más (están todas en el portal, en «Mejoras»).</Text> : null}
     </View>
   );
 }

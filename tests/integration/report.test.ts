@@ -76,7 +76,7 @@ describe.skipIf(!dbUrl)("informe del proyecto y envío por correo", () => {
       const { project } = await setup();
       const rs = [];
       for (let i = 0; i < 34; i++) rs.push(await routes.addRoute(project.id, { path: `/p${i}`, label: `Página ${i}` }, db));
-      const stored = { v: 1, categories: { seo: [{ id: "meta-description", title: "x", impact: { count: 1 } }] } };
+      const stored = { v: 2, categories: { seo: [{ id: "meta-description", title: "x", impact: { count: 1 } }] } };
       for (const [i, r] of rs.entries()) {
         const a = await audit(project.id, r.id, "mobile", daysAgo(2), 30 + i);
         await db.update(s.auditLogs).set({ improvements: stored as never }).where(eq(s.auditLogs.id, a.id));

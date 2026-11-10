@@ -22,7 +22,7 @@ export function reportData(kind: ReportData["kind"], o: Overrides = {}): ReportD
     })),
   );
   const titles = Object.fromEntries(paths.map((p, i) => [p, i === 0 ? "Inicio" : `Página número ${i}`]));
-  const improvements = { v: 1 as const, categories: { performance: [{ id: "render-blocking-insight", title: "Bloquea", impact: { ms: 1900 } }, { id: "unused-javascript", title: "JS", impact: { bytes: 90_000 } }], accessibility: [{ id: "color-contrast", title: "Contraste", impact: { count: 3 } }], seo: [{ id: "meta-description", title: "Sin descripción", impact: { count: 1 } }] } };
+  const improvements = { v: 2 as const, categories: { performance: [{ id: "render-blocking-insight", title: "Bloquea", impact: { ms: 1900 } }, { id: "unused-javascript", title: "JS", impact: { bytes: 90_000 } }], accessibility: [{ id: "color-contrast", title: "Contraste", impact: { count: 3 } }], seo: [{ id: "meta-description", title: "Sin descripción", impact: { count: 1 } }] } };
   const base: ReportData = {
     kind, generatedAt: now, days: 30, from: new Date(now.getTime() - 30 * DAY), clientName: "Acme S.A.", contactName: "Ana", contactEmail: "ana@acme.test",
     projectId: "p", projectName: "Tienda ñandú", baseUrl: "https://acme.test", performanceThreshold: 80,

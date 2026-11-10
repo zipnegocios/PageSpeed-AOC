@@ -1,5 +1,5 @@
 import type { Database } from "@/server/db/client";
-import { extractImprovements, isAuditImprovements, type AuditImprovements } from "@/server/domain/improvements";
+import { extractImprovements, isAuditImprovements, isLegacyImprovements, type AuditImprovements } from "@/server/domain/improvements";
 import { listAuditImprovements, saveAuditImprovements } from "@/server/repositories/audits";
 import { localizeLhr } from "@/server/report/lighthouse-report";
 import type { R2Store } from "@/server/storage/r2";
@@ -18,20 +18,28 @@ export async function loadAuditImprovements(auditIds: string[], db: Database, de
   let backfilled = 0;
   for (const id of auditIds) {
     const row = rows.get(id);
-    if (row && isAuditImprovements(row.improvements)) {
+    if (!row) continue;
+    if (isAuditImprovements(row.improvements)) {
       out.set(id, row.improvements);
-    } else if (row && backfilled < BACKFILL_PER_REQUEST) {
+      continue;
+    }
+    // Sin resumen o con el de la versión anterior (solo 10 causas por rubro): se vuelve a calcular desde R2 una vez, con tope por petición.
+    const legacy = isLegacyImprovements(row.improvements) ? row.improvements : null;
+    if (backfilled < BACKFILL_PER_REQUEST) {
       backfilled++;
       try {
         const lhr = await loadAuditLhr(row, deps.r2);
-        if (!lhr) continue;
-        const computed = extractImprovements(localizeLhr(lhr as never, "es"));
-        out.set(id, computed);
-        await saveAuditImprovements(db, id, computed);
+        if (lhr) {
+          const computed = extractImprovements(localizeLhr(lhr as never, "es"));
+          out.set(id, computed);
+          await saveAuditImprovements(db, id, computed);
+          continue;
+        }
       } catch {
-        /* R2 sin configurar o un resultado ilegible: la página queda sin causas, no sin aviso ni sin informe */
+        /* R2 sin configurar o un resultado ilegible: se queda con lo que ya había (si había), sin tumbar la página */
       }
     }
+    if (legacy) out.set(id, legacy);
   }
   return out;
 }

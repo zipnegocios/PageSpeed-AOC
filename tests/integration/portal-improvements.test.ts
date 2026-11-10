@@ -17,7 +17,7 @@ const DAY = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY);
 
 const STORED: AuditImprovements = {
-  v: 1,
+  v: 2,
   categories: {
     seo: [
       { id: "meta-description", title: "El documento no tiene una meta descripción", impact: { count: 1 } },
@@ -100,12 +100,37 @@ describe.skipIf(!url)("portal: mejoras por página", () => {
     const first = await portal.getPortalImprovements(await load(a), db, { r2 });
     expect(first.pages[0]!.blocks[0]!.items.map((i) => i.id)).toEqual(["meta-description"]);
     const [saved] = await db.select({ improvements: s.auditLogs.improvements }).from(s.auditLogs).where(eq(s.auditLogs.id, row.id));
-    expect(saved!.improvements).toMatchObject({ v: 1, categories: { seo: [{ id: "meta-description" }] } });
+    expect(saved!.improvements).toMatchObject({ v: 2, categories: { seo: [{ id: "meta-description" }] } });
 
     // La segunda vez ya no necesita R2: se lee de la base.
     s3.objects.clear();
     const second = await portal.getPortalImprovements(await load(a), db, { r2 });
     expect(second.pages[0]!.blocks[0]!.items.map((i) => i.id)).toEqual(["meta-description"]);
+  });
+
+  it("un resumen de la versión anterior (10 por rubro) se recalcula desde R2 con todas las causas; si R2 no responde, se queda con el anterior", async () => {
+    const a = await setup();
+    const ids = Array.from({ length: 14 }, (_, i) => `check-${i}`);
+    const lhr = {
+      lighthouseVersion: "13.0.0",
+      categories: { seo: { title: "SEO", score: 0.6, auditRefs: ids.map((id) => ({ id, weight: 1 })) } },
+      audits: Object.fromEntries(ids.map((id) => [id, { title: `Falla ${id}`, score: 0, scoreDisplayMode: "binary", details: { items: [{}] } }])),
+    };
+    await r2.putAuditJson("acme/sitio/contacto/mobile/v1.json.gz", lhr);
+    const legacy = { v: 1, categories: { seo: ids.slice(0, 10).map((id) => ({ id, title: id, impact: { count: 1 } })) } };
+    const row = await audit(a.project.id, a.routes[1]!.id, "mobile", { seo: 60, improvements: legacy as never, r2Key: "acme/sitio/contacto/mobile/v1.json.gz" });
+    await alerts.evaluateAudit(row.id, { db });
+    const out = await portal.getPortalImprovements(await load(a), db, { r2 });
+    expect(out.pages[0]!.blocks[0]!.items).toHaveLength(14);
+    const [saved] = await db.select({ improvements: s.auditLogs.improvements }).from(s.auditLogs).where(eq(s.auditLogs.id, row.id));
+    expect((saved!.improvements as { v: number }).v).toBe(2);
+
+    // Otra auditoría con el resumen anterior cuyo resultado ya no está en R2: conserva sus 10 causas.
+    const b = await audit(a.project.id, a.routes[1]!.id, "desktop", { seo: 60, improvements: legacy as never, r2Key: "no-existe.json.gz" });
+    await alerts.evaluateAudit(b.id, { db });
+    const kept = await portal.getPortalImprovements(await load(a), db, { r2 });
+    const desktop = kept.pages[0]!.blocks.find((x) => x.profile === "desktop");
+    expect(desktop!.items).toHaveLength(10);
   });
 
   it("si R2 no tiene el resultado, la página sigue apareciendo (sin causas) en lugar de perderse el aviso", async () => {

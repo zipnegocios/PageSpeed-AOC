@@ -35,3 +35,23 @@ describe("portal: acordeones", () => {
     }
   });
 });
+
+describe("portal: lista de causas expandible", () => {
+  const many = Array.from({ length: 14 }, (_, i) => ({ id: `c${i}`, text: `Causa número ${i + 1}`, impact: i === 0 ? "≈ 1,9 s" : "" }));
+  const page = { path: "/a", title: "Consultoría legal", blocks: [{ profile: "mobile" as const, kind: "threshold" as const, category: "performance" as const, value: 48, threshold: 85, auditId: "x", items: many }] };
+
+  it("enseña las 5 primeras numeradas, el botón va debajo de la lista y dice cuántas faltan", () => {
+    const html = renderToStaticMarkup(createElement(ImprovementList, { data: { total: 1, pages: [page] }, base: "/c/x/y" }));
+    for (let n = 1; n <= 5; n++) expect(html).toContain(`Causa número ${n}<`);
+    expect(html).not.toContain("Causa número 6<");
+    expect(html.indexOf("Ver las 9 restantes")).toBeGreaterThan(html.indexOf("Causa número 5<"));
+    expect(html).toContain("14 causas en total");
+  });
+
+  it("con 5 o menos no hay botón", () => {
+    const few = { ...page, blocks: [{ ...page.blocks[0]!, items: many.slice(0, 5) }] };
+    const html = renderToStaticMarkup(createElement(ImprovementList, { data: { total: 1, pages: [few] }, base: "/c/x/y" }));
+    expect(html).not.toContain("restantes");
+    expect(html).not.toContain("causas en total");
+  });
+});

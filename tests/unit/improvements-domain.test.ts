@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatImpact, hasGlossary, plainImprovement } from "@/server/domain/improvement-glossary";
-import { extractImprovements, isAuditImprovements } from "@/server/domain/improvements";
+import { MAX_ITEMS_PER_CATEGORY, extractImprovements, isAuditImprovements, isLegacyImprovements } from "@/server/domain/improvements";
 import type { LhrLike } from "@/server/domain/score-extraction";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url), "utf8")) as LhrLike;
@@ -63,12 +63,21 @@ describe("lo que hay que mejorar, extraído de Lighthouse", () => {
     expect(out["best-practices"]).toBeUndefined();
   });
 
+  it("guarda hasta 50 por rubro (antes 10), de más a menos importante, sin perder las que pasaban del décimo lugar", () => {
+    const ids = Array.from({ length: 63 }, (_, i) => `y${i}`);
+    const lhr: LhrLike = { categories: { accessibility: cat("", ids, 1) }, audits: Object.fromEntries(ids.map((id) => [id, { title: id, score: 0, scoreDisplayMode: "binary" }])) };
+    const out = extractImprovements(lhr).categories.accessibility!;
+    expect(out).toHaveLength(50);
+    expect(out.map((i) => i.id).slice(0, 12)).toEqual(ids.slice(0, 12));
+    expect(MAX_ITEMS_PER_CATEGORY).toBe(50);
+  });
+
   it("recorta a `limit` por rubro y devuelve vacío si no hay nada que mejorar", () => {
     const ids = Array.from({ length: 15 }, (_, i) => `x${i}`);
     const lhr: LhrLike = { categories: { accessibility: cat("", ids, 1) }, audits: Object.fromEntries(ids.map((id) => [id, { title: id, score: 0, scoreDisplayMode: "binary" }])) };
-    expect(extractImprovements(lhr).categories.accessibility).toHaveLength(10);
+    expect(extractImprovements(lhr).categories.accessibility).toHaveLength(15);
     expect(extractImprovements(lhr, 3).categories.accessibility).toHaveLength(3);
-    expect(extractImprovements({ categories: {}, audits: {} })).toEqual({ v: 1, categories: {} });
+    expect(extractImprovements({ categories: {}, audits: {} })).toEqual({ v: 2, categories: {} });
   });
 
   it("con un resultado real de Lighthouse 13 encuentra lo que falla y es JSON guardable", () => {
@@ -77,7 +86,9 @@ describe("lo que hay que mejorar, extraído de Lighthouse", () => {
     expect(out.categories["best-practices"]!.map((i) => i.id)).toContain("errors-in-console");
     expect(out.categories.performance!.map((i) => i.id)).toContain("unsized-images");
     expect(isAuditImprovements(JSON.parse(JSON.stringify(out)))).toBe(true);
-    expect(isAuditImprovements({ v: 2, categories: {} })).toBe(false);
+    expect(isAuditImprovements({ v: 1, categories: {} })).toBe(false); // la versión anterior (10 por rubro) se recalcula
+    expect(isLegacyImprovements({ v: 1, categories: {} })).toBe(true);
+    expect(isLegacyImprovements({ v: 2, categories: {} })).toBe(false);
     expect(isAuditImprovements(null)).toBe(false);
   });
 });
