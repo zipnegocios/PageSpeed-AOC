@@ -72,7 +72,8 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     await db.insert(s.seoSearchDaily).values({ projectId: project.id, date: "2026-10-29", page: "/", country: "col", device: "MOBILE", clicks: 7, impressions: 120, positionSum: 543.25 });
     await db.insert(s.seoTrafficDaily).values({ projectId: project.id, date: "2026-10-29", page: "/", country: "Colombia", channel: "Organic Search", sessions: 5, users: 4 });
     await db.insert(s.seoAiReferralsDaily).values({ projectId: project.id, date: "2026-10-29", source: "chatgpt.com", page: "/", sessions: 2, users: 2 });
-    await db.insert(s.seoSocialDaily).values({ projectId: project.id, date: "2026-10-29", network: "instagram", page: "/", sessions: 3, users: 2 });
+    await db.insert(s.seoSourceDaily).values({ projectId: project.id, date: "2026-10-29", grp: "social", source: "instagram", page: "/", sessions: 3, users: 2 });
+    await db.insert(s.seoQueryDaily).values({ projectId: project.id, date: "2026-10-29", query: "ingeniería civil", clicks: 4, impressions: 80, positionSum: 320 });
     await db.insert(s.projectActions).values({ projectId: project.id, happenedOn: "2026-10-14", text: "Actualicé un componente." });
     await db.insert(s.serverChecks).values({ projectId: project.id, month: "2026-10", checkedAt: new Date("2026-10-31T10:00:00Z") });
     await db.insert(s.clientReportSends).values({ projectId: project.id, kind: "weekly", periodKey: "2026-W45", status: "sent", sentAt: new Date("2026-11-10T13:00:00Z") });

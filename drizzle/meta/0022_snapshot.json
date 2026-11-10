@@ -1,5 +1,5 @@
 {
-  "id": "ad5098cf-292e-4397-909c-09687b050abb",
+  "id": "30378811-82d1-4c5a-b3f0-93c7507a4227",
   "prevId": "0c64e29c-f067-46e3-a3d0-ac8ca3428ffa",
   "version": "7",
   "dialect": "postgresql",
@@ -166,12 +166,6 @@
         },
         "avatar_key": {
           "name": "avatar_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "phone": {
-          "name": "phone",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1081,12 +1075,6 @@
         "welcome_sent_at": {
           "name": "welcome_sent_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -2789,6 +2777,103 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.seo_query_daily": {
+      "name": "seo_query_daily",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "query": {
+          "name": "query",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "position_sum": {
+          "name": "position_sum",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "seo_query_daily_project_date_idx": {
+          "name": "seo_query_daily_project_date_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "seo_query_daily_project_id_projects_id_fk": {
+          "name": "seo_query_daily_project_id_projects_id_fk",
+          "tableFrom": "seo_query_daily",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "seo_query_daily_project_id_date_query_pk": {
+          "name": "seo_query_daily_project_id_date_query_pk",
+          "columns": [
+            "project_id",
+            "date",
+            "query"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.seo_search_daily": {
       "name": "seo_search_daily",
       "schema": "",
@@ -2988,6 +3073,110 @@
             "project_id",
             "date",
             "network",
+            "page"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.seo_source_daily": {
+      "name": "seo_source_daily",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grp": {
+          "name": "grp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "page": {
+          "name": "page",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessions": {
+          "name": "sessions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "users": {
+          "name": "users",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "seo_source_daily_project_date_idx": {
+          "name": "seo_source_daily_project_date_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "seo_source_daily_project_id_projects_id_fk": {
+          "name": "seo_source_daily_project_id_projects_id_fk",
+          "tableFrom": "seo_source_daily",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "seo_source_daily_project_id_date_grp_source_page_pk": {
+          "name": "seo_source_daily_project_id_date_grp_source_page_pk",
+          "columns": [
+            "project_id",
+            "date",
+            "grp",
+            "source",
             "page"
           ]
         }

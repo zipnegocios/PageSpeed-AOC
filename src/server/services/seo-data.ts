@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@/server/db/client";
 import { socialLabel } from "@/server/domain/seo-social";
+import { SOURCE_GROUPS, SOURCE_GROUP_LABEL, sourceLabel, type SourceGroup } from "@/server/domain/seo-sources";
 import { DomainError } from "@/server/domain/errors";
 import {
   averagePosition,
@@ -55,6 +56,8 @@ export type SeoDashboard = {
     previousTotals: SearchTotals;
     daily: Array<{ date: string; clicks: number; impressions: number }>;
     topPages: Array<{ page: string; clicks: number; impressions: number; ctr: number; position: number | null }>;
+    /** Con qué buscan: las consultas con más clics del periodo (sin filtro de idioma: no llevan página). */
+    topQueries: Array<{ query: string; clicks: number; impressions: number; position: number | null }>;
     countries: Array<{ country: string; name: string; clicks: number; impressions: number }>;
     devices: Array<{ device: string; label: string; clicks: number; impressions: number }>;
   } | null;
@@ -69,6 +72,19 @@ export type SeoDashboard = {
     channels: Array<{ channel: string; sessions: number }>;
     topPages: Array<{ page: string; sessions: number; users: number }>;
     countries: Array<{ country: string; sessions: number }>;
+  } | null;
+  /**
+   * De dónde llegan las visitas, **repartidas por completo** (GA4): cada sesión en un solo grupo, así que los grupos suman el total.
+   * Null si no hay filas en el periodo.
+   */
+  sources: {
+    range: DateRange;
+    previous: DateRange;
+    totals: TrafficTotals;
+    previousTotals: TrafficTotals;
+    groups: Array<{ group: SourceGroup; label: string; sessions: number; previousSessions: number }>;
+    /** Las fuentes concretas con más sesiones (cualquier grupo): Google, Instagram, un dominio… */
+    top: Array<{ group: SourceGroup; key: string; label: string; sessions: number }>;
   } | null;
   /** Visitas que llegan desde redes sociales (GA4), por red. Null si no hay filas en el periodo. */
   social: {
@@ -97,6 +113,8 @@ const TOP_AI_SOURCES = 10;
 const TOP_AI_PAGES = 5;
 const TOP_SOCIAL_NETWORKS = 12;
 const TOP_SOCIAL_PAGES = 5;
+const TOP_SOURCES = 15;
+const TOP_QUERIES = 10;
 
 const searchTotals = (row: data.SearchTotalsRow): SearchTotals => ({
   clicks: row.clicks,
@@ -110,13 +128,14 @@ const syncInfo = (row: integrations.SeoIntegration | undefined): SeoSyncInfo | n
 
 async function loadSearch(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["search"]> {
   const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
-  const [current, before, daily, pages, countries, devices] = await Promise.all([
+  const [current, before, daily, pages, countries, devices, queries] = await Promise.all([
     data.searchTotals(db, projectId, scope(range)),
     data.searchTotals(db, projectId, scope(prev)),
     data.searchDaily(db, projectId, scope(range)),
     data.searchBy(db, projectId, scope(range), "page", TOP_PAGES),
     data.searchBy(db, projectId, scope(range), "country", TOP_COUNTRIES),
     data.searchBy(db, projectId, scope(range), "device", 3),
+    data.queryTop(db, projectId, range, TOP_QUERIES),
   ]);
   if (current.rows === 0) return null;
   return {
@@ -128,6 +147,7 @@ async function loadSearch(db: Database, projectId: string, range: DateRange, pre
     topPages: pages.map((p) => ({ page: p.key, clicks: p.clicks, impressions: p.impressions, ctr: ctr(p.clicks, p.impressions), position: averagePosition(p.positionSum, p.impressions) })),
     countries: countries.map((c) => ({ country: c.key, name: countryName(c.key), clicks: c.clicks, impressions: c.impressions })),
     devices: devices.map((d) => ({ device: d.key, label: deviceLabel(d.key), clicks: d.clicks, impressions: d.impressions })),
+    topQueries: queries.map((q) => ({ query: q.query, clicks: q.clicks, impressions: q.impressions, position: averagePosition(q.positionSum, q.impressions) })),
   };
 }
 
@@ -151,6 +171,28 @@ async function loadTraffic(db: Database, projectId: string, range: DateRange, pr
     channels: channels.map((c) => ({ channel: c.key, sessions: c.sessions })),
     topPages: pages.map((p) => ({ page: p.key, sessions: p.sessions, users: p.users })),
     countries: countries.map((c) => ({ country: ga4CountryName(c.key), sessions: c.sessions })),
+  };
+}
+
+async function loadSources(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["sources"]> {
+  const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
+  const [current, before, groups, previousGroups, top] = await Promise.all([
+    data.sourceTotals(db, projectId, scope(range)),
+    data.sourceTotals(db, projectId, scope(prev)),
+    data.sourceByGroup(db, projectId, scope(range)),
+    data.sourceByGroup(db, projectId, scope(prev)),
+    data.sourceTop(db, projectId, scope(range), TOP_SOURCES),
+  ]);
+  if (current.rows === 0) return null;
+  const known = new Set<string>(SOURCE_GROUPS);
+  const before2 = new Map(previousGroups.map((g) => [g.group, g.sessions]));
+  return {
+    range,
+    previous: prev,
+    totals: { sessions: current.sessions, users: current.users },
+    previousTotals: { sessions: before.sessions, users: before.users },
+    groups: groups.filter((g) => known.has(g.group)).map((g) => ({ group: g.group as SourceGroup, label: SOURCE_GROUP_LABEL[g.group as SourceGroup], sessions: g.sessions, previousSessions: before2.get(g.group) ?? 0 })),
+    top: top.filter((t) => known.has(t.group)).map((t) => ({ group: t.group as SourceGroup, key: t.key, label: sourceLabel(t.group as SourceGroup, t.key), sessions: t.sessions })),
   };
 }
 
@@ -227,8 +269,8 @@ export async function getSeoDashboard(projectId: string, opts: { days: number; /
   const filter = lang ? marketsRepo.languageFilter(declared, lang) : undefined;
   const sync = { gsc: syncInfo(rows.find((r) => r.kind === "gsc")), ga4: syncInfo(rows.find((r) => r.kind === "ga4")) };
 
-  const end = latestDate([last.search, last.traffic, last.ai, last.social]);
-  if (!end) return { range: null, previous: null, sync, markets, lang, languages: null, search: null, traffic: null, social: null, ai: null };
+  const end = latestDate([last.search, last.traffic, last.ai, last.sources]);
+  if (!end) return { range: null, previous: null, sync, markets, lang, languages: null, search: null, traffic: null, sources: null, social: null, ai: null };
 
   const range = periodRange(end, opts.days);
   const prev = previousRange(range);
@@ -239,13 +281,14 @@ export async function getSeoDashboard(projectId: string, opts: { days: number; /
     return { r, p: previousRange(r) };
   };
   const s = forSource(last.search);
-  const t = forSource(latestDate([last.traffic, last.ai, last.social]));
-  const [search, traffic, social, ai, languages] = await Promise.all([
+  const t = forSource(latestDate([last.traffic, last.ai, last.sources]));
+  const [search, traffic, sources, social, ai, languages] = await Promise.all([
     loadSearch(db, projectId, s.r, s.p, filter),
     loadTraffic(db, projectId, t.r, t.p, filter),
+    loadSources(db, projectId, t.r, t.p, filter),
     loadSocial(db, projectId, t.r, t.p, filter),
     loadAi(db, projectId, t.r, t.p, filter),
     declared.length > 0 ? loadLanguages(db, projectId, s.r, t.r, declared) : Promise.resolve(null),
   ]);
-  return { range, previous: { from: prev.from, to: prev.to }, sync, markets, lang, languages, search, traffic, social, ai };
+  return { range, previous: { from: prev.from, to: prev.to }, sync, markets, lang, languages, search, traffic, sources, social, ai };
 }

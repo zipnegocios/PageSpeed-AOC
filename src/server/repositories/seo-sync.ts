@@ -1,7 +1,7 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
-import { seoAiReferralsDaily, seoSocialDaily, seoSearchDaily, seoTrafficDaily } from "@/server/db/schema";
-import type { AiRow, SearchRow, SocialRow, TrafficRow } from "@/server/domain/seo-sync";
+import { seoAiReferralsDaily, seoQueryDaily, seoSearchDaily, seoSourceDaily, seoTrafficDaily } from "@/server/db/schema";
+import type { AiRow, QueryRow, SearchRow, SourceRow, TrafficRow } from "@/server/domain/seo-sync";
 
 /** Filas por INSERT: con 8 columnas quedan lejos del límite de parámetros de Postgres (65.535). */
 const BATCH = 2000;
@@ -42,9 +42,16 @@ export async function replaceAiWindow(db: Database, projectId: string, from: str
   });
 }
 
-export async function replaceSocialWindow(db: Database, projectId: string, from: string, to: string, rows: SocialRow[]): Promise<void> {
+export async function replaceSourceWindow(db: Database, projectId: string, from: string, to: string, rows: SourceRow[]): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.delete(seoSocialDaily).where(and(eq(seoSocialDaily.projectId, projectId), gte(seoSocialDaily.date, from), lte(seoSocialDaily.date, to)));
-    for (const batch of batches(within(rows, from, to))) await tx.insert(seoSocialDaily).values(batch.map((r) => ({ projectId, ...r })));
+    await tx.delete(seoSourceDaily).where(and(eq(seoSourceDaily.projectId, projectId), gte(seoSourceDaily.date, from), lte(seoSourceDaily.date, to)));
+    for (const batch of batches(within(rows, from, to))) await tx.insert(seoSourceDaily).values(batch.map((r) => ({ projectId, ...r })));
+  });
+}
+
+export async function replaceQueryWindow(db: Database, projectId: string, from: string, to: string, rows: QueryRow[]): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(seoQueryDaily).where(and(eq(seoQueryDaily.projectId, projectId), gte(seoQueryDaily.date, from), lte(seoQueryDaily.date, to)));
+    for (const batch of batches(within(rows, from, to))) await tx.insert(seoQueryDaily).values(batch.map((r) => ({ projectId, ...r })));
   });
 }

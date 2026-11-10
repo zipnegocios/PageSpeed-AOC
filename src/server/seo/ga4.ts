@@ -1,22 +1,18 @@
-import { SOCIAL_CHANNEL_GROUPS, SOCIAL_SOURCE_REGEX } from "@/server/domain/seo-social";
+import { AI_SOURCE_REGEX } from "@/server/domain/seo-sources";
 import { requestJson, type Ctx } from "./http";
 
 export const GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 
 export type Ga4Ctx = Ctx & { token: string };
 
-/** Fuentes de sesión que se consideran asistentes de IA. Los enlaces de ChatGPT con `utm_source` llegan como `chatgpt.com`. */
-export const AI_SOURCE_REGEX = "chatgpt\\.com|chat\\.openai\\.com|perplexity|claude\\.ai|gemini\\.google\\.com|copilot\\.microsoft\\.com";
+export { AI_SOURCE_REGEX } from "@/server/domain/seo-sources";
 
 /** Filtro de GA4: sesiones cuya fuente coincide con un asistente de IA. */
 export const aiSourceFilter = {
   filter: { fieldName: "sessionSource", stringFilter: { matchType: "PARTIAL_REGEXP", value: AI_SOURCE_REGEX, caseSensitive: false } },
 };
 
-/** ¿Esta fuente de sesión es un asistente de IA? Misma regla que `aiSourceFilter`, para clasificar en local. */
-export function isAiSource(source: string): boolean {
-  return new RegExp(AI_SOURCE_REGEX, "i").test(source);
-}
+export { isAiSource } from "@/server/domain/seo-sources";
 
 export type Ga4Report = {
   dimensions: string[];
@@ -79,16 +75,3 @@ export async function runReport(c: Ga4Ctx, property: string, q: Ga4Report): Prom
   }
   return { rows, rowCount, truncated, requests };
 }
-
-/**
- * Filtro de GA4 para las redes sociales: sesiones cuyo grupo de canal es social o de vídeo, o cuya fuente parece de una red
- * conocida (WhatsApp o Telegram llegan a veces como «referido»). Es amplio a propósito: en local se descarta lo que no encaja.
- */
-export const socialSourceFilter = {
-  orGroup: {
-    expressions: [
-      { filter: { fieldName: "sessionDefaultChannelGroup", inListFilter: { values: [...SOCIAL_CHANNEL_GROUPS] } } },
-      { filter: { fieldName: "sessionSource", stringFilter: { matchType: "PARTIAL_REGEXP", value: SOCIAL_SOURCE_REGEX, caseSensitive: false } } },
-    ],
-  },
-};

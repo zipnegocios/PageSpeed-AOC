@@ -1,7 +1,7 @@
 import { and, between, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Database } from "@/server/db/client";
-import { seoAiReferralsDaily, seoSearchDaily, seoSocialDaily, seoTrafficDaily } from "@/server/db/schema";
+import { seoAiReferralsDaily, seoQueryDaily, seoSearchDaily, seoSourceDaily, seoTrafficDaily } from "@/server/db/schema";
 import type { Market } from "@/server/domain/seo-markets";
 import { languageCase, type PageFilter } from "./seo-markets";
 
@@ -21,14 +21,14 @@ const count = sql<number>`count(*)::int`;
 // ----------------------------------------------------------- último día
 
 /** Último día con datos en cada tabla (null si la tabla no tiene filas del proyecto). */
-export async function lastDates(db: Database, projectId: string): Promise<{ search: string | null; traffic: string | null; ai: string | null; social: string | null }> {
-  const [search, traffic, ai, social] = await Promise.all([
+export async function lastDates(db: Database, projectId: string): Promise<{ search: string | null; traffic: string | null; ai: string | null; sources: string | null }> {
+  const [search, traffic, ai, sources] = await Promise.all([
     db.select({ d: sql<string | null>`to_char(max(${seoSearchDaily.date}), 'YYYY-MM-DD')` }).from(seoSearchDaily).where(eq(seoSearchDaily.projectId, projectId)),
     db.select({ d: sql<string | null>`to_char(max(${seoTrafficDaily.date}), 'YYYY-MM-DD')` }).from(seoTrafficDaily).where(eq(seoTrafficDaily.projectId, projectId)),
     db.select({ d: sql<string | null>`to_char(max(${seoAiReferralsDaily.date}), 'YYYY-MM-DD')` }).from(seoAiReferralsDaily).where(eq(seoAiReferralsDaily.projectId, projectId)),
-    db.select({ d: sql<string | null>`to_char(max(${seoSocialDaily.date}), 'YYYY-MM-DD')` }).from(seoSocialDaily).where(eq(seoSocialDaily.projectId, projectId)),
+    db.select({ d: sql<string | null>`to_char(max(${seoSourceDaily.date}), 'YYYY-MM-DD')` }).from(seoSourceDaily).where(eq(seoSourceDaily.projectId, projectId)),
   ]);
-  return { search: search[0]?.d ?? null, traffic: traffic[0]?.d ?? null, ai: ai[0]?.d ?? null, social: social[0]?.d ?? null };
+  return { search: search[0]?.d ?? null, traffic: traffic[0]?.d ?? null, ai: ai[0]?.d ?? null, sources: sources[0]?.d ?? null };
 }
 
 // ------------------------------------------------------- Search Console
@@ -127,28 +127,72 @@ export async function aiBy(db: Database, projectId: string, r: Range, by: "sourc
     .limit(limit);
 }
 
-// --------------------------------------------------------- redes sociales
+// ----------------------------------------------- de dónde llegan (reparto completo)
 
-const socialIn = (projectId: string, r: Range) => and(eq(seoSocialDaily.projectId, projectId), between(seoSocialDaily.date, r.from, r.to), r.pageFilter?.(seoSocialDaily.page));
+const sourceIn = (projectId: string, r: Range, group?: string) =>
+  and(eq(seoSourceDaily.projectId, projectId), between(seoSourceDaily.date, r.from, r.to), group ? eq(seoSourceDaily.grp, group) : undefined, r.pageFilter?.(seoSourceDaily.page));
 
-export async function socialTotals(db: Database, projectId: string, r: Range): Promise<TrafficTotalsRow> {
+export async function sourceTotals(db: Database, projectId: string, r: Range, group?: string): Promise<TrafficTotalsRow> {
   const [row] = await db
-    .select({ rows: count, sessions: num(seoSocialDaily.sessions), users: num(seoSocialDaily.users) })
-    .from(seoSocialDaily)
-    .where(socialIn(projectId, r));
+    .select({ rows: count, sessions: num(seoSourceDaily.sessions), users: num(seoSourceDaily.users) })
+    .from(seoSourceDaily)
+    .where(sourceIn(projectId, r, group));
   return row ?? { rows: 0, sessions: 0, users: 0 };
 }
 
-export async function socialBy(db: Database, projectId: string, r: Range, by: "network" | "page", limit: number): Promise<Array<{ key: string; sessions: number; users: number }>> {
-  const column = seoSocialDaily[by];
-  const sessions = num(seoSocialDaily.sessions);
+/** Sesiones por grupo (buscador, red social, directo…) en el periodo. */
+export async function sourceByGroup(db: Database, projectId: string, r: Range): Promise<Array<{ group: string; sessions: number }>> {
+  const sessions = num(seoSourceDaily.sessions);
+  const rows = await db.select({ group: seoSourceDaily.grp, sessions }).from(seoSourceDaily).where(sourceIn(projectId, r)).groupBy(seoSourceDaily.grp).orderBy(desc(sessions), seoSourceDaily.grp);
+  return rows;
+}
+
+/** Las fuentes concretas con más sesiones (de un grupo o de todos). */
+export async function sourceTop(db: Database, projectId: string, r: Range, limit: number, group?: string): Promise<Array<{ group: string; key: string; sessions: number; users: number }>> {
+  const sessions = num(seoSourceDaily.sessions);
   return db
-    .select({ key: column, sessions, users: num(seoSocialDaily.users) })
-    .from(seoSocialDaily)
-    .where(socialIn(projectId, r))
-    .groupBy(column)
-    .orderBy(desc(sessions), column)
+    .select({ group: seoSourceDaily.grp, key: seoSourceDaily.source, sessions, users: num(seoSourceDaily.users) })
+    .from(seoSourceDaily)
+    .where(sourceIn(projectId, r, group))
+    .groupBy(seoSourceDaily.grp, seoSourceDaily.source)
+    .orderBy(desc(sessions), seoSourceDaily.grp, seoSourceDaily.source)
     .limit(limit);
+}
+
+/** Páginas de entrada de un grupo (p. ej. a las que llegan desde las redes). */
+export async function sourcePages(db: Database, projectId: string, r: Range, limit: number, group?: string): Promise<Array<{ key: string; sessions: number; users: number }>> {
+  const sessions = num(seoSourceDaily.sessions);
+  return db
+    .select({ key: seoSourceDaily.page, sessions, users: num(seoSourceDaily.users) })
+    .from(seoSourceDaily)
+    .where(sourceIn(projectId, r, group))
+    .groupBy(seoSourceDaily.page)
+    .orderBy(desc(sessions), seoSourceDaily.page)
+    .limit(limit);
+}
+
+// Redes sociales: el grupo «social» del reparto (los nombres se conservan para quien ya los usa).
+export const socialTotals = (db: Database, projectId: string, r: Range) => sourceTotals(db, projectId, r, "social");
+export async function socialBy(db: Database, projectId: string, r: Range, by: "network" | "page", limit: number): Promise<Array<{ key: string; sessions: number; users: number }>> {
+  if (by === "page") return sourcePages(db, projectId, r, limit, "social");
+  return (await sourceTop(db, projectId, r, limit, "social")).map(({ key, sessions, users }) => ({ key, sessions, users }));
+}
+
+// ------------------------------------------------------- con qué buscan (Search Console)
+
+export type QueryRowOut = { query: string; clicks: number; impressions: number; positionSum: number };
+
+/** Las consultas con más clics del periodo (suma de los días; la posición, ponderada por impresiones). No admite filtro de idioma: no hay página. */
+export async function queryTop(db: Database, projectId: string, r: { from: string; to: string }, limit: number): Promise<QueryRowOut[]> {
+  const clicks = num(seoQueryDaily.clicks);
+  const rows = await db
+    .select({ query: seoQueryDaily.query, clicks, impressions: num(seoQueryDaily.impressions), positionSum: sql<number>`coalesce(sum(${seoQueryDaily.positionSum}), 0)::float` })
+    .from(seoQueryDaily)
+    .where(and(eq(seoQueryDaily.projectId, projectId), between(seoQueryDaily.date, r.from, r.to)))
+    .groupBy(seoQueryDaily.query)
+    .orderBy(desc(clicks), seoQueryDaily.query)
+    .limit(limit);
+  return rows.map((x) => ({ ...x, positionSum: Number(x.positionSum) }));
 }
 
 // ------------------------------------------------------ desglose por idioma

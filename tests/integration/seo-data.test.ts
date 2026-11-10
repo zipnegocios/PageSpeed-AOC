@@ -37,12 +37,12 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
   const traffic = (project: string, date: string, page: string, country: string, channel: string, sessions: number, users: number) =>
     db.insert(s.seoTrafficDaily).values({ projectId: project, date, page, country, channel, sessions, users });
   const social = (project: string, date: string, network: string, page: string, sessions: number, users: number) =>
-    db.insert(s.seoSocialDaily).values({ projectId: project, date, network, page, sessions, users });
+    db.insert(s.seoSourceDaily).values({ projectId: project, date, grp: "social", source: network, page, sessions, users });
   const ai = (project: string, date: string, source: string, page: string, sessions: number, users: number) =>
     db.insert(s.seoAiReferralsDaily).values({ projectId: project, date, source, page, sessions, users });
 
   it("sin datos: rango nulo, secciones nulas y estado de descarga según las conexiones", async () => {
-    expect(await getSeoDashboard(projectId, { days: 28 }, db)).toEqual({ range: null, previous: null, sync: { gsc: null, ga4: null }, markets: [], lang: null, languages: null, search: null, traffic: null, social: null, ai: null });
+    expect(await getSeoDashboard(projectId, { days: 28 }, db)).toEqual({ range: null, previous: null, sync: { gsc: null, ga4: null }, markets: [], lang: null, languages: null, search: null, traffic: null, sources: null, social: null, ai: null });
 
     await db.insert(s.seoIntegrations).values([
       { projectId, kind: "gsc", externalId: "sc-domain:acme.test", syncStatus: "ok", syncedThrough: "2026-06-29", lastSyncAt: new Date("2026-06-30T10:00:00Z"), syncDetail: "Descargados 12 días." },
@@ -129,6 +129,36 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
       // El periodo anterior (días -13 a -7) está vacío en 7 días; con 90 días entra el día -30 (facebook).
       const d90 = await getSeoDashboard(projectId, { days: 90 }, db);
       expect(d90.social!.totals.sessions).toBe(21);
+    });
+
+    it("reparto completo de fuentes: los grupos suman el total de sesiones y se comparan con el periodo anterior", async () => {
+      const src = (date: string, grp: string, source: string, page: string, sessions: number) => db.insert(s.seoSourceDaily).values({ projectId, date, grp, source, page, sessions, users: sessions });
+      await src(day(0), "search", "google", "/es/precios", 20);
+      await src(day(0), "direct", "direct", "/", 10);
+      await src(day(-1), "referral", "blog.otro.com", "/es/blog", 5);
+      await src(day(-1), "search", "bing", "/es/blog", 5);
+      await src(day(-30), "search", "google", "/es/blog", 7);
+      const d = await getSeoDashboard(projectId, { days: 7 }, db);
+      expect(d.sources!.totals.sessions).toBe(20 + 10 + 5 + 5 + 17); // incluye las redes sociales sembradas arriba (8 + 5 + 3 + 1)
+      expect(d.sources!.groups.reduce((a, g) => a + g.sessions, 0)).toBe(d.sources!.totals.sessions); // el reparto suma el 100 %
+      expect(d.sources!.groups.map((g) => g.group)).toEqual(expect.arrayContaining(["search", "social", "direct", "referral"]));
+      expect(d.sources!.groups[0]).toMatchObject({ group: "search", label: "Buscadores", sessions: 25 });
+      expect(d.sources!.top[0]).toMatchObject({ group: "search", key: "google", label: "Google", sessions: 20 });
+      expect(d.sources!.top.find((t) => t.key === "blog.otro.com")?.label).toBe("blog.otro.com");
+      const d90 = await getSeoDashboard(projectId, { days: 90 }, db);
+      expect(d90.sources!.groups.find((g) => g.group === "search")!.sessions).toBe(32);
+    });
+
+    it("con qué buscan: las consultas con más clics del periodo, con la posición ponderada", async () => {
+      const q = (date: string, query: string, clicks: number, impressions: number, positionSum: number) => db.insert(s.seoQueryDaily).values({ projectId, date, query, clicks, impressions, positionSum });
+      await q(day(0), "grúa torre", 5, 50, 250);
+      await q(day(-1), "grúa torre", 3, 50, 100);
+      await q(day(-2), "andamio", 1, 10, 20);
+      await q(day(-100), "viejo", 9, 9, 9);
+      const d = await getSeoDashboard(projectId, { days: 28 }, db);
+      expect(d.search!.topQueries.map((x) => x.query)).toEqual(["grúa torre", "andamio"]);
+      expect(d.search!.topQueries[0]).toMatchObject({ clicks: 8, impressions: 100 });
+      expect(d.search!.topQueries[0]!.position).toBeCloseTo(3.5, 5); // (250 + 100) / 100
     });
 
     it("el filtro de idioma también acota las redes sociales por página", async () => {
