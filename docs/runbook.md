@@ -152,6 +152,15 @@ Crea la clave en Google Cloud (console.cloud.google.com): selecciona o crea un p
 **La conexión a Search Console o GA4 figura «Conectado», pero la descarga dice «Falta la cuenta de servicio de Google en el worker»**
 La prueba de conexión corre en el **web** y la descarga en el **worker**, y no comparten variables. Define `GOOGLE_SERVICE_ACCOUNT_JSON` también en el servicio del worker (el JSON completo, en una sola línea) y redespliégalo; después pulsa *Actualizar ahora*. Si la cuenta se guardó desde SEO → Cuenta de Google en lugar de la variable, el worker necesita la misma `AUTH_ENCRYPTION_KEY` que el web.
 
+**Las auditorías de Lighthouse de un proyecto fallan con `HTTP_4XX` pero PageSpeed Insights lo pasa**
+PSI sale de IPs de Google; el worker sale de la IP de su servidor y fija la IP del sitio en Chromium. Cuando Lighthouse da un 4xx (o «sitio caído»), el worker hace tres pruebas con la misma dirección y las deja en el mensaje del fallo (lista de Páginas y detalle de la auditoría): *«Prueba desde el worker: IP fijada 403 · DNS normal 403 · otro agente 200»*. Cómo leerlas:
+- Todas fallan igual (403/429): el sitio rechaza la **IP del worker**. Pide al cliente que la permita en su cortafuegos (misma gestión que el rastreador: ver «Pedir a un cliente que permita el rastreador»; la IP se averigua como allí).
+- Solo falla **IP fijada**: la fijación de IP rompe ese sitio (CDN o alojamiento compartido que enruta por nombre). El worker ya lo detecta y **reintenta una vez con el DNS normal**; si pasa, la auditoría sale bien y queda un aviso en el registro del worker.
+- Falla «DNS normal» pero pasa «otro agente»: el sitio rechaza el agente `Chrome-Lighthouse`.
+- 404 en las tres: la dirección base o la ruta no existe tal cual. 401: la página pide iniciar sesión (configura el acceso de la ruta).
+- `429`, `408` y `425` se **reintentan solos** (retroceso exponencial); los demás 4xx no.
+`WORKER_LOST` en una auditoría suelta: el worker se reinició a mitad (típicamente un despliegue). La reconciliación la reencola si el trabajo seguía pendiente; si quedó fallada, pulsa «Auditar este dispositivo». Si se repite fuera de despliegues, revisa la memoria del worker.
+
 **El rastreo técnico (pestaña SEO → «Auditoría técnica») sale «Fallido» o «Parcial»**
 El motivo está escrito en la propia pantalla. Los casos:
 - *«El sitio rechaza al rastreador (403 o 429)»* o *«un cortafuegos está frenando al rastreador»*: el sitio (casi siempre Cloudflare u otro WAF) bloquea al agente `PageSpeedAOC-SEO/1.0`. No hay nada que arreglar aquí: hay que pedir al cliente que lo permita (ver «Pedir a un cliente que permita el rastreador» abajo). No se guardan hallazgos de un rastreo bloqueado, para no llenar el panel de falsos errores.

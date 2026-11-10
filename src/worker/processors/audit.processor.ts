@@ -4,7 +4,7 @@ import type { Database } from "@/server/db/client";
 import { assertRouteAuditable } from "@/server/domain/audit-rules";
 import { AuthFailedError } from "@/server/domain/audit-errors";
 import { resolveProjectAuth } from "@/server/services/project-auth";
-import { classifyError } from "@/server/domain/error-classifier";
+import { classifyError, withNote } from "@/server/domain/error-classifier";
 import { LighthouseRuntimeError } from "@/server/domain/audit-errors";
 import { buildAuditKey } from "@/server/domain/r2-key";
 import { extractImprovements } from "@/server/domain/improvements";
@@ -17,6 +17,7 @@ import type { R2Store } from "@/server/storage/r2";
 import { resolvePinnedHost, type HostResolver } from "../host-pin";
 import type { ProjectAuthConfig } from "@/server/domain/project-auth";
 import type { LighthouseRunner } from "../lighthouse/runner";
+import { describeProbe, pinIsCulprit, probeSite } from "../lighthouse/probe";
 
 export type AuditProcessorDeps = {
   db: Database;
@@ -81,6 +82,7 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
     log.info({ url: ctx.route.url, profile: ctx.audit.profile, attempt, maxAttempts }, "auditoría iniciada");
 
     let launched = false;
+    let diagnosis = "";
     try {
       assertRouteAuditable(ctx.route.url, ctx.project.allowedHosts);
       const pinnedHost = await resolvePinnedHost(ctx.route.url, {
@@ -105,18 +107,37 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
       }
 
       launched = true;
-      const { lhr } = await deps.runner({
-        url: ctx.route.url,
-        profile: ctx.audit.profile,
-        timeoutMs: deps.timeoutMs,
-        chromePath: deps.chromePath,
-        pinnedHost,
-        extraPinnedHosts: extraPinnedHosts.filter((p): p is NonNullable<typeof p> => Boolean(p)),
-        auth,
-      });
+      const run = async (pin: typeof pinnedHost) => {
+        const { lhr } = await deps.runner({
+          url: ctx.route.url,
+          profile: ctx.audit.profile,
+          timeoutMs: deps.timeoutMs,
+          chromePath: deps.chromePath,
+          pinnedHost: pin,
+          extraPinnedHosts: extraPinnedHosts.filter((p): p is NonNullable<typeof p> => Boolean(p)),
+          auth,
+        });
+        const out = extractResults(lhr);
+        if (!out.ok) throw new LighthouseRuntimeError(out.code, out.message);
+        return { lhr, extracted: out };
+      };
 
-      const extracted = extractResults(lhr);
-      if (!extracted.ok) throw new LighthouseRuntimeError(extracted.code, extracted.message);
+      let result: Awaited<ReturnType<typeof run>>;
+      try {
+        result = await run(pinnedHost);
+      } catch (err) {
+        // Un 4xx o «sitio caído» con el sitio funcionando en PageSpeed Insights: se mira desde el worker quién rechaza (IP fijada, agente o IP del
+        // worker) y se deja en el mensaje. Si la culpable es la IP fijada, se reintenta una vez con el DNS normal (la IP ya se validó como pública).
+        const first = classifyError(err);
+        if (!(first.code === "HTTP_4XX" || first.code === "SITE_DOWN") || ctx.route.requiresAuth) throw err;
+        const probe = await probeSite(ctx.route.url, ctx.audit.profile, pinnedHost, { allowPrivate: deps.allowPrivate, resolver: deps.resolver });
+        diagnosis = describeProbe(probe);
+        if (!pinIsCulprit(probe)) throw err;
+        log.warn({ diagnosis }, "la IP fijada hace que el sitio rechace a Chromium; se reintenta con el DNS normal");
+        result = await run(undefined);
+        diagnosis = "";
+      }
+      const { lhr, extracted } = result;
 
       const key = buildAuditKey({
         clientSlug: ctx.clientSlug,
@@ -142,7 +163,7 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
       );
       await evaluate("success", auditId, log);
     } catch (err) {
-      const failure = classifyError(err);
+      const failure = withNote(classifyError(err), diagnosis);
       const isLast = !failure.retryable || attempt >= maxAttempts;
       if (isLast) {
         await repo.markFailed(deps.db, auditId, failure);

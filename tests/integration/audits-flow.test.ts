@@ -1,3 +1,4 @@
+import { createServer, type Server } from "node:http";
 import { gunzipSync } from "node:zlib";
 import pino from "pino";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -16,6 +17,7 @@ import { getFirstScanSummary, requestAudit, requestFirstScan } from "@/server/se
 import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
+import type { HostResolver } from "@/worker/host-pin";
 import { startWorker, type RunningWorker } from "@/worker/start";
 import type { LighthouseRunner } from "@/worker/lighthouse/runner";
 
@@ -61,8 +63,8 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
   });
 
   const okRunner: LighthouseRunner = async () => ({ lhr: structuredClone(fixture) as never });
-  const start = async (runner: LighthouseRunner) => {
-    worker = await startWorker({ env: env(), runner, allowPrivate: true, logger: pino({ level: "silent" }), heartbeatIntervalMs: 100 });
+  const start = async (runner: LighthouseRunner, resolver?: HostResolver) => {
+    worker = await startWorker({ env: env(), runner, allowPrivate: true, resolver, logger: pino({ level: "silent" }), heartbeatIntervalMs: 100 });
   };
 
   beforeAll(async () => {
@@ -90,11 +92,11 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
   });
 
   /** Proyecto con una ruta; usa una IP literal para no depender de DNS. */
-  async function setup(opts: { phase?: "development" | "production"; paths?: string[] } = {}) {
+  async function setup(opts: { phase?: "development" | "production"; paths?: string[]; baseUrl?: string } = {}) {
     const client = await clients.createClient({ name: "Acme" }, db);
     const project = await projects.createProject(
       client.id,
-      { name: "Sitio", baseUrl: "http://127.0.0.1:18123", phase: opts.phase ?? "development" },
+      { name: "Sitio", baseUrl: opts.baseUrl ?? "http://127.0.0.1:18123", phase: opts.phase ?? "development" },
       db,
     );
     const created = [];
@@ -389,6 +391,64 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
       const { audits: [a] } = await req(r!.id, ["mobile"]);
       const done = await waitFor(finished(a!.id));
       expect(done).toMatchObject({ status: "failed", attempts: 1, errorCode: "HTTP_4XX" });
+    });
+
+    describe("un 4xx del sitio", () => {
+      // Un sitio que rechaza (403) a quien le llega por 127.0.0.1 y deja pasar a 127.0.0.2: así se distingue la IP fijada del DNS normal.
+      let site: Server;
+      beforeAll(async () => {
+        site = createServer((req, res) => {
+          res.writeHead(req.socket.localAddress?.endsWith("127.0.0.1") ? 403 : 200, { server: "sitio-de-prueba" });
+          res.end("ok");
+        });
+        await new Promise<void>((r) => site.listen(18123, "0.0.0.0", r));
+      });
+      afterAll(() => new Promise<void>((r) => site.close(() => r())));
+      const forbidden = () => new LighthouseRuntimeError("ERRORED_DOCUMENT_REQUEST", "Status code: 403");
+
+      it("falla sin reintentos y deja en el mensaje la prueba hecha desde el worker", async () => {
+        const { routes: [r] } = await setup();
+        let calls = 0;
+        await start(async () => {
+          calls++;
+          throw forbidden();
+        });
+        const { audits: [a] } = await req(r!.id, ["mobile"]);
+        const done = await waitFor(finished(a!.id));
+        expect(calls).toBe(1);
+        expect(done).toMatchObject({ status: "failed", attempts: 1, errorCode: "HTTP_4XX" });
+        expect(done.errorMessage).toContain("La página respondió con error 403.");
+        expect(done.errorMessage).toContain("Prueba desde el worker: DNS normal 403 · otro agente 403 (servidor: sitio-de-prueba).");
+      });
+
+      it("un 429 se reintenta con el retroceso normal y termina bien", async () => {
+        const { routes: [r] } = await setup();
+        let calls = 0;
+        await start(async () => {
+          if (++calls === 1) throw new LighthouseRuntimeError("ERRORED_DOCUMENT_REQUEST", "Status code: 429");
+          return okRunner({} as never);
+        });
+        const { audits: [a] } = await req(r!.id, ["mobile"]);
+        const done = await waitFor(finished(a!.id));
+        expect(calls).toBe(2);
+        expect(done).toMatchObject({ status: "succeeded", attempts: 2 });
+      });
+
+      it("si la culpable es la IP fijada, reintenta una vez con el DNS normal y la auditoría sale bien", async () => {
+        const { routes: [r] } = await setup({ baseUrl: "http://pin.test:18123" });
+        const pins: Array<unknown> = [];
+        let lookups = 0;
+        const resolver: HostResolver = async () => [{ address: ++lookups === 1 ? "127.0.0.1" : "127.0.0.2", family: 4 }];
+        await start(async (input) => {
+          pins.push(input.pinnedHost);
+          if (input.pinnedHost) throw forbidden();
+          return okRunner({} as never);
+        }, resolver);
+        const { audits: [a] } = await req(r!.id, ["mobile"]);
+        const done = await waitFor(finished(a!.id));
+        expect(done).toMatchObject({ status: "succeeded", attempts: 1, errorCode: null });
+        expect(pins).toEqual([{ host: "pin.test", ip: "127.0.0.1" }, undefined]);
+      });
     });
 
     it("si R2 rechaza el acceso, falla sin reintentos y no guarda nada", async () => {

@@ -77,6 +77,7 @@ function DevicePanel({ block, page, projectId, now }: { block: ProfileBlock; pag
                     {formatDate(a.finishedAt ?? a.queuedAt)} <span className="text-ink-muted">· {formatAgo(a.finishedAt ?? a.queuedAt, now)}</span>
                   </span>
                   {a.status === "succeeded" ? <Score value={a.scorePerformance} className="text-[20px]" /> : <AuditStatusBadge audit={a} />}
+                  {a.status === "failed" && a.errorMessage ? <span className="basis-full text-[13px] leading-5 break-words text-ink-muted">{a.errorMessage}</span> : null}
                 </Link>
               </li>
             ))}

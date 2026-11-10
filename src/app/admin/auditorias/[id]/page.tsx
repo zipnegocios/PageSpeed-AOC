@@ -74,6 +74,18 @@ function FailedChecksCard({ categories }: { categories: CategoryChecks[] | null 
 
 const TRIGGER_LABEL = { manual: "Manual", scheduled: "Programada", mcp: "Agente (MCP)" } as const;
 
+/** Qué hacer ante los fallos que más se repiten. */
+function failureAdvice(code: string | null, message: string | null): string | null {
+  if (code === "HTTP_4XX") {
+    const status = /error (\d{3})/.exec(message ?? "")?.[1];
+    if (status === "404" || status === "410") return "Qué hacer: revisa la dirección base del proyecto y la ruta; la página no existe tal cual.";
+    if (status === "401") return "Qué hacer: la página pide iniciar sesión; configura el acceso de la ruta.";
+    return "Qué hacer: si «DNS normal» y «otro agente» también fallan, el sitio rechaza la IP del worker: pide permitirla en su cortafuegos (runbook: «Pedir a un cliente que permita el rastreador»). Si solo falla «IP fijada», el reintento sin fijar ya lo cubre.";
+  }
+  if (code === "WORKER_LOST") return "Qué hacer: el worker se reinició durante la auditoría (por ejemplo, un despliegue). Vuelve a auditar la página.";
+  return null;
+}
+
 export default async function AuditPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<ViewerSearch> }) {
   const { id } = await params;
   const search = await searchParams;
@@ -203,6 +215,7 @@ export default async function AuditPage({ params, searchParams }: { params: Prom
         <Alert tone="danger">
           <strong>{audit.errorCode ?? "ERROR"}</strong>
           {audit.errorMessage ? ` · ${audit.errorMessage}` : ""} Intentos realizados: {audit.attempts}.
+          {failureAdvice(audit.errorCode, audit.errorMessage) ? <span className="mt-1 block">{failureAdvice(audit.errorCode, audit.errorMessage)}</span> : null}
         </Alert>
       ) : null}
       {audit.status === "queued" && audit.errorCode ? (

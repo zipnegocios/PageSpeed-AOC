@@ -14,7 +14,13 @@ const MAX_MESSAGE = 300;
 const clip = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, MAX_MESSAGE);
 
 const R2_CONFIG_ERRORS = new Set(["AccessDenied", "NoSuchBucket", "InvalidAccessKeyId", "SignatureDoesNotMatch", "Forbidden"]);
+const TRANSIENT_4XX = new Set(["408", "425", "429"]);
 const NETWORK_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EPIPE"]);
+
+/** Añade una nota al mensaje de un fallo, sin pasar del tope. */
+export function withNote(failure: ClassifiedError, note: string): ClassifiedError {
+  return note ? { ...failure, message: clip(`${failure.message} ${note}`) } : failure;
+}
 
 /** Traduce un error de Lighthouse (`runtimeError.code`) a un código propio. */
 function fromLighthouse(code: string, message: string): ClassifiedError {
@@ -31,7 +37,8 @@ function fromLighthouse(code: string, message: string): ClassifiedError {
       return { code: "SITE_DOWN", retryable: true, message: clip(`No se pudo cargar el sitio. ${message}`) };
     case "ERRORED_DOCUMENT_REQUEST":
       if (status && status.startsWith("5")) return { code: "HTTP_5XX", retryable: true, message: clip(`El sitio respondió con error ${status}.`) };
-      if (status && status.startsWith("4")) return { code: "HTTP_4XX", retryable: false, message: clip(`La página respondió con error ${status}.`) };
+      // 408, 425 y 429 son pasajeros (el sitio pide esperar): se reintentan. El resto de 4xx no cambia por esperar.
+      if (status && status.startsWith("4")) return { code: "HTTP_4XX", retryable: TRANSIENT_4XX.has(status), message: clip(`La página respondió con error ${status}.`) };
       return { code: "SITE_DOWN", retryable: true, message: clip(`El sitio respondió con error. ${message}`) };
     case "INSECURE_DOCUMENT_REQUEST":
       return { code: "TLS_ERROR", retryable: false, message: clip("El certificado del sitio no es válido.") };
