@@ -14,7 +14,8 @@ import { Sparkline } from "./sparkline";
  * Un proyecto de un vistazo; toda la tarjeta es un enlace a su pantalla y "Última auditoría" va directo a esa auditoría.
  * Sin auditorías muestra anillos vacíos y "Sin auditorías".
  */
-export function ProjectCard({ project: p, now }: { project: FleetProject; now?: Date }) {
+/** `viewerId`: la persona que mira (null si es el propietario). Si el cliente no es suyo, la tarjeta dice «Compartido». */
+export function ProjectCard({ project: p, now, viewerId = null }: { project: FleetProject; now?: Date; viewerId?: string | null }) {
   const href = projectPath(p.clientSlug, p.slug);
   return (
     <article className="hud-flat press rise relative flex min-w-0 flex-col gap-4 rounded-lg p-4 focus-within:border-primary hover:border-primary">
@@ -30,7 +31,10 @@ export function ProjectCard({ project: p, now }: { project: FleetProject; now?: 
               </span>
             </div>
           </div>
-          <Badge tone={p.phase === "production" ? "primary" : "neutral"}>{p.phase === "production" ? "Producción" : "Desarrollo"}</Badge>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Badge tone={p.phase === "production" ? "primary" : "neutral"}>{p.phase === "production" ? "Producción" : "Desarrollo"}</Badge>
+            {viewerId && p.clientOwnerId !== viewerId ? <Badge tone="neutral">Compartido</Badge> : null}
+          </div>
         </header>
 
         <div className="flex items-center gap-4">

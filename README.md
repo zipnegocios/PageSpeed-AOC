@@ -416,10 +416,29 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
 2. Copia su `tokens.json` a `design/tokens.json`.
 3. `pnpm tokens:sync` regenera `src/lib/ui/tokens/*` (CI verifica que no haya diferencias).
 
+## Quién ve qué (equipos internos)
+
+- **El propietario ve todo.** Un miembro (rol `admin`) ve los clientes de los que es **responsable** (`clients.owner_id`: quien los crea, o a quien se
+  los reasignan), los que le **compartieron enteros** (con todos sus proyectos, también los futuros) y los **proyectos sueltos** que le compartieron.
+  Un cliente sin responsable o cuyo responsable salió del equipo es del propietario.
+- **Compartir** lo hacen solo el propietario o el responsable, en la tarjeta «Compartir con el equipo» de la ficha del cliente (entero o por proyecto) o
+  del proyecto (tabla `team_shares`, migración 0025). Quien recibe lo opera igual que el responsable **salvo** compartir, cambiar el responsable,
+  archivar, restaurar, borrar y suspender. Con solo proyectos compartidos, la ficha del cliente es un contenedor: nombre y esos proyectos, sin PIN,
+  contacto, correos ni responsable. Cada tarjeta de proyecto ajeno lleva la insignia «Compartido».
+- **Dónde se aplica:** dominio puro `domain/access.ts` (alcance = el mismo `KeyAccess` de las claves de agente), servicios `access.ts` (guardas que
+  responden 404, también cuando existe pero no se ve) y `team-access.ts`; listados filtrados en SQL con `repositories/scope.ts`; guardas
+  `@/lib/auth/access` en **todas** las acciones de servidor, rutas `/api/admin/**` y fichas. `tests/unit/team-access-guard.test.ts` falla si se añade
+  una acción, una ruta o un listado del panel sin guarda. Lo del sistema entero (cuenta de Google, respaldos, equipo, contadores de la cola) es del propietario.
+- **Agentes (MCP):** cada clave guarda quién la creó (`mcp_api_keys.created_by`; nulo = propietario) y **nunca ve más que su creador**, ni siquiera si
+  lo que él ve cambia después (se intersecta en cada llamada: `intersectAccess`). «Acceso total» en la clave de un miembro significa «todo lo que yo vea».
+  Cada miembro lista y gestiona solo sus claves; el propietario, todas. Al quitar a alguien del equipo sus clientes pasan al propietario y sus claves se borran.
+- **Efecto al desplegar la migración 0025:** los miembros dejan de ver los clientes que no crearon hasta que se los compartan. Conviene que el propietario
+  comparta lo necesario ese mismo día.
+
 ## Equipo y acceso al panel
 
 - La cuenta **propietaria** se crea al primer arranque con `ADMIN_EMAIL` / `ADMIN_PASSWORD` (solo se leen cuando no existe ninguna; cambiarlas después no agrega ni cambia a nadie).
-- Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Todas administran clientes, proyectos, agentes y cola; solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Si el correo no sale, el enlace se copia desde la pantalla.
+- Las demás personas se **invitan por correo** desde **Panel → Equipo** (solo el propietario lo ve): reciben un enlace de un solo uso, válido 7 días, para crear su propia contraseña. Solo el propietario agrega o quita personas, reenvía invitaciones o envía un enlace de contraseña nueva. Qué ve cada persona lo decide el modelo de acceso de abajo. Si el correo no sale, el enlace se copia desde la pantalla.
 - **La invitación por correo** lista por secciones numeradas todo lo que se puede hacer en la plataforma (clientes y proyectos, auditorías y alertas, SEO, lo que recibe el cliente, lo que anota cada responsable, agentes MCP, lo que está en camino y lo exclusivo de la cuenta propietaria) y pide completar nombre, apellido y WhatsApp en «Mi perfil», que es lo que ven los clientes. El listado vive en `STAFF_GUIDE` (`notify/invite-email.ts`): se actualiza ahí cuando cambia lo que hace el panel.
 - Al invitar se prepara **el perfil completo** de la persona: nombre, apellido y foto (todo opcional) y cómo entra: **enlace por
   correo** (la cuenta nace con esos datos al aceptarlo) o **contraseña provisional** (la cuenta se crea en el acto, sin correo; la

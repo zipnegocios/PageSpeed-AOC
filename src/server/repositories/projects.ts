@@ -129,6 +129,8 @@ export type ProjectListing = {
   auditFrequency: "weekly" | "daily";
   clientId: string;
   clientName: string;
+  /** Responsable del cliente (null = la cuenta propietaria): sirve para marcar lo que a alguien le compartieron. */
+  clientOwnerId: string | null;
   /** Logotipo del cliente (para dibujarlo junto al proyecto); null si no tiene. */
   clientLogo: ClientLogoInfo | null;
 };
@@ -146,6 +148,7 @@ export async function listAllProjects(db: Database, scope?: Scope): Promise<Proj
       auditFrequency: projects.auditFrequency,
       clientId: clients.id,
       clientName: clients.name,
+      clientOwnerId: clients.ownerId,
       logoIconKey: clients.logoIconKey,
       logoFullKey: clients.logoFullKey,
       logoBg: clients.logoBg,

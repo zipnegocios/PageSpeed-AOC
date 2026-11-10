@@ -23,6 +23,8 @@ export type FleetProject = {
   clientId: string;
   clientName: string;
   clientSlug: string;
+  /** Responsable del cliente (null = la cuenta propietaria). */
+  clientOwnerId: string | null;
   /** Logotipo del cliente, si lo tiene. */
   clientLogo?: ClientLogoInfo | null;
   /** Promedio de las últimas puntuaciones de todas sus rutas y perfiles (null si aún no hay auditorías correctas). */
@@ -110,6 +112,7 @@ export async function getFleet(db: Database = getDb(), now: Date = new Date(), s
       clientId: p.clientId,
       clientName: p.clientName,
       clientSlug: p.clientSlug,
+      clientOwnerId: p.clientOwnerId,
       clientLogo: p.clientLogo,
       scores: averageScores(latest),
       performanceChange: meanPerformanceChange(latest),

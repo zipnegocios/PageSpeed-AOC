@@ -18,7 +18,9 @@ export type PhaseFilter = "todos" | "produccion" | "desarrollo";
 
 /** Cifras de toda la flota + una tarjeta por proyecto. Comparten datos, así que se piden una sola vez. */
 export async function FleetSection({ phase }: { phase: PhaseFilter }) {
-  const all = await requireScope().then(({ scope }) => getFleet(undefined, undefined, scope)).catch(() => null);
+  const viewer = await requireScope().catch(() => null);
+  const viewerId = viewer && viewer.session.role !== "owner" ? viewer.session.id : null;
+  const all = viewer ? await getFleet(undefined, undefined, viewer.scope).catch(() => null) : null;
   if (all === null) {
     return (
       <Panel title="Flota" span={4}>
@@ -103,7 +105,7 @@ export async function FleetSection({ phase }: { phase: PhaseFilter }) {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {shown.map((p) => (
-              <ProjectCard key={p.id} project={p} now={now} />
+              <ProjectCard key={p.id} project={p} now={now} viewerId={viewerId} />
             ))}
           </div>
         )}

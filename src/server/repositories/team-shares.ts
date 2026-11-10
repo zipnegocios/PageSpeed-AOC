@@ -49,6 +49,16 @@ export async function deleteKeysCreatedBy(db: Database, adminId: string): Promis
   return rows.length;
 }
 
+/** Cuántos clientes tiene a su cargo cada persona (para `/admin/equipo`). */
+export async function countOwnedClientsByAdmin(db: Database): Promise<Array<{ adminId: string; clients: number }>> {
+  const rows = await db
+    .select({ adminId: clients.ownerId, clients: sql<number>`count(*)::int` })
+    .from(clients)
+    .where(and(isNotNull(clients.ownerId), isNull(clients.deletedAt)))
+    .groupBy(clients.ownerId);
+  return rows.flatMap((r) => (r.adminId ? [{ adminId: r.adminId, clients: r.clients }] : []));
+}
+
 /** Cuántos accesos sueltos tiene cada persona (para `/admin/equipo`). */
 export async function countSharesByAdmin(db: Database): Promise<Array<{ adminId: string; clients: number; projects: number }>> {
   return db

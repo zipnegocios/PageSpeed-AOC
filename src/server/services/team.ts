@@ -55,6 +55,8 @@ export type TeamView = {
     lastName: string | null;
     avatarKey: string | null;
     provisionalPassword: boolean;
+    /** Lo que ve: clientes a su cargo, clientes que le compartieron enteros y proyectos sueltos. El propietario ve todo. */
+    access: { owned: number; sharedClients: number; sharedProjects: number };
   }>;
   invites: Array<{ id: string; email: string; kind: InviteKind; createdAt: Date; expiresAt: Date; firstName: string | null; lastName: string | null }>;
 };
@@ -62,9 +64,11 @@ export type TeamView = {
 /** El equipo y sus invitaciones pendientes. Solo el propietario lo ve. */
 export async function listTeam(actor: AdminSummary, db: Database = getDb(), deps: TeamDeps = {}): Promise<TeamView> {
   assertOwner(actor);
-  const [members, pending] = await Promise.all([admins.listAdmins(db), invites.listPending(db, nowOf(deps))]);
+  const [members, pending, shared, owned] = await Promise.all([admins.listAdmins(db), invites.listPending(db, nowOf(deps)), shares.countSharesByAdmin(db), shares.countOwnedClientsByAdmin(db)]);
+  const sharedBy = new Map(shared.map((r) => [r.adminId, r]));
+  const ownedBy = new Map(owned.map((r) => [r.adminId, r.clients]));
   return {
-    members: members.map((m) => ({ id: m.id, email: m.email, role: m.role === "owner" ? "owner" : "admin", createdAt: m.createdAt, firstName: m.firstName, lastName: m.lastName, avatarKey: m.avatarKey, provisionalPassword: m.provisionalPassword })),
+    members: members.map((m) => ({ access: { owned: ownedBy.get(m.id) ?? 0, sharedClients: sharedBy.get(m.id)?.clients ?? 0, sharedProjects: sharedBy.get(m.id)?.projects ?? 0 }, id: m.id, email: m.email, role: m.role === "owner" ? "owner" : "admin", createdAt: m.createdAt, firstName: m.firstName, lastName: m.lastName, avatarKey: m.avatarKey, provisionalPassword: m.provisionalPassword })),
     invites: pending.map((i) => ({ id: i.id, email: i.email, kind: i.kind as InviteKind, createdAt: i.createdAt, expiresAt: i.expiresAt, firstName: i.firstName, lastName: i.lastName })),
   };
 }

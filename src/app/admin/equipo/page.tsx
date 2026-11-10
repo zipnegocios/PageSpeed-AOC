@@ -25,7 +25,7 @@ export default async function TeamPage() {
 
   return (
     <AdminShell title="Equipo" subtitle="Quién puede entrar al panel." crumbs={[{ label: "Panel", href: "/admin" }]}>
-      <Card title="Invitar a una persona" description="Prepara su perfil (nombre y foto, opcionales) y elige cómo entra. Todas las personas del equipo administran clientes, proyectos, agentes y cola; solo tú agregas o quitas personas.">
+      <Card title="Invitar a una persona" description="Prepara su perfil (nombre y foto, opcionales) y elige cómo entra. Cada persona ve solo los clientes que ella crea y lo que su responsable le comparte (desde la ficha del cliente o del proyecto); tú ves todo. Solo tú agregas o quitas personas.">
         <InviteForm />
       </Card>
 
@@ -41,7 +41,10 @@ export default async function TeamPage() {
                 {m.id === session.id ? <Badge>Tú</Badge> : null}
                 {m.provisionalPassword ? <Badge>Contraseña provisional</Badge> : null}
               </div>
-              <p className="text-[15px] text-ink-muted">Desde {formatDate(m.createdAt)}</p>
+              <p className="text-[15px] text-ink-muted">
+                Desde {formatDate(m.createdAt)} ·{" "}
+                {m.role === "owner" ? "Ve todos los clientes y proyectos" : `Ve ${m.access.owned} ${m.access.owned === 1 ? "cliente propio" : "clientes propios"}, ${m.access.sharedClients} ${m.access.sharedClients === 1 ? "compartido entero" : "compartidos enteros"} y ${m.access.sharedProjects} ${m.access.sharedProjects === 1 ? "proyecto suelto" : "proyectos sueltos"}`}
+              </p>
               {m.role === "owner" ? null : (
                 <div className="flex flex-wrap items-start gap-3">
                   <LinkAction action={sendResetAction.bind(null, m.id)} label="Enviar enlace de contraseña nueva" pendingLabel="Enviando…" />

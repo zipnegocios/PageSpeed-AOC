@@ -15,7 +15,7 @@ type Phase = (typeof PHASES)[number];
 
 /** Todos los proyectos en un solo lugar, sin pasar por los clientes: buscar, filtrar por fase y abrir. */
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; fase?: string }> }) {
-  const { scope } = await requireScope();
+  const { session, scope } = await requireScope();
   const { q = "", fase } = await searchParams;
   const phase: Phase = (PHASES as readonly string[]).includes(fase ?? "") ? (fase as Phase) : "todos";
   const all = await getFleet(undefined, undefined, scope);
@@ -74,7 +74,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             {[...shown]
               .sort((a, b) => a.clientName.localeCompare(b.clientName, "es") || a.name.localeCompare(b.name, "es"))
               .map((p) => (
-                <ProjectCard key={p.id} project={p} now={now} />
+                <ProjectCard key={p.id} project={p} now={now} viewerId={session.role === "owner" ? null : session.id} />
               ))}
           </div>
         )}
