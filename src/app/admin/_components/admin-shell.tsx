@@ -30,7 +30,7 @@ export async function AdminShell({
   // La persona de la barra (menú de perfil): la sesión ya se leyó en la página y aquí sale de la caché de la petición.
   const session = await getSession();
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-7xl flex-col gap-6 px-4 pb-10 md:px-8">
+    <div className="mx-auto flex min-h-dvh w-full max-w-[1920px] flex-col gap-6 px-4 pb-10 md:px-8">
       <header className="hud z-30 mt-3 md:sticky md:top-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg px-3 py-2">
         <nav aria-label="Principal" className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Link href="/admin" className="press mr-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-[13px] font-bold tracking-[0.08em] text-ink uppercase">

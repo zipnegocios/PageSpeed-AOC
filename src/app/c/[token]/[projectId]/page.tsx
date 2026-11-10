@@ -1,123 +1,93 @@
-import { PinGateFor } from "@/app/c/_components/pin-gate";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { SeoDataSection } from "@/app/_components/seo/seo-data-section";
+import { redirect } from "next/navigation";
 import { FieldDataCard } from "@/app/_components/field-data-card";
 import { HistoryPanel, type HistorySearch } from "@/app/_components/history-panel";
-import { PROFILE_LABEL, formatDate } from "@/lib/audit-format";
-import { Badge } from "@/lib/ui/components/badge";
-import { Card } from "@/lib/ui/components/card";
-import { PortalPageCard, groupLatestByPage } from "@/app/c/_components/portal-page-card";
-import { parseSeoPeriod } from "@/server/domain/seo-data";
-import { getPortalOverview, getPortalProject } from "@/server/services/portal";
-import { getPortalSeoDashboard } from "@/server/services/seo-portal";
-import { BlockedNotice } from "../../_components/blocked-notice";
-import { PortalShell } from "../../_components/portal-shell";
-import { SuspendedNotice } from "../../_components/suspended-notice";
-import { portalAccess } from "../../_lib/access";
-import { portalProjectPath } from "@/lib/urls";
+import { formatDate } from "@/lib/audit-format";
 import { pageTitle } from "@/lib/brand";
+import { AgenticFraction } from "@/lib/ui/components/agentic-fraction";
+import { ScoreRing } from "@/lib/ui/components/score-ring";
+import { averageScores } from "@/server/services/history";
+import { ChevronRight } from "../../_components/portal-icons";
+import { PortalPage } from "../../_components/portal-page";
+import { loadProjectGate } from "../../_lib/project-gate";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: pageTitle("Tu informe"), robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: pageTitle("Resumen"), robots: { index: false, follow: false } };
 
-export default async function PortalProjectPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ token: string; projectId: string }>;
-  searchParams: Promise<HistorySearch>;
-}) {
+const TILES = [
+  ["performance", "Rendimiento"],
+  ["seo", "SEO"],
+  ["accessibility", "Accesibilidad"],
+  ["best_practices", "Buenas prácticas"],
+] as const;
+
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+
+export default async function PortalSummary({ params, searchParams }: { params: Promise<{ token: string; projectId: string }>; searchParams: Promise<HistorySearch> }) {
   const { token, projectId } = await params;
   const search = await searchParams;
-  const access = await portalAccess(token);
-  if (access.state === "blocked") return <BlockedNotice />;
-  if (access.state === "suspended") return <SuspendedNotice clientName={access.clientName} />;
-  if (access.state === "legacy") notFound();
-  if (access.state === "pin") return <PinGateFor slug={token} />;
-
-  const project = await getPortalProject(access.client.id, projectId);
-  if (!project) notFound();
+  const gate = await loadProjectGate(token, projectId);
+  if (gate.kind === "notice") return gate.element;
+  const { project, client, base } = gate;
   // Un enlace antiguo con UUID se lleva a la dirección legible.
-  if (projectId !== project.slug) redirect(portalProjectPath(token, project.slug));
-  const several = (await getPortalOverview(access.client.id)).length > 1;
-  // Solo si el administrador lo activó para este proyecto y tiene datos conectados; si no, el servicio devuelve null.
-  const days = parseSeoPeriod(search.periodo);
-  const seo = await getPortalSeoDashboard(access.client.id, project.id, { days, lang: Array.isArray(search.idioma) ? search.idioma[0] : search.idioma });
+  if (projectId !== project.slug) redirect(base);
+
+  const avg = averageScores(project.latest);
+  const agentic = project.latest.reduce((acc, l) => (l.agentic ? { passed: acc.passed + l.agentic.passed, total: acc.total + l.agentic.total } : acc), { passed: 0, total: 0 });
+  const lastAudit = project.latest.reduce<Date | null>((max, l) => (max === null || l.finishedAt > max ? l.finishedAt : max), null);
+  const pages = new Set(project.latest.map((l) => l.routeId)).size;
+  const open = project.improvements.length;
 
   return (
-    <PortalShell
-      clientName={access.client.name}
-      title={project.name}
-      subtitle={
-        <>
-          <span className="font-mono break-all text-[15px]">{project.baseUrl}</span>
-          {several ? (
-            <>
-              {" · "}
-              <Link href={`/c/${token}`} className="font-semibold text-link hover:underline">
-                Todos tus proyectos
-              </Link>
-            </>
-          ) : null}
-        </>
-      }
-    >
-      <Card
-        title="Estado actual"
-        description="Resultado de la última auditoría de cada página, en móvil y en escritorio, frente a la anterior."
-        actions={
-          <a
-            href={`${portalProjectPath(token, project.slug)}/informe`}
-            download
-            className="inline-flex min-h-11 items-center rounded-md border border-border-strong bg-surface-200 px-4 text-[17px] font-semibold text-ink hover:bg-surface-300"
-          >
-            Descargar informe (PDF)
-          </a>
-        }
-      >
-        {project.latest.length === 0 ? (
-          <p className="text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {groupLatestByPage(project.latest).map((pg) => (
-              <PortalPageCard key={pg.routeId} page={pg} detailBase={portalProjectPath(token, project.slug)} />
-            ))}
-          </div>
-        )}
-      </Card>
+    <PortalPage title="Resumen" subtitle={<span className="font-mono break-all text-[14px]">{project.baseUrl}</span>}>
+      {project.latest.length === 0 ? (
+        <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
+      ) : (
+        <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <li className="hud flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-3 text-center">
+            <span aria-hidden="true" className="flex size-14 items-center justify-center rounded-full bg-primary-subtle text-[20px] font-bold text-on-primary-subtle">
+              {initialsOf(client.name)}
+            </span>
+            <span className="line-clamp-2 text-[15px] leading-5 font-semibold text-ink">{client.name}</span>
+          </li>
+          {TILES.map(([key, label]) => (
+            <li key={key} className="hud flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-3 text-center">
+              <ScoreRing value={avg[key]} label={label} size={72} />
+              <span className="text-[13px] leading-4 font-semibold text-ink-muted">{label}</span>
+            </li>
+          ))}
+          <li className="hud flex min-h-36 flex-col items-center justify-center gap-2 rounded-lg p-3 text-center">
+            <AgenticFraction value={agentic.total > 0 ? agentic : null} className="text-[28px] leading-8" />
+            <span className="text-[13px] leading-4 font-semibold text-ink-muted">Navegación agéntica</span>
+          </li>
+        </ul>
+      )}
 
-      {project.improvements.length > 0 ? (
-        <Card title="Puntos por mejorar" description="Lo que está por debajo de la meta acordada para tu sitio.">
-          <ul className="divide-y divide-border rounded-sm border border-border">
-            {project.improvements.map((a) => (
-              <li key={a.id} className="flex flex-col gap-1 px-3 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="danger">{a.kind === "audit_failure" ? "Sin datos" : "Bajo la meta"}</Badge>
-                  <span className="font-semibold text-ink">
-                    {a.kind === "audit_failure" ? "No pudimos auditar esta página" : a.summary}
-                  </span>
-                </div>
-                <p className="text-[15px] text-ink-muted">
-                  <span className="font-mono break-all">{a.routePath}</span> · {PROFILE_LABEL[a.profile]} · desde {formatDate(a.openedAt)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
+      <ul className="hud divide-y divide-border overflow-hidden rounded-lg">
+        {[
+          { href: `${base}/mejoras`, label: "Puntos por mejorar", value: open === 0 ? "Todo dentro de la meta" : `${open} ${open === 1 ? "pendiente" : "pendientes"}`, tone: open === 0 ? "text-ok" : "text-danger" },
+          { href: `${base}/rutas`, label: "Páginas auditadas", value: String(pages), tone: "text-ink-muted" },
+          { href: `${base}/informes`, label: "Última auditoría", value: lastAudit ? formatDate(lastAudit) : "—", tone: "text-ink-muted" },
+        ].map((row) => (
+          <li key={row.label}>
+            <Link href={row.href} className="press flex min-h-14 items-center gap-3 px-4 py-2">
+              <span className="flex-1 text-[17px] text-ink">{row.label}</span>
+              <span className={`text-[17px] ${row.tone}`}>{row.value}</span>
+              <ChevronRight className="text-ink-muted" />
+            </Link>
+          </li>
+        ))}
+      </ul>
 
-      {seo ? <SeoDataSection dashboard={seo} days={days} basePath={portalProjectPath(token, project.slug)} search={search} audience="client" /> : null}
-
-      <HistoryPanel
-        projectId={project.id}
-        basePath={portalProjectPath(token, project.slug)}
-        search={search}
-        description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo."
-      />
-
-      <FieldDataCard projectId={project.id} basePath={portalProjectPath(token, project.slug)} search={search} audience="client" />
-    </PortalShell>
+      <HistoryPanel projectId={project.id} basePath={base} search={search} description="Cómo han cambiado las puntuaciones de tus páginas con el tiempo." />
+      <FieldDataCard projectId={project.id} basePath={base} search={search} audience="client" />
+    </PortalPage>
   );
 }

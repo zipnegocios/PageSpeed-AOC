@@ -63,7 +63,7 @@ export function PortalPageCard({ page, detailBase }: { page: PortalPage; detailB
           </dl>
           <div>
             <Link href={`${detailBase}/detalle/${l.auditId}`} className="inline-flex min-h-11 items-center font-semibold text-link hover:underline">
-              Ver detalle técnico
+              Ver detalle de ingeniería
             </Link>
           </div>
         </div>

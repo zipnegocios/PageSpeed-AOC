@@ -44,7 +44,8 @@
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   color-scheme: dark;
 }
-:root[data-theme="light"] {
+:root[data-theme="light"],
+[data-theme="light"] {
   --surface-100: #F3F4F6;
   --surface-200: #FFFFFF;
   --surface-300: #E5E7EB;

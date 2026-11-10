@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { darkToken } from "@/lib/tokens";
+import { lightToken } from "@/lib/tokens";
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const { token } = await params;
@@ -12,7 +12,8 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   };
 }
 
-export const viewport: Viewport = { themeColor: darkToken("surface-100") };
+// Portal solo claro: la barra del navegador y los controles nativos también.
+export const viewport: Viewport = { colorScheme: "light", themeColor: lightToken("surface-200") };
 
 export default function PortalLayout({ children }: { children: ReactNode }) {
   return children;

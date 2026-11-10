@@ -27,7 +27,7 @@ let css = `/* ${src.name} — generated from design/tokens.json (Design System m
 css += `:root {\n${decls(first)}\n${lengths("spacing")}\n${lengths("radius")}\n${lengths("effects")}\n${fonts}\n  color-scheme: ${first};\n}\n`;
 for (const theme of others) {
   const body = decls(theme);
-  css += `:root[data-theme="${theme}"] {\n${body}\n  color-scheme: ${theme};\n}\n`;
+  css += `:root[data-theme="${theme}"],\n[data-theme="${theme}"] {\n${body}\n  color-scheme: ${theme};\n}\n`;
 }
 writeFileSync(new URL("tokens.css", outDir), css);
 

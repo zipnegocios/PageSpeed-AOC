@@ -100,6 +100,104 @@ body::before {
   }
 }
 
+/*
+ * Portal del cliente: estilo de app de iPhone. Solo claro, tipografía del sistema, esquinas suaves y sin los adornos HUD
+ * (retícula, corchetes, corte lima). El panel de administración no lleva `.portal` y conserva su estilo técnico.
+ * Los tokens de color salen del tema `light` (`data-theme="light"` en el contenedor); las referencias entre tokens
+ * (`chart-1`, `focus-ring`) se vuelven a declarar aquí para que se resuelvan con el color claro y no con el del :root.
+ */
+.portal {
+  --font-portal: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-sans: var(--font-portal);
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --chart-1: var(--primary);
+  --focus-ring: var(--primary);
+  --tabbar-h: 3.5rem;
+  background: var(--surface-100);
+  color: var(--ink);
+  font-family: var(--font-portal);
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+/* El rebote de iOS al pasar del borde muestra el fondo de <html>: que sea claro también. */
+html:has(.portal) {
+  background: #f3f4f6;
+}
+.portal .hud,
+.portal .hud-flat {
+  background: var(--surface-200);
+  border-color: transparent;
+  box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.05), 0 1px 2px rgba(17, 24, 39, 0.04);
+}
+.portal .hud-brackets::before,
+.portal .hud-brackets::after {
+  display: none;
+}
+.portal .title-cut {
+  padding: 0;
+  margin: 0;
+  color: inherit;
+}
+.portal .title-cut::before {
+  display: none;
+}
+.portal .uppercase {
+  text-transform: none;
+}
+.portal :focus-visible {
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Barra de pestañas: fija abajo en el teléfono, respeta el área segura (muesca y barra de inicio). */
+.portal-tabbar {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 0.5px solid rgba(17, 24, 39, 0.18);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .portal-tabbar,
+  .portal-topbar {
+    background: rgba(255, 255, 255, 0.94);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+.portal-topbar {
+  padding-top: env(safe-area-inset-top);
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 0.5px solid rgba(17, 24, 39, 0.18);
+}
+.portal-main {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 1.5rem);
+}
+@media (min-width: 768px) {
+  .portal-main {
+    padding-bottom: 2rem;
+  }
+}
+
+/* Desplegable de iOS: <details> con chevron que gira. */
+.portal details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.portal details > summary::-webkit-details-marker {
+  display: none;
+}
+.portal details[open] > summary .chev {
+  transform: rotate(90deg);
+}
+.portal .chev {
+  transition: transform 180ms ease-out;
+}
+
 @media (prefers-contrast: more) {
   .hud,
   .hud-flat {
