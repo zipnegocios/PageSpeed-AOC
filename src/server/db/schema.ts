@@ -603,6 +603,9 @@ export const mcpApiKeys = pgTable("mcp_api_keys", {
   allAccess: boolean("all_access").notNull().default(true),
   clientIds: uuid("client_ids").array().notNull().default(sql`'{}'::uuid[]`),
   projectIds: uuid("project_ids").array().notNull().default(sql`'{}'::uuid[]`),
+  // Quién creó la clave (o autorizó la conexión). Nulo = la creó el propietario o es anterior a este campo: sin recorte. Para un
+  // miembro, el alcance efectivo es la intersección de lo guardado aquí con lo que ese miembro ve hoy.
+  createdBy: uuid("created_by"),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   // Cuándo se cambió por última vez el secreto de la clave (null si nunca se rotó).
@@ -663,6 +666,31 @@ export const adminUsers = pgTable("admin_users", {
   provisionalPassword: boolean("provisional_password").notNull().default(false),
   ...timestamps,
 });
+
+// ------------------------------------------------------------ team_shares
+// Qué clientes y proyectos comparte su responsable con otros miembros del equipo. `project_id` nulo = todo el cliente (también sus
+// proyectos futuros); con valor, solo ese proyecto. El propietario ve todo sin necesitar filas aquí; el responsable de un cliente
+// (`clients.owner_id`) lo ve entero sin necesitarlas tampoco.
+export const teamShares = pgTable(
+  "team_shares",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    grantedBy: uuid("granted_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("team_shares_client_uniq").on(t.adminId, t.clientId).where(sql`${t.projectId} is null`),
+    uniqueIndex("team_shares_project_uniq").on(t.adminId, t.projectId).where(sql`${t.projectId} is not null`),
+    index("team_shares_admin_idx").on(t.adminId),
+  ],
+);
 
 // ---------------------------------------------------------- admin_invites
 // Invitaciones para entrar al panel y enlaces de contraseña nueva. El token viaja solo en el enlace: aquí queda su sha256.

@@ -29,6 +29,12 @@ export async function findClient(db: Database, id: string): Promise<Client | und
 }
 
 /** Por identificador actual o por uno anterior (enlaces viejos). Solo clientes vigentes. */
+/** El cliente tenga o no archivado (para decidir quién puede restaurar o borrar). */
+export async function findClientIncludingArchived(db: Database, id: string): Promise<Client | undefined> {
+  const [row] = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+  return row;
+}
+
 export async function findClientBySlug(db: Database, slug: string): Promise<Client | undefined> {
   const [row] = await db
     .select()

@@ -176,6 +176,13 @@
       "when": 1794292253596,
       "tag": "0024_responsable_cliente",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794296292109,
+      "tag": "0025_acceso_equipo",
+      "breakpoints": true
     }
   ]
 }

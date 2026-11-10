@@ -78,6 +78,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "seo_traffic_daily",
       "server_checks",
       "settings",
+      "team_shares",
     ]);
   });
 

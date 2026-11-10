@@ -12,6 +12,7 @@ import type { Mailer } from "@/server/notify/mailer";
 import { webMailer } from "@/server/notify/web-mailer";
 import * as admins from "@/server/repositories/admin-users";
 import * as invites from "@/server/repositories/admin-invites";
+import * as shares from "@/server/repositories/team-shares";
 import { MIN_PASSWORD_LENGTH, normalizeEmail, summarize, type AdminSummary } from "./admin-auth";
 import { deleteAvatarObjects, profileName, putAvatarObject, type ProfileDeps } from "./profile";
 import { assertUuid, isUniqueViolation, parseInput } from "./shared";
@@ -177,7 +178,13 @@ export async function removeMember(actor: AdminSummary, userId: string, db: Data
   const target = await admins.findAdminById(db, userId);
   if (!target) throw new DomainError("NOT_FOUND", "Usuario no encontrado.");
   assertCanRemove(actor, target, await admins.countAdmins(db));
-  await admins.deleteAdmin(db, target.id);
+  // Sus clientes pasan al propietario (si no, quedarían sin responsable ni a la vista de nadie) y sus claves de agente dejan de existir.
+  // Sus compartidos caen solos por la clave foránea.
+  await db.transaction(async (tx) => {
+    await shares.reassignClients(tx as unknown as Database, target.id, actor.id);
+    await shares.deleteKeysCreatedBy(tx as unknown as Database, target.id);
+    await admins.deleteAdmin(tx as unknown as Database, target.id);
+  });
   await invites.revokePendingForEmail(db, target.email, nowOf(deps));
   await deleteAvatarObjects(target.avatarKey ? [target.avatarKey] : [], deps);
 }

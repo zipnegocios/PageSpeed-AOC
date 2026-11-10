@@ -30,6 +30,7 @@ export const BACKUP_TABLES: ReadonlyArray<{ name: string; table: PgTable; order:
   { name: "mcp_api_keys", table: s.mcpApiKeys, order: [s.mcpApiKeys.id] },
   { name: "oauth_clients", table: s.oauthClients, order: [s.oauthClients.id] },
   { name: "admin_users", table: s.adminUsers, order: [s.adminUsers.id] },
+  { name: "team_shares", table: s.teamShares, order: [s.teamShares.id] },
   { name: "admin_invites", table: s.adminInvites, order: [s.adminInvites.id] },
   { name: "settings", table: s.settings, order: [s.settings.key] },
 ];

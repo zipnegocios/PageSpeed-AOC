@@ -89,6 +89,8 @@ describe.skipIf(!dbUrl)("respaldos de Postgres a R2", () => {
     await alerts.sweepNotifications({ db, mailer: { send: async () => undefined }, recipient: "a@x.test", appUrl: "https://app.test", now: () => new Date("2026-10-30T10:05:00Z") });
     await createApiKey({ name: "agente", preset: "read", access: "all" }, db);
     await db.insert(s.adminUsers).values({ email: "admin@x.test", passwordHash: "scrypt$hash", role: "owner" });
+    const [member] = await db.insert(s.adminUsers).values({ email: "miembro@x.test", passwordHash: "scrypt$hash", role: "admin" }).returning();
+    await db.insert(s.teamShares).values({ adminId: member!.id, clientId: client.id, projectId: project.id });
     await db.insert(s.oauthClients).values({ name: "Claude", redirectUris: ["https://claude.ai/api/mcp/auth_callback"] });
     await db.insert(s.adminInvites).values({ email: "luis@x.test", kind: "invite", tokenHash: "h".repeat(64), expiresAt: new Date("2026-11-10T00:00:00.789Z") });
     await db.insert(s.settings).values({ key: "default_thresholds", value: { performance: 80, seo: 90 } });
