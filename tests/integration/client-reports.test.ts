@@ -28,7 +28,7 @@ describe.skipIf(!dbUrl)("correos automáticos al cliente", () => {
   beforeAll(async () => { await runMigrations(dbUrl!, "./drizzle"); });
   afterAll(() => pool.end());
   beforeEach(async () => {
-    await db.execute(sql`truncate clients, settings restart identity cascade`);
+    await db.execute(sql`truncate clients, settings, admin_users restart identity cascade`);
     sent = [];
     failMail = false;
     clock = new Date("2026-11-10T13:00:00Z");

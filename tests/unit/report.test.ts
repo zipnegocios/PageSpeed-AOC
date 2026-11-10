@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createSerialCache } from "@/server/report/cache";
 import { renderReportPdf } from "@/server/report/pdf";
+import { DEFAULT_SENDER } from "@/server/domain/client-sender";
 import { buildReportEmail } from "@/server/notify/report-email";
 import { reportData } from "../helpers/report-data";
 import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
@@ -170,7 +171,7 @@ describe("informe", () => {
 
 describe("correo del informe", () => {
   it("saluda al contacto, nombra el periodo y enlaza el portal con el texto escapado", () => {
-    const m = buildReportEmail({ contactName: "Ana", projectName: "Tienda <b>", days: 90, portalUrl: "https://app.test/c/tok/proj" });
+    const m = buildReportEmail({ contactName: "Ana", projectName: "Tienda <b>", days: 90, portalUrl: "https://app.test/c/tok/proj", sender: DEFAULT_SENDER, appUrl: "https://app.test" });
     expect(m.subject).toBe("Informes técnicos web · Tienda <b>");
     expect(m.text).toContain("Informe resumen");
     expect(m.text).toContain("Informe de ingeniería");
@@ -179,7 +180,7 @@ describe("correo del informe", () => {
     expect(m.text).toContain("https://app.test/c/tok/proj");
     expect(m.html).toContain("Tienda &lt;b&gt;");
     expect(m.html).not.toContain("Tienda <b>");
-    expect(buildReportEmail({ contactName: null, projectName: "T", days: 7, portalUrl: "u" }).text).toMatch(/^Hola,/);
+    expect(buildReportEmail({ contactName: null, projectName: "T", days: 7, portalUrl: "u", sender: DEFAULT_SENDER, appUrl: "https://app.test" }).text).toMatch(/^Hola,/);
   });
 });
 

@@ -1,4 +1,5 @@
 import { getDb, type Database } from "@/server/db/client";
+import { senderMailFields } from "@/server/domain/client-sender";
 import { ccAddresses, greetingNames } from "@/server/domain/client-welcome";
 import { DomainError } from "@/server/domain/errors";
 import { generatePin, hashPin, isPin, pinMatches } from "@/server/domain/portal-pin";
@@ -9,6 +10,7 @@ import { webMailer } from "@/server/notify/web-mailer";
 import * as repo from "@/server/repositories/clients";
 import type { Client } from "@/server/repositories/clients";
 import { decryptJson, encryptJson } from "@/server/crypto/secret-box";
+import { resolveSender } from "./client-sender";
 import { assertUuid } from "./shared";
 
 /** Mínimo entre dos PIN pedidos por correo desde el portal: frena el correo no deseado y el cierre de sesiones ajenas. */
@@ -53,12 +55,15 @@ function baseUrl(deps: PinDeps): string {
   return (deps.appUrl ?? process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 }
 
-async function sendPin(client: Client, pin: string, deps: PinDeps): Promise<void> {
+async function sendPin(db: Database, client: Client, pin: string, deps: PinDeps): Promise<void> {
   const to = client.contactEmail?.trim();
   if (!to) throw new DomainError("INVALID", "Este cliente no tiene correo de contacto. Agrégalo en su ficha para poder enviarle el PIN.");
   // El acceso es uno solo para todo el equipo: el PIN nuevo le llega al contacto principal y a quienes van en copia.
   const cc = ccAddresses(client.ccContacts, to);
+  const sender = await resolveSender(db, client);
   const mail = buildPinEmail({
+    sender,
+    appUrl: baseUrl(deps),
     contactName: client.contactName,
     names: greetingNames(client.contactName, client.ccContacts),
     clientName: client.name,
@@ -66,7 +71,7 @@ async function sendPin(client: Client, pin: string, deps: PinDeps): Promise<void
     portalUrl: `${baseUrl(deps)}/c/${client.slug}`,
   });
   try {
-    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail });
+    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail, ...senderMailFields(sender) });
   } catch {
     throw new DomainError("UPSTREAM", "No se pudo enviar el correo. Revisa la configuración SMTP e inténtalo de nuevo.");
   }
@@ -82,7 +87,7 @@ export async function generateClientPin(clientId: string, opts: { email?: boolea
   if (!client) throw new DomainError("NOT_FOUND", "Cliente no encontrado.");
   const pin = generatePin();
   // Primero el correo: si falla, el PIN anterior sigue valiendo y no se deja al cliente sin acceso.
-  if (opts.email) await sendPin(client, pin, deps);
+  if (opts.email) await sendPin(db, client, pin, deps);
   const now = (deps.now ?? (() => new Date()))();
   await repo.setClientPinRow(db, client.id, hashPin(client.id, pin, secretOf(deps)), now, sealPin(pin, deps));
   return { pin, emailed: Boolean(opts.email), to: opts.email ? (client.contactEmail ?? null) : null };
@@ -113,7 +118,7 @@ export async function requestPinByEmail(ref: string, db: Database = getDb(), dep
   if (!reserved) return { sent: false };
   const pin = generatePin();
   try {
-    await sendPin(client, pin, deps);
+    await sendPin(db, client, pin, deps);
   } catch (err) {
     await repo.restorePinRequest(db, client.id, reserved.previous);
     throw err;

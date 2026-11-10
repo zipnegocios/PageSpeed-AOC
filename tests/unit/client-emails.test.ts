@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SENDER, type ClientSender } from "@/server/domain/client-sender";
 import {
   buildClientReportEmail,
   buildMonthlyEmail,
@@ -18,6 +19,8 @@ const base: ClientEmailBase = {
   clientName: "Café Aurora",
   site: "cafeaurora.com",
   portalUrl: "https://app.example.com/c/cafe-aurora",
+  sender: DEFAULT_SENDER,
+  appUrl: "https://app.example.com",
 };
 const one: ClientEmailBase = { ...base, names: ["Ana"] };
 
@@ -98,9 +101,10 @@ describe("bienvenida", () => {
     expect(m.text).toContain("PIN: 123456");
     expect(m.html).toContain("https://app.example.com/c/cafe-aurora");
     expect(m.html).toContain("zipnegocios");
-    expect(m.html).not.toMatch(/pagespeed/i);
-    expect(m.html).not.toContain("<img");
-    // El nombre encabeza la banda y la firma; la marca va después.
+    expect(m.html.replace(/alt="PageSpeed"/g, "")).not.toMatch(/pagespeed/i);
+    // La banda lleva el logo y, junto a él, tu nombre; la marca va después.
+    expect(m.html).toContain("https://app.example.com/brand/logo-glyph-email.png");
+    expect(m.html.indexOf("<img")).toBeLessThan(m.html.indexOf("Gustavo Amarista"));
     expect(m.html.indexOf("Gustavo Amarista")).toBeLessThan(m.html.indexOf("zipnegocios"));
     expect(m.text).toContain("Gustavo Amarista\nzipnegocios");
     expect(m.text).toContain("WhatsApp +1 316 469 5701");
@@ -127,6 +131,40 @@ describe("bienvenida", () => {
     const m = buildWelcomeEmail({ ...base, ...input, site: "<b>x</b>.com" });
     expect(m.html).not.toContain("<b>x</b>.com");
     expect(m.html).toContain("&lt;b&gt;x&lt;/b&gt;.com");
+  });
+});
+
+describe("quién firma: el responsable del cliente", () => {
+  const luis: ClientSender = { ...DEFAULT_SENDER, name: "Luis Porteles", whatsapp: "+1 555 010 0000", email: "luis@example.com" };
+  const input = { kind: "sitio" as const, techLabel: "WordPress", includesServer: true, eolNote: null, pin: "123456" };
+
+  it("la bienvenida, la banda, la firma y el pie llevan el nombre y el WhatsApp de Luis, y nada de Gustavo", () => {
+    const m = buildWelcomeEmail({ ...base, ...input, sender: luis });
+    for (const out of [m.html, m.text]) {
+      expect(out).toContain("Luis Porteles");
+      expect(out).toContain("+1 555 010 0000");
+      expect(out).not.toContain("Gustavo");
+      expect(out).not.toContain("316 469");
+    }
+    expect(m.text).toContain("Soy Luis Porteles (zipnegocios), quien se encarga de su sitio.");
+    expect(m.html.indexOf("<img")).toBeLessThan(m.html.indexOf("Luis Porteles"));
+  });
+  it("los demás correos también: semanal, mensual e informe a mano", () => {
+    for (const m of [buildWeeklyEmail({ ...weekly, sender: luis }), buildMonthlyEmail({ ...monthly, sender: luis }), buildClientReportEmail({ ...base, sender: luis, periodLabel: "últimos 30 días", summaryLine: "Todo bien." })]) {
+      expect(m.text).toContain("Luis Porteles\nzipnegocios");
+      expect(m.text).toContain("WhatsApp +1 555 010 0000");
+      expect(m.html).not.toContain("Gustavo");
+    }
+  });
+  it("sin teléfono guardado, el pie no muestra WhatsApp en lugar de inventarlo", () => {
+    const m = buildWelcomeEmail({ ...base, ...input, sender: { ...luis, whatsapp: null } });
+    expect(m.text).not.toContain("WhatsApp");
+    expect(m.html).not.toContain("WhatsApp");
+  });
+  it("el nombre del responsable se escapa", () => {
+    const m = buildWelcomeEmail({ ...base, ...input, sender: { ...luis, name: "Luis <b>x</b>" } });
+    expect(m.html).not.toContain("Luis <b>x</b>");
+    expect(m.html).toContain("Luis &lt;b&gt;x&lt;/b&gt;");
   });
 });
 

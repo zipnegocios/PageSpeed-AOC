@@ -11,6 +11,7 @@ import {
   PROJECT_KIND_LABEL,
   siteLabel,
 } from "@/server/domain/client-welcome";
+import { senderMailFields } from "@/server/domain/client-sender";
 import { generatePin, hashPin } from "@/server/domain/portal-pin";
 import { buildWelcomeEmail } from "@/server/notify/client-emails";
 import type { Mailer } from "@/server/notify/mailer";
@@ -20,6 +21,7 @@ import { findClient, setClientCc, setClientPinRow, setWelcomeSent } from "@/serv
 import { findProject, setProjectEmailProfile } from "@/server/repositories/projects";
 import { requiredText } from "@/server/validation/common";
 import { readStoredPin, type PinDeps } from "./portal-pin";
+import { resolveSender } from "./client-sender";
 import { assertUuid, parseInput } from "./shared";
 import { encryptJson } from "@/server/crypto/secret-box";
 
@@ -119,7 +121,10 @@ export async function sendClientWelcome(
   const newPin = !test && !stored;
   const pin = stored ?? (test ? "000000" : generatePin());
 
+  const sender = await resolveSender(db, client);
   const mail = buildWelcomeEmail({
+    sender,
+    appUrl: base,
     names: greetingNames(client.contactName, cc),
     clientName: client.name,
     site: siteLabel(project.baseUrl),
@@ -143,7 +148,7 @@ export async function sendClientWelcome(
     sentAt: now,
   };
   try {
-    await (deps.mailer ?? webMailer()).send({ to, ...(ccTo.length > 0 ? { cc: ccTo } : {}), ...mail, subject });
+    await (deps.mailer ?? webMailer()).send({ to, ...(ccTo.length > 0 ? { cc: ccTo } : {}), ...mail, subject, ...senderMailFields(sender) });
   } catch (err) {
     if (!test) {
       const e = err as { code?: unknown; message?: unknown };

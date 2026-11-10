@@ -5,8 +5,8 @@ import { buildWhatsappLink } from "@/server/notify/whatsapp-link";
 import { PortalShell } from "./portal-shell";
 
 /** Sustituye todos los datos cuando el cliente está suspendido, y dice a quién escribir para reactivarlo. */
-export function SuspendedNotice({ clientName }: { clientName: string }) {
-  const link = buildWhatsappLink(SUPPORT_CONTACT.whatsapp, reactivationMessage(clientName));
+export function SuspendedNotice({ clientName, contact }: { clientName: string; contact: { name: string; whatsapp: string | null } }) {
+  const link = contact.whatsapp ? buildWhatsappLink(contact.whatsapp, reactivationMessage(clientName, contact.name)) : null;
   return (
     <PortalShell clientName={clientName} title="Tu informe">
       <Card>
@@ -15,7 +15,7 @@ export function SuspendedNotice({ clientName }: { clientName: string }) {
         </div>
         <p className="text-[19px] leading-6 text-ink">Tu servicio está suspendido. Para volver a ver tus auditorías, ponte en contacto con nosotros y lo reactivamos.</p>
         <p className="text-ink-muted">
-          Contacto: <strong className="text-ink">{SUPPORT_CONTACT.name}</strong> · {SUPPORT_CONTACT.brand} ({SUPPORT_CONTACT.handle}) · {SUPPORT_CONTACT.whatsapp}
+          Contacto: <strong className="text-ink">{contact.name}</strong> · {SUPPORT_CONTACT.brand} ({SUPPORT_CONTACT.handle}){contact.whatsapp ? ` · ${contact.whatsapp}` : ""}
         </p>
         {link ? (
           <div>

@@ -23,10 +23,20 @@ export default async function ProfilePage() {
         <AvatarUploader initials={initials(session)} src={avatarUrl(session.id, session.avatarKey)} />
       </Card>
 
-      <Card title="Datos personales" description="Cómo te ve el resto del equipo. Son opcionales: sin nombre se usa tu correo.">
+      <Card title="Datos personales" description="Cómo te ve el equipo y, con tu nombre y WhatsApp, cómo te ven tus clientes en los correos. Sin nombre se usa tu correo.">
         <ActionForm action={updateProfileAction} submitLabel="Guardar" pendingLabel="Guardando…" className="max-w-xl">
           <Field label="Nombre" id="firstName" defaultValue={session.firstName ?? ""} maxLength={60} autoComplete="given-name" />
           <Field label="Apellido" id="lastName" defaultValue={session.lastName ?? ""} maxLength={60} autoComplete="family-name" />
+          <Field
+            label="WhatsApp"
+            id="phone"
+            type="tel"
+            defaultValue={session.phone ?? ""}
+            maxLength={40}
+            autoComplete="tel"
+            placeholder="+1 555 010 0000"
+            hint="Firma los correos de tus clientes y aparece en el aviso de servicio suspendido de su portal. Tu nombre y apellido también salen ahí: los clientes te reconocen por ellos."
+          />
         </ActionForm>
       </Card>
 

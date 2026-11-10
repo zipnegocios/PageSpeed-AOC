@@ -133,6 +133,12 @@ export async function setClientLogoBg(db: Database, id: string, bg: string | nul
   return rows.length > 0;
 }
 
+/** Cambia el responsable del cliente. */
+export async function setClientOwner(db: Database, id: string, ownerId: string | null): Promise<boolean> {
+  const rows = await db.update(clients).set({ ownerId }).where(and(eq(clients.id, id), isNull(clients.deletedAt))).returning({ id: clients.id });
+  return rows.length > 0;
+}
+
 /** Guarda las personas que reciben los correos en copia. */
 export async function setClientCc(db: Database, id: string, ccContacts: Array<{ name: string; email: string }>): Promise<void> {
   await db.update(clients).set({ ccContacts }).where(and(eq(clients.id, id), isNull(clients.deletedAt)));

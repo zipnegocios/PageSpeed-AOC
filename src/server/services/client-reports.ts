@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@/server/db/client";
 import { DomainError } from "@/server/domain/errors";
+import { senderMailFields, type ClientSender } from "@/server/domain/client-sender";
 import { ccAddresses, greetingNames, siteLabel } from "@/server/domain/client-welcome";
 import {
   buildSourceRows,
@@ -34,6 +35,7 @@ import { findProject, type Project } from "@/server/repositories/projects";
 import * as seoData from "@/server/repositories/seo-data";
 import * as seoIntegrations from "@/server/repositories/seo-integrations";
 import { portalProjectPath } from "@/lib/urls";
+import { resolveSender } from "./client-sender";
 import { assertUuid } from "./shared";
 
 export type ReportDeps = {
@@ -49,7 +51,7 @@ const pageLabel = (page: string) => (page === "/" ? "Inicio" : page);
 
 type Ctx = { project: Project; client: Client; now: Date; base: string; emailBase: ClientEmailBase };
 
-function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps): Ctx {
+function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps, sender: ClientSender): Ctx {
   const base = (deps.appUrl ?? process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
   return {
     project,
@@ -61,6 +63,8 @@ function contextOf(project: Project, client: Client, now: Date, deps: ReportDeps
       clientName: client.name,
       site: siteLabel(project.baseUrl),
         portalUrl: `${base}${portalProjectPath(client.slug, project.slug)}`,
+      sender,
+      appUrl: base,
     },
   };
 }
@@ -197,7 +201,8 @@ export async function sendClientReport(kind: ReportKind, projectId: string, opts
   if (project.phase !== "production") throw new DomainError("INVALID", "El proyecto debe estar en producción.");
 
   const period = periodOf(kind, now);
-  const ctx = contextOf(project, client, now, deps);
+  const sender = await resolveSender(db, client);
+  const ctx = contextOf(project, client, now, deps, sender);
   const skip = async (reason: string): Promise<SendOutcome> => {
     if (test) throw new DomainError("INVALID", reason);
     await repo.recordSend(db, { projectId, kind, periodKey: period.key, status: "skipped", detail: reason, at: now });
@@ -219,7 +224,7 @@ export async function sendClientReport(kind: ReportKind, projectId: string, opts
   const cc = test ? [] : ccAddresses(client.ccContacts, primary);
   const subject = test ? `[PRUEBA] ${mail.subject}` : mail.subject;
   try {
-    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail, subject });
+    await (deps.mailer ?? webMailer()).send({ to, ...(cc.length > 0 ? { cc } : {}), ...mail, subject, ...senderMailFields(sender) });
   } catch (err) {
     if (!test) {
       const e = err as { code?: unknown; message?: unknown };

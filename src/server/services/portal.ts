@@ -1,3 +1,4 @@
+import { resolveSender } from "./client-sender";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
@@ -29,7 +30,8 @@ export type PortalAccess =
   | { state: "invalid" }
   /** Enlace antiguo con token: ya no da acceso, solo lleva al portal con PIN. */
   | { state: "legacy"; slug: string }
-  | { state: "suspended"; clientName: string }
+  /** `contact` es el responsable del cliente: a quien escribe para reactivar el servicio. */
+  | { state: "suspended"; clientName: string; contact: { name: string; whatsapp: string | null } }
   /** Pide el PIN. También para un identificador que no existe: así no se puede averiguar qué clientes hay. */
   | { state: "pin" }
   | { state: "ok"; client: PortalClient };
@@ -50,7 +52,10 @@ export async function resolvePortal(ref: string, hasSession: SessionCheck, db: D
   if (!isValidSlug(ref)) return { state: "invalid" };
   const client = await findClientBySlug(db, ref);
   if (!client) return { state: "pin" };
-  if (client.status === "suspended") return { state: "suspended", clientName: client.name };
+  if (client.status === "suspended") {
+    const sender = await resolveSender(db, client);
+    return { state: "suspended", clientName: client.name, contact: { name: sender.name, whatsapp: sender.whatsapp } };
+  }
   if (client.pinHash && (await hasSession({ id: client.id, pinVersion: client.pinVersion }))) {
     const logo = logoInfo(client);
     return { state: "ok", client: { id: client.id, name: client.name, ...(logo ? { logo } : {}) } };

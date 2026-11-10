@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@/server/db/client";
 import { env } from "@/server/config/env";
+import { senderMailFields } from "@/server/domain/client-sender";
 import { ccAddresses, greetingNames } from "@/server/domain/client-welcome";
 import { DomainError } from "@/server/domain/errors";
 import type { Period } from "@/server/domain/history";
@@ -8,6 +9,7 @@ import { webMailer } from "@/server/notify/web-mailer";
 import { buildReportEmail } from "@/server/notify/report-email";
 import { getProjectReportPdf } from "@/server/report";
 import { insertNotification, listRecentNotifications } from "@/server/repositories/alerts";
+import { resolveSender } from "./client-sender";
 import { getClient } from "./clients";
 import { getProject } from "./projects";
 import { portalProjectPath } from "@/lib/urls";
@@ -47,7 +49,10 @@ export async function sendProjectReport(
   const summary = await getPdf(projectId, days, "summary", db);
   const engineering = await getPdf(projectId, days, "engineering", db);
   const cc = ccAddresses(client.ccContacts, to);
+  const sender = await resolveSender(db, client);
   const mail = buildReportEmail({
+    sender,
+    appUrl: base,
     contactName: client.contactName,
     names: greetingNames(client.contactName, client.ccContacts),
     clientName: client.name,
@@ -61,6 +66,7 @@ export async function sendProjectReport(
       to,
       ...(cc.length > 0 ? { cc } : {}),
       ...mail,
+      ...senderMailFields(sender),
       attachments: [summary, engineering].map((f) => ({ filename: f.filename, content: f.pdf, contentType: "application/pdf" })),
     });
   } catch (err) {

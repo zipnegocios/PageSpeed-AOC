@@ -49,6 +49,12 @@ export async function findFirstAdmin(db: Database): Promise<AdminUser | undefine
   return row;
 }
 
+/** La cuenta propietaria (la más antigua con ese rol): responsable por defecto de los clientes sin responsable. */
+export async function findOwnerAccount(db: Database): Promise<AdminUser | undefined> {
+  const [row] = await db.select().from(adminUsers).where(eq(adminUsers.role, "owner")).orderBy(asc(adminUsers.createdAt)).limit(1);
+  return row;
+}
+
 /** Todo el equipo, de la cuenta más antigua a la más reciente. */
 export function listAdmins(db: Database): Promise<AdminUser[]> {
   return db.select().from(adminUsers).orderBy(asc(adminUsers.createdAt));
@@ -65,7 +71,7 @@ export async function setAdminPassword(db: Database, id: string, passwordHash: s
   return rows.length > 0;
 }
 
-export async function updateProfile(db: Database, id: string, values: { firstName: string | null; lastName: string | null }): Promise<AdminUser | undefined> {
+export async function updateProfile(db: Database, id: string, values: { firstName: string | null; lastName: string | null; phone: string | null }): Promise<AdminUser | undefined> {
   const [row] = await db.update(adminUsers).set(values).where(eq(adminUsers.id, id)).returning();
   return row;
 }

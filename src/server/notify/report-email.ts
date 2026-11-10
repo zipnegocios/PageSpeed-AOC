@@ -1,3 +1,4 @@
+import type { ClientSender } from "@/server/domain/client-sender";
 import { givenName } from "@/server/domain/client-welcome";
 import { PERIOD_LABEL, type Period } from "@/server/domain/history";
 import { composeClientEmail, voice, type ClientEmail } from "./client-emails";
@@ -13,6 +14,8 @@ export function buildReportEmail(input: {
   projectName: string;
   days: Period;
   portalUrl: string;
+  sender: ClientSender;
+  appUrl: string;
 }): ClientEmail {
   const names = input.names ?? (input.contactName?.trim() ? [givenName(input.contactName)] : []);
   const T = voice(names);
@@ -22,6 +25,8 @@ export function buildReportEmail(input: {
     preview: `Los informes de ${input.projectName} de los últimos ${period}, en PDF.`,
     names,
     clientName: input.clientName ?? "",
+    sender: input.sender,
+    appUrl: input.appUrl,
     blocks: [
       { k: "p", t: `${T("Te adjunto", "Les adjunto")} los informes de **${input.projectName}** con las auditorías de los últimos ${period}, en PDF:` },
       {

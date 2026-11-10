@@ -169,6 +169,13 @@
       "when": 1794291554509,
       "tag": "0023_retirar_redes_sociales",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794292253596,
+      "tag": "0024_responsable_cliente",
+      "breakpoints": true
     }
   ]
 }
