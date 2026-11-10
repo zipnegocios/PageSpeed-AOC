@@ -1,5 +1,5 @@
 {
-  "id": "81f7a59e-2cea-43b6-b15a-106c1b45df63",
+  "id": "c5ac60bf-db1b-4aa8-8d58-d9f081282489",
   "prevId": "883aa44d-a1a3-415c-8b3e-60d0218fd1bc",
   "version": "7",
   "dialect": "postgresql",
@@ -990,19 +990,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "cc_contacts": {
-          "name": "cc_contacts",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "welcome_sent_at": {
-          "name": "welcome_sent_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "notes": {
           "name": "notes",
           "type": "text",
@@ -1698,27 +1685,6 @@
         },
         "seo_client_visible": {
           "name": "seo_client_visible",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "project_kind",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'site'"
-        },
-        "tech_label": {
-          "name": "tech_label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "includes_server": {
-          "name": "includes_server",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -2718,6 +2684,103 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.seo_social_daily": {
+      "name": "seo_social_daily",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "network": {
+          "name": "network",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "page": {
+          "name": "page",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sessions": {
+          "name": "sessions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "users": {
+          "name": "users",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "seo_social_daily_project_date_idx": {
+          "name": "seo_social_daily_project_date_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "seo_social_daily_project_id_projects_id_fk": {
+          "name": "seo_social_daily_project_id_projects_id_fk",
+          "tableFrom": "seo_social_daily",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "seo_social_daily_project_id_date_network_page_pk": {
+          "name": "seo_social_daily_project_id_date_network_page_pk",
+          "columns": [
+            "project_id",
+            "date",
+            "network",
+            "page"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.seo_traffic_daily": {
       "name": "seo_traffic_daily",
       "schema": "",
@@ -2950,17 +3013,7 @@
         "initial",
         "reminder",
         "failure",
-        "report",
-        "welcome"
-      ]
-    },
-    "public.project_kind": {
-      "name": "project_kind",
-      "schema": "public",
-      "values": [
-        "site",
-        "shop",
-        "app"
+        "report"
       ]
     },
     "public.project_phase": {

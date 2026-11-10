@@ -128,6 +128,11 @@ function Trafico({ data }: { data: ReportData }) {
         <Kpi label="Sesiones" value={traffic ? formatCount(traffic.totals.sessions) : "—"} delta={traffic ? percentDelta(traffic.totals.sessions, traffic.previousTotals.sessions) : null} />
         <Kpi label="Visitas desde IA (mínimo)" value={ai ? formatCount(ai.totals.sessions) : "—"} delta={ai ? percentDelta(ai.totals.sessions, ai.previousTotals.sessions) : null} />
       </View>
+      {d.social && d.social.byNetwork.length > 0 ? (
+        <Text style={[s.small, { marginBottom: 6 }]}>
+          Visitas desde redes sociales: {d.social.byNetwork.slice(0, 3).map((n) => `${n.label} ${formatCount(n.sessions)}`).join(" · ")} ({formatCount(d.social.totals.sessions)} sesiones en total).
+        </Text>
+      ) : null}
       {search && search.topPages.length > 0 ? (
         <View>
           <Text style={[s.label, { marginBottom: 3 }]}>Páginas con más clics</Text>

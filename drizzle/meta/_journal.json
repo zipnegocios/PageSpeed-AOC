@@ -138,8 +138,15 @@
     {
       "idx": 19,
       "version": "7",
-      "when": 1794288350172,
-      "tag": "0019_bienvenida_cliente",
+      "when": 1794287789136,
+      "tag": "0019_redes_sociales",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794288755807,
+      "tag": "0020_bienvenida_cliente",
       "breakpoints": true
     }
   ]

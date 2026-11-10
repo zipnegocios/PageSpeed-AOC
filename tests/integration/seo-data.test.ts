@@ -36,11 +36,13 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
     db.insert(s.seoSearchDaily).values({ projectId: project, date, page, country, device, clicks, impressions, positionSum });
   const traffic = (project: string, date: string, page: string, country: string, channel: string, sessions: number, users: number) =>
     db.insert(s.seoTrafficDaily).values({ projectId: project, date, page, country, channel, sessions, users });
+  const social = (project: string, date: string, network: string, page: string, sessions: number, users: number) =>
+    db.insert(s.seoSocialDaily).values({ projectId: project, date, network, page, sessions, users });
   const ai = (project: string, date: string, source: string, page: string, sessions: number, users: number) =>
     db.insert(s.seoAiReferralsDaily).values({ projectId: project, date, source, page, sessions, users });
 
   it("sin datos: rango nulo, secciones nulas y estado de descarga según las conexiones", async () => {
-    expect(await getSeoDashboard(projectId, { days: 28 }, db)).toEqual({ range: null, previous: null, sync: { gsc: null, ga4: null }, markets: [], lang: null, languages: null, search: null, traffic: null, ai: null });
+    expect(await getSeoDashboard(projectId, { days: 28 }, db)).toEqual({ range: null, previous: null, sync: { gsc: null, ga4: null }, markets: [], lang: null, languages: null, search: null, traffic: null, social: null, ai: null });
 
     await db.insert(s.seoIntegrations).values([
       { projectId, kind: "gsc", externalId: "sc-domain:acme.test", syncStatus: "ok", syncedThrough: "2026-06-29", lastSyncAt: new Date("2026-06-30T10:00:00Z"), syncDetail: "Descargados 12 días." },
@@ -106,6 +108,32 @@ describe.skipIf(!dbUrl)("datos de búsqueda y tráfico (SEO)", () => {
       await ai(projectId, day(-1), "perplexity.ai", "/es/blog", 2, 2);
       await ai(projectId, day(-1), "chatgpt.com", "/es/blog", 3, 3);
       await ai(projectId, day(-30), "chatgpt.com", "/es/blog", 1, 1);
+      // Redes sociales.
+      await social(projectId, day(0), "instagram", "/es/blog", 8, 6);
+      await social(projectId, day(-1), "facebook", "/es/precios", 5, 4);
+      await social(projectId, day(-1), "instagram", "/es/precios", 3, 3);
+      await social(projectId, day(-2), "other", "/es/blog", 1, 1);
+      await social(projectId, day(-30), "facebook", "/es/blog", 4, 4);
+    });
+
+    it("redes sociales: totales, por red con su nombre, páginas de entrada y comparación con el periodo anterior", async () => {
+      const d = await getSeoDashboard(projectId, { days: 7 }, db);
+      expect(d.social!.totals).toEqual({ sessions: 17, users: 14 });
+      expect(d.social!.byNetwork).toEqual([
+        { network: "instagram", label: "Instagram", sessions: 11 },
+        { network: "facebook", label: "Facebook", sessions: 5 },
+        { network: "other", label: "Otras redes", sessions: 1 },
+      ]);
+      expect(d.social!.topPages.map((p) => [p.page, p.sessions])).toEqual([["/es/blog", 9], ["/es/precios", 8]]);
+      expect(d.social!.range).toEqual(d.traffic!.range);
+      // El periodo anterior (días -13 a -7) está vacío en 7 días; con 90 días entra el día -30 (facebook).
+      const d90 = await getSeoDashboard(projectId, { days: 90 }, db);
+      expect(d90.social!.totals.sessions).toBe(21);
+    });
+
+    it("el filtro de idioma también acota las redes sociales por página", async () => {
+      const d = await getSeoDashboard(projectId, { days: 28, lang: "es" }, db);
+      expect(d.social).not.toBeNull();
     });
 
     it("periodo de 7 días: totales, CTR y posición ponderada por impresiones", async () => {
