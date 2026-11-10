@@ -194,7 +194,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
         {!client.contactEmail ? (
           <p className="text-ink-muted">Agrega el correo de contacto del cliente (abajo, en sus datos) para poder enviarle la bienvenida.</p>
         ) : productionProjects.length === 0 ? (
-          <p className="text-ink-muted">Pon al menos un proyecto en producción: el portal del cliente solo muestra los proyectos en producción.</p>
+          <p className="text-ink-muted">La bienvenida habla de un sitio ya publicado: pon al menos un proyecto en producción para enviarla. El portal del cliente ya muestra también los proyectos en desarrollo.</p>
         ) : (
           <WelcomeForm
             action={sendWelcomeAction.bind(null, id)}

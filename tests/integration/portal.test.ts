@@ -107,6 +107,42 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
     });
   });
 
+  describe("proyectos en desarrollo", () => {
+    it("el cliente ve el proyecto en desarrollo en su lista, con su fase, y los de producción también", async () => {
+      const { client, project } = await setup("Acme", "production");
+      const dev = await projects.createProject(client.id, { name: "Sitio nuevo", baseUrl: "https://nuevo.test" }, db);
+      expect(dev.phase).toBe("development");
+      const list = await portal.getPortalOverview(client.id, db);
+      expect(list.map((p) => [p.name, p.phase])).toEqual([["Sitio nuevo", "development"], ["Sitio Acme", "production"]]);
+      expect(project.id).toBeTruthy();
+    });
+
+    it("las mejoras de un proyecto en desarrollo se calculan contra las metas (en desarrollo no hay alertas) y con sus causas guardadas", async () => {
+      const a = await setup("Dev", "development", ["/", "/blog"]);
+      await thresholds.setThresholds(a.project.id, [{ metric: "performance", minScore: 85, enabled: true }, { metric: "seo", minScore: 90, enabled: true }], db);
+      const row = await audit(a.project.id, a.routes[0]!.id, "mobile", daysAgo(1), { p: 60, s: 95 });
+      await db.update(s.auditLogs).set({ improvements: { v: 2, categories: { performance: [{ id: "unused-javascript", title: "JS", impact: { ms: 900 } }] } } }).where(eq(s.auditLogs.id, row.id));
+      await audit(a.project.id, a.routes[1]!.id, "mobile", daysAgo(1), { p: 92, s: 80 });
+      const project = (await portal.getPortalProject(a.client.id, a.project.id, db))!;
+      expect(project.improvements.map((i) => i.summary).sort()).toEqual(["Rendimiento 60 (mínimo 85)", "SEO 80 (mínimo 90)"]);
+      const out = await portal.getPortalImprovements(project, db);
+      expect(out.total).toBe(2);
+      const home = out.pages.find((p) => p.path === "/")!;
+      expect(home.blocks[0]).toMatchObject({ category: "performance", value: 60, threshold: 85 });
+      expect(home.blocks[0]!.items.map((i) => i.id)).toEqual(["unused-javascript"]);
+      // No se abrió ninguna alerta ni se avisó a nadie por ello.
+      expect(await db.select().from(s.alertStates)).toHaveLength(0);
+      expect((await portal.getPortalOverview(a.client.id, db))[0]!.openAlerts).toBe(2);
+    });
+
+    it("sin metas activas, un proyecto en desarrollo no tiene mejoras", async () => {
+      const a = await setup("Dev", "development");
+      await thresholds.setThresholds(a.project.id, [{ metric: "performance", minScore: 85, enabled: false }, { metric: "seo", minScore: 90, enabled: false }], db);
+      await audit(a.project.id, a.routes[0]!.id, "mobile", daysAgo(1), { p: 10 });
+      expect((await portal.getPortalProject(a.client.id, a.project.id, db))!.improvements).toEqual([]);
+    });
+  });
+
   describe("getLatestScores", () => {
     it("toma la última auditoría correcta por ruta y perfil y la variación frente a la anterior", async () => {
       const { project, routes: [r] } = await setup();
@@ -174,7 +210,7 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
   });
 
   describe("proyectos del portal", () => {
-    it("solo muestra proyectos en producción y no archivados, con sus promedios y alertas", async () => {
+    it("muestra los proyectos en producción y en desarrollo (no los archivados), con sus promedios y alertas", async () => {
       const a = await setup("Acme");
       const dev = await projects.createProject(a.client.id, { name: "Pruebas", baseUrl: "https://dev.test" }, db);
       const gone = await projects.createProject(a.client.id, { name: "Viejo", baseUrl: "https://viejo.test" }, db);
@@ -184,18 +220,23 @@ describe.skipIf(!dbUrl)("histórico y portal del cliente", () => {
       await alerts.evaluateAudit(a1.id, { db });
 
       const list = await portal.getPortalOverview(a.client.id, db);
-      expect(list.map((p) => p.name)).toEqual(["Sitio Acme"]);
-      expect(list[0]).toMatchObject({ openAlerts: 2, averages: { performance: 60, seo: 80 } });
-      expect(list[0]!.lastAuditAt?.getTime()).toBe(daysAgo(1).getTime());
+      // Primero los que ya están en desarrollo (por fase y nombre), después los de producción.
+      expect(list.map((p) => [p.name, p.phase])).toEqual([["Pruebas", "development"], ["Sitio Acme", "production"]]);
+      const prod = list.find((p) => p.name === "Sitio Acme")!;
+      expect(prod).toMatchObject({ openAlerts: 2, averages: { performance: 60, seo: 80 } });
+      expect(prod.lastAuditAt?.getTime()).toBe(daysAgo(1).getTime());
       expect(dev.id).toBeTruthy();
     });
 
-    it("un cliente no puede ver proyectos de otro, ni de desarrollo, ni ids inválidos", async () => {
+    it("un cliente no puede ver proyectos de otro ni archivados, ni ids inválidos; los suyos en desarrollo sí", async () => {
       const a = await setup("Acme");
       const b = await setup("Otro");
       const dev = await setup("Dev", "development");
-      expect(await portal.getPortalProject(a.client.id, a.project.id, db)).toMatchObject({ id: a.project.id, name: "Sitio Acme" });
+      expect(await portal.getPortalProject(a.client.id, a.project.id, db)).toMatchObject({ id: a.project.id, name: "Sitio Acme", phase: "production" });
       expect(await portal.getPortalProject(a.client.id, b.project.id, db)).toBeNull();
+      expect(await portal.getPortalProject(dev.client.id, dev.project.id, db)).toMatchObject({ id: dev.project.id, phase: "development" });
+      expect(await portal.getPortalProject(a.client.id, dev.project.id, db)).toBeNull(); // el de otro cliente, aunque esté en desarrollo
+      await projects.archiveProject(dev.project.id, db);
       expect(await portal.getPortalProject(dev.client.id, dev.project.id, db)).toBeNull();
       // También se llega por el identificador legible (slug), y solo dentro del cliente dueño.
       expect(await portal.getPortalProject(a.client.id, a.project.slug, db)).toMatchObject({ id: a.project.id, slug: a.project.slug });

@@ -2,6 +2,7 @@ import { resolveSender } from "./client-sender";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, type Database } from "@/server/db/client";
 import { projects } from "@/server/db/schema";
+import { conditionSummary, developmentConditions, type ImprovementCondition } from "@/server/domain/dev-conditions";
 import { logoInfo, type ClientLogoInfo } from "@/server/domain/client-logo";
 import { formatImpact, plainImprovement } from "@/server/domain/improvement-glossary";
 import { categoryOfMetric, type ImprovementCategory } from "@/server/domain/improvements";
@@ -18,6 +19,7 @@ import { getAudit, getSiblingAudits, type AuditDetail, type SiblingAudits } from
 import { loadAuditImprovements } from "./audit-improvements";
 import { getRoute, listRoutes } from "./routes";
 import { getMarkets } from "./seo-markets";
+import { getThresholds } from "./thresholds";
 
 /** El token es de 32 bytes en base64url: 43 caracteres. Todo lo demás se descarta sin tocar la base de datos. */
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -68,31 +70,46 @@ export type PortalProjectSummary = {
   slug: string;
   name: string;
   baseUrl: string;
+  /** En qué fase está: el cliente ve también los proyectos en desarrollo. */
+  phase: "development" | "production";
   lastAuditAt: Date | null;
   averages: LatestScores["scores"];
   openAlerts: number;
 };
 
-/** Solo proyectos en producción y no archivados: lo que se monitorea de verdad. */
-async function productionProjects(db: Database, clientId: string) {
+/** Los proyectos del cliente que no están archivados, en producción o en desarrollo: así puede ver cómo avanza lo que aún se está construyendo. */
+async function visibleProjects(db: Database, clientId: string) {
   return db
-    .select({ id: projects.id, slug: projects.slug, slugAliases: projects.slugAliases, name: projects.name, baseUrl: projects.baseUrl })
+    .select({ id: projects.id, slug: projects.slug, slugAliases: projects.slugAliases, name: projects.name, baseUrl: projects.baseUrl, phase: projects.phase })
     .from(projects)
-    .where(and(eq(projects.clientId, clientId), eq(projects.phase, "production"), isNull(projects.deletedAt)))
-    .orderBy(asc(projects.name));
+    .where(and(eq(projects.clientId, clientId), isNull(projects.deletedAt)))
+    .orderBy(asc(projects.phase), asc(projects.name));
+}
+
+/**
+ * Lo que está por debajo de la meta en un proyecto: en producción, las alertas abiertas; en desarrollo (donde no se abren alertas), las mismas
+ * condiciones calculadas contra las metas configuradas. Null en producción: ahí se leen las alertas.
+ */
+async function developmentImprovements(projectId: string, latest: LatestScores[], db: Database): Promise<ImprovementCondition[]> {
+  return developmentConditions(latest, await getThresholds(projectId, db));
 }
 
 export async function getPortalOverview(clientId: string, db: Database = getDb()): Promise<PortalProjectSummary[]> {
   assertUuid(clientId, "Cliente");
-  const list = await productionProjects(db, clientId);
+  const list = await visibleProjects(db, clientId);
   return Promise.all(
     list.map(async (p) => {
-      const [latest, alerts] = await Promise.all([getLatestScores(p.id, db), listOpenAlerts(p.id, db)]);
+      const latest = await getLatestScores(p.id, db);
+      const open = p.phase === "production" ? (await listOpenAlerts(p.id, db)).length : (await developmentImprovements(p.id, latest, db)).length;
       return {
-        ...p,
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        baseUrl: p.baseUrl,
+        phase: p.phase,
         lastAuditAt: latest.reduce<Date | null>((max, l) => (max === null || l.finishedAt > max ? l.finishedAt : max), null),
         averages: averageScores(latest),
-        openAlerts: alerts.length,
+        openAlerts: open,
       };
     }),
   );
@@ -103,21 +120,34 @@ export type PortalProject = {
   slug: string;
   name: string;
   baseUrl: string;
+  phase: "development" | "production";
   latest: LatestScores[];
   /** Lo que está por debajo de la meta; sin datos internos. */
   improvements: Array<Pick<AlertView, "id" | "kind" | "routePath" | "profile" | "summary" | "openedAt">>;
+  /** Solo en desarrollo: las condiciones calculadas (en producción se leen de las alertas abiertas). */
+  devConditions?: ImprovementCondition[];
 };
 
 /**
- * null si el proyecto no es de este cliente, no está en producción o está archivado. `ref` es el identificador
+ * null si el proyecto no es de este cliente o está archivado (en desarrollo sí se ve). `ref` es el identificador
  * legible (slug) del proyecto o, para enlaces antiguos, su UUID.
  */
 export async function getPortalProject(clientId: string, ref: string, db: Database = getDb()): Promise<PortalProject | null> {
   assertUuid(clientId, "Cliente");
-  const found = (await productionProjects(db, clientId)).find((p) => p.slug === ref || p.slugAliases.includes(ref) || p.id === ref);
-  const project = found ? { id: found.id, slug: found.slug, name: found.name, baseUrl: found.baseUrl } : undefined;
+  const found = (await visibleProjects(db, clientId)).find((p) => p.slug === ref || p.slugAliases.includes(ref) || p.id === ref);
+  const project = found ? { id: found.id, slug: found.slug, name: found.name, baseUrl: found.baseUrl, phase: found.phase } : undefined;
   if (!project) return null;
-  const [latest, alerts] = await Promise.all([getLatestScores(project.id, db), listOpenAlerts(project.id, db)]);
+  const latest = await getLatestScores(project.id, db);
+  if (project.phase === "development") {
+    const devConditions = await developmentImprovements(project.id, latest, db);
+    return {
+      ...project,
+      latest,
+      devConditions,
+      improvements: devConditions.map((c) => ({ id: `dev-${c.routePath}-${c.profile}-${c.metric}`, kind: c.kind, routePath: c.routePath, profile: c.profile, summary: conditionSummary(c), openedAt: c.openedAt })),
+    };
+  }
+  const alerts = await listOpenAlerts(project.id, db);
   return {
     ...project,
     latest,
@@ -238,7 +268,7 @@ const CATEGORY_ORDER: ImprovementCategory[] = ["performance", "accessibility", "
  * de lo guardado al terminar cada auditoría; una auditoría anterior se lee de R2 una vez y queda guardada.
  */
 export async function getPortalImprovements(project: PortalProject, db: Database = getDb(), deps: { r2?: Pick<R2Store, "getAuditJson"> } = {}): Promise<PortalImprovements> {
-  const conditions = await listOpenAlertConditions(project.id, db);
+  const conditions = project.devConditions ?? (await listOpenAlertConditions(project.id, db));
   if (conditions.length === 0) return { pages: [], total: 0 };
   const latest = new Map(project.latest.map((l) => [`${l.path}|${l.profile}`, l]));
   const auditIds = [...new Set(conditions.flatMap((c) => (c.kind === "threshold" ? [latest.get(`${c.routePath}|${c.profile}`)?.auditId] : [])).filter((x): x is string => Boolean(x)))];

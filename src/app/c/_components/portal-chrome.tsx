@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BRAND_NAME } from "@/lib/brand";
 import { BrandGlyph, BrandLockup } from "@/lib/ui/components/brand-mark";
-import { Badge } from "@/lib/ui/components/badge";
+import { PhaseBadge } from "./phase-badge";
 import { ClientLogo } from "@/lib/ui/components/client-logo";
 import { CopyrightLine } from "@/lib/ui/components/copyright-line";
 import { PortalTabs, type PortalTabId } from "./portal-tabs";
@@ -55,7 +55,7 @@ export function PortalChrome({
               <span className="hidden truncate font-normal text-ink-muted md:inline">· {projectName}</span>
               {phase ? (
                 <span className="hidden md:inline-flex">
-                  <Badge tone={phase === "production" ? "ok" : "warning"}>{phase === "production" ? "En producción" : "En desarrollo"}</Badge>
+                  <PhaseBadge phase={phase} />
                 </span>
               ) : null}
             </p>

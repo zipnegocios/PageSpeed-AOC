@@ -7,6 +7,7 @@ import { Badge } from "@/lib/ui/components/badge";
 import { Card } from "@/lib/ui/components/card";
 import { ScoreRing } from "@/lib/ui/components/score-ring";
 import { getPortalOverview } from "@/server/services/portal";
+import { PhaseBadge } from "../_components/phase-badge";
 import { BlockedNotice } from "../_components/blocked-notice";
 import { PortalShell } from "../_components/portal-shell";
 import { SuspendedNotice } from "../_components/suspended-notice";
@@ -41,11 +42,11 @@ export default async function PortalHome({ params }: { params: Promise<{ token: 
     <PortalShell clientName={access.client.name} title="Tu informe" subtitle="Así van tus sitios en las últimas auditorías.">
       {projects.length === 0 ? (
         <Card>
-          <p className="text-ink-muted">Aún no hay proyectos en producción. Cuando tu sitio empiece a monitorearse, aparecerá aquí.</p>
+          <p className="text-ink-muted">Aún no hay proyectos. Cuando tu sitio empiece a medirse, aparecerá aquí, en desarrollo o en producción.</p>
         </Card>
       ) : (
         projects.map((p) => (
-          <Card key={p.id} title={p.name} description={p.baseUrl}>
+          <Card key={p.id} title={p.name} description={p.baseUrl} actions={<PhaseBadge phase={p.phase} />}>
             <dl className="grid grid-cols-2 gap-4 md:grid-cols-4">
               {SCORE_LABELS.map(([key, label]) => (
                 <div key={key} className="flex flex-col items-center gap-2 text-center">

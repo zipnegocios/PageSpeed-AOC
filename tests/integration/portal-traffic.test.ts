@@ -33,7 +33,7 @@ describe.skipIf(!url)("portal: pestaña Tráfico", () => {
     if (issues.length) await db.insert(s.seoCrawlIssues).values(issues.map((i) => ({ runId: run!.id, page: i.page, code: i.code, severity: i.severity, evidence: i.evidence ?? {} })));
   }
 
-  it("la puerta: de otro cliente, en desarrollo o sin activar para el cliente no devuelve nada", async () => {
+  it("la puerta: de otro cliente, archivado o sin activar para el cliente no devuelve nada", async () => {
     const a = await setup();
     const other = await clients.createClient({ name: "Beta" }, db);
     await crawlRun(a.project.id, [{ page: "/x", code: "title_missing", severity: "error" }]);
@@ -41,7 +41,12 @@ describe.skipIf(!url)("portal: pestaña Tráfico", () => {
     expect(await getPortalTraffic(other.id, a.project, { days: 28 }, db)).toBeNull();
     await db.update(s.projects).set({ seoClientVisible: false }).where(eq(s.projects.id, a.project.id));
     expect(await getPortalTraffic(a.client.id, a.project, { days: 28 }, db)).toBeNull();
+    // En desarrollo también lo ve si el administrador lo activó: así sigue la salud SEO de su sitio mientras se construye.
     await db.update(s.projects).set({ seoClientVisible: true, phase: "development" }).where(eq(s.projects.id, a.project.id));
+    expect(await getPortalTraffic(a.client.id, a.project, { days: 28 }, db)).not.toBeNull();
+    await db.update(s.projects).set({ seoClientVisible: false }).where(eq(s.projects.id, a.project.id));
+    expect(await getPortalTraffic(a.client.id, a.project, { days: 28 }, db)).toBeNull();
+    await db.update(s.projects).set({ seoClientVisible: true, deletedAt: new Date() }).where(eq(s.projects.id, a.project.id));
     expect(await getPortalTraffic(a.client.id, a.project, { days: 28 }, db)).toBeNull();
   });
 

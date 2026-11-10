@@ -15,6 +15,7 @@ export default async function PortalProjectLayout({ children, params }: { childr
       clientName={gate.client.name}
       logo={gate.client.logo ? { src: portalLogoUrl(token, gate.client.logo.icon ? "icon" : "full", gate.client.logo.v), bg: gate.client.logo.bg } : null}
       projectName={gate.project.name}
+      phase={gate.project.phase}
       several={gate.several}
       badges={{ mejoras: gate.project.improvements.length }}
     >

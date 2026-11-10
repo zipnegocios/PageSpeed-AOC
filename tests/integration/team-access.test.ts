@@ -34,7 +34,7 @@ describe.skipIf(!url)("equipo: quién ve qué", () => {
   beforeAll(async () => { await runMigrations(url!, "./drizzle"); });
   afterAll(() => pool.end());
   beforeEach(async () => {
-    await db.execute(sql`truncate clients, settings, admin_users restart identity cascade`);
+    await db.execute(sql`truncate clients, settings, admin_users, mcp_api_keys restart identity cascade`);
     const mk = async (email: string, role: "owner" | "admin") => (await db.insert(s.adminUsers).values({ email, passwordHash: "x", role, firstName: email.split("@")[0] }).returning())[0]!;
     gustavo = await mk("gustavo@zip.test", "owner");
     luis = await mk("luis@zip.test", "admin");

@@ -51,10 +51,10 @@ describe.skipIf(!dbUrl)("SEO en el portal del cliente", () => {
     expect(await ask(otherClientId)).toBeNull();
   });
 
-  it("un proyecto en desarrollo o archivado no se muestra", async () => {
+  it("un proyecto en desarrollo se muestra si el administrador lo activó; uno archivado no", async () => {
     await setSeoClientVisible(projectId, true, db);
     await db.execute(sql`update projects set phase = 'development' where id = ${projectId}`);
-    expect(await ask()).toBeNull();
+    expect(await ask()).not.toBeNull();
     expect((await getSeoSharing(projectId, db)).inProduction).toBe(false);
     await db.execute(sql`update projects set phase = 'production', deleted_at = now() where id = ${projectId}`);
     expect(await ask()).toBeNull();

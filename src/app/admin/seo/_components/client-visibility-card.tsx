@@ -17,7 +17,7 @@ export function ClientVisibilityCard({ projectId, sharing }: { projectId: string
       actions={<Badge tone={sharing.visible ? "ok" : "neutral"}>{sharing.visible ? "Visible" : "Oculto"}</Badge>}
     >
       {!sharing.inProduction ? (
-        <Alert tone="info">El portal solo muestra proyectos en producción. Mientras este esté en desarrollo, el cliente no lo verá aunque lo actives.</Alert>
+        <Alert tone="info">Este proyecto está en desarrollo: el cliente lo ve en su portal con la etiqueta «En desarrollo». Si lo activas, también verá la salud SEO y, cuando existan, las visitas y la búsqueda.</Alert>
       ) : null}
       <p className="text-[15px] leading-5 text-ink-muted">
         {sharing.visible

@@ -93,7 +93,7 @@ export async function sendClientWelcome(
   assertUuid(input.projectId, "Proyecto");
   const project = await findProject(db, input.projectId);
   if (!project || project.clientId !== client.id) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
-  if (project.phase !== "production") throw new DomainError("INVALID", "El proyecto debe estar en producción: el portal del cliente solo muestra proyectos en producción.");
+  if (project.phase !== "production") throw new DomainError("INVALID", "La bienvenida habla de un sitio ya publicado: el proyecto debe estar en producción. El cliente ya ve sus proyectos en desarrollo en el portal.");
 
   let cc;
   try {

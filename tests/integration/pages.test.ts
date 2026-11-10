@@ -152,7 +152,7 @@ describe.skipIf(!dbUrl)("páginas con sus dos dispositivos", () => {
   });
 
   describe("getPortalSiblings", () => {
-    it("solo para auditorías correctas de proyectos en producción del propio cliente", async () => {
+    it("solo para auditorías correctas de proyectos del propio cliente (en producción o en desarrollo)", async () => {
       const a = await setup("Acme", "Tienda", "production", ["/"]);
       const b = await setup("Beta", "Otro", "production", ["/"]);
       const dev = await setup("Gamma", "Dev", "development", ["/"]);
@@ -165,7 +165,8 @@ describe.skipIf(!dbUrl)("páginas con sus dos dispositivos", () => {
       expect(await getPortalSiblings(a.client.id, a.project.id, m.id, db)).not.toBeNull(); // también por UUID
       expect(await getPortalSiblings(b.client.id, a.project.slug, m.id, db)).toBeNull(); // proyecto de otro cliente
       expect(await getPortalSiblings(a.client.id, a.project.slug, failed.id, db)).toBeNull(); // auditoría no correcta
-      expect(await getPortalSiblings(dev.client.id, dev.project.slug, devAudit.id, db)).toBeNull(); // desarrollo
+      expect(await getPortalSiblings(dev.client.id, dev.project.slug, devAudit.id, db)).not.toBeNull(); // el cliente también ve su proyecto en desarrollo
+      expect(await getPortalSiblings(a.client.id, dev.project.slug, devAudit.id, db)).toBeNull(); // pero no el de otro cliente
       expect(await getPortalSiblings(a.client.id, a.project.slug, "no-es-uuid", db)).toBeNull();
     });
   });

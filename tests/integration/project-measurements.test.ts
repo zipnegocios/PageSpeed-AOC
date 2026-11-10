@@ -48,13 +48,13 @@ describe.skipIf(!url)("portal: resumen de todas las mediciones", () => {
     expect(m.states).toMatchObject({ speed: "included", improvements: "included", field: "pending", search: "off", traffic: "off", sources: "off", ai: "off", health: "off" });
   });
 
-  it("otro cliente o un proyecto en desarrollo no obtiene el tráfico", async () => {
+  it("otro cliente no obtiene el tráfico; un proyecto en desarrollo con el interruptor activado sí", async () => {
     const a = await setup();
     await seedGoogle(a.project.id);
     const other = await clients.createClient({ name: "Beta" }, db);
     expect((await getPortalMeasurements(other.id, a.project, { days: 28, hasLighthouse: true }, db)).traffic).toBeNull();
     await db.update(s.projects).set({ phase: "development" }).where(eq(s.projects.id, a.project.id));
-    expect((await getPortalMeasurements(a.client.id, a.project, { days: 28, hasLighthouse: true }, db)).seoAccess).toBe(false);
+    expect((await getPortalMeasurements(a.client.id, a.project, { days: 28, hasLighthouse: true }, db)).seoAccess).toBe(true);
   });
 
   it("con Google y datos reales: reparto por fuente que suma el total, redes por nombre y veredicto de experiencia real", async () => {

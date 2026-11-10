@@ -122,7 +122,7 @@ export async function buildProjectReport(
   }
 
   // Lo que cuelga del portal (títulos, causas de las mejoras y tráfico/SEO) sale de los mismos servicios que la pantalla del cliente.
-  const portalProject: PortalProject = { id: project.id, slug: project.slug, name: project.name, baseUrl: project.baseUrl, latest, improvements: [] };
+  const portalProject: PortalProject = { id: project.id, slug: project.slug, name: project.name, baseUrl: project.baseUrl, phase: project.phase, latest, improvements: [] };
   const [titles, pageImprovements, measurements, daily, logo, newest] = await Promise.all([
     portalPageTitles(portalProject, latest.map((l) => l.path), db),
     getPortalImprovements(portalProject, db),

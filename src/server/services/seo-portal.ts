@@ -4,7 +4,7 @@ import * as repo from "@/server/repositories/seo-portal";
 import { getSeoDashboard, type SeoDashboard } from "./seo-data";
 import { assertUuid } from "./shared";
 
-export type SeoSharing = { visible: boolean; /** El portal solo muestra proyectos en producción. */ inProduction: boolean };
+export type SeoSharing = { visible: boolean; /** El cliente también ve los proyectos en desarrollo: esto solo informa de la fase. */ inProduction: boolean };
 
 /** Si el cliente ve «Tráfico y búsqueda» de este proyecto en su portal (por defecto, no). */
 export async function getSeoSharing(projectId: string, db: Database = getDb()): Promise<SeoSharing> {
@@ -21,7 +21,7 @@ export async function setSeoClientVisible(projectId: string, visible: boolean, d
 
 /**
  * Lo que ve el cliente en su portal: el mismo panel que el administrador, o null si no corresponde mostrarlo (el proyecto
- * no es de este cliente, no está en producción, el administrador no lo activó o no tiene ninguna conexión). Es la única
+ * no es de este cliente, está archivado, el administrador no lo activó o no tiene ninguna conexión). Es la única
  * puerta del portal a estos datos: se comprueba aquí, no en la pantalla.
  */
 export async function getPortalSeoDashboard(clientId: string, projectId: string, opts: { days: number; lang?: string }, db: Database = getDb()): Promise<SeoDashboard | null> {

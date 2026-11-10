@@ -121,10 +121,18 @@ del proyecto (`src/server/domain/alert-state-machine.ts`, función pura con prue
 - **Acceso:** `/c/<identificador-del-cliente>` con PIN (ver arriba), solo lectura. Desde la ficha del cliente se
   genera el PIN y se **suspende** al cliente (el portal pasa al aviso de servicio suspendido). Los cambios surten
   efecto en la siguiente petición: el acceso se vuelve a comprobar siempre y las páginas no se cachean.
-- Muestra solo los proyectos **en producción**: estado actual de cada página y perfil con su variación respecto
-  a la auditoría anterior, "puntos por mejorar" (las alertas abiertas, sin códigos internos) y la evolución.
-  Con un único proyecto abre directo en su detalle.
-- Cada proyecto se autoriza con el cliente de la sesión; un proyecto de otro cliente, de desarrollo o archivado
+- Muestra los proyectos **en producción y en desarrollo** (con una etiqueta de fase): estado actual de cada página y perfil
+  con su variación respecto a la auditoría anterior, "puntos por mejorar" y la evolución. Con un único proyecto abre directo en su detalle.
+  En **producción**, los puntos por mejorar son las alertas abiertas (sin códigos internos). En **desarrollo** no se abren alertas, así que se
+  calculan al vuelo (`domain/dev-conditions.ts`): cada última auditoría cuyo rubro esté por debajo de la meta configurada, con las mismas causas
+  guardadas. «Tráfico y búsqueda» (y la salud SEO) de un proyecto en desarrollo se ve si el administrador activó «Visible para el cliente». Las
+  auditorías programadas, las alertas y los correos semanal y mensual siguen solo para producción.
+- La cabecera lleva siempre la marca de PageSpeed antes que la del cliente (logotipo completo en escritorio, solo el isotipo en el teléfono) y el
+  pie queda abajo del todo. Los desplegables son un acordeón exclusivo (`<details name>`): abrir uno cierra el otro, y todo parte contraído.
+  Rutas: cada sigla (R, S, A, B, IA, LCP, CLS, TBT, Agentes) tiene una burbuja que explica qué mide (`domain/metric-hints.ts`, `Hint`), y cambiar entre
+  Móvil y Escritorio cambia a la vez la cinta de notas de la fila y las métricas. Mejoras: se guardan hasta 50 causas por rubro (`MAX_ITEMS_PER_CATEGORY`;
+  `audit_logs.improvements` pasa a `v: 2` y las auditorías de la versión anterior, con solo 10, se recalculan desde R2 la primera vez que se miran).
+- Cada proyecto se autoriza con el cliente de la sesión; un proyecto de otro cliente o archivado
   responde 404. Más de 30 enlaces mal formados desde una IP en 10 minutos cortan el acceso con un aviso
   (limitadores en memoria; hay una sola réplica web).
 - Cabeceras de `/c/*`: `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`.
@@ -485,7 +493,7 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   idiomas) y **Salud SEO**: el último rastreo técnico en frases llanas (`domain/seo-client-glossary.ts`), solo errores y avisos
   (la información no se muestra), agrupado por tema (acceso, indexación, direcciones principales, contenido, idiomas, datos
   estructurados), con nuevos y resueltos frente a la revisión anterior y las páginas afectadas. Mismo interruptor que antes
-  («Visible para el cliente», `seo_client_visible`) y solo proyectos en producción; la salud SEO no exige tener Google conectado.
+  («Visible para el cliente», `seo_client_visible`), en producción o en desarrollo; la salud SEO no exige tener Google conectado.
 - **Informes en PDF: resumen e ingeniería** (`/c/<enlace>/<proyecto>/informes`, `.../informe?tipo=resumen|ingenieria&dias=7|30|90`).
   Dos documentos con el **logotipo del cliente y el de la aplicación**: el **resumen** (5 apartados, normalmente 2 a 4 páginas, en
   lenguaje claro) y el de **ingeniería** (portada con índice y 8 apartados: método, notas y métricas por página, rendimiento a fondo,

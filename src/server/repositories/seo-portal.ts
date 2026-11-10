@@ -16,12 +16,12 @@ export async function setClientVisible(db: Database, projectId: string, visible:
   return rows.length;
 }
 
-/** El proyecto, solo si es de este cliente, está en producción, no está archivado y el administrador activó SEO para él. */
+/** El proyecto, solo si es de este cliente, no está archivado y el administrador activó SEO para él (en producción o en desarrollo). */
 export async function findPortalSeoProject(db: Database, clientId: string, projectId: string): Promise<{ id: string } | null> {
   const [row] = await db
     .select({ id: projects.id })
     .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.clientId, clientId), eq(projects.phase, "production"), eq(projects.seoClientVisible, true), isNull(projects.deletedAt)))
+    .where(and(eq(projects.id, projectId), eq(projects.clientId, clientId), eq(projects.seoClientVisible, true), isNull(projects.deletedAt)))
     .limit(1);
   return row ?? null;
 }

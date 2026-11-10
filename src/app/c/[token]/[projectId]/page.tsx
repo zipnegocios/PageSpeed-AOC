@@ -13,6 +13,7 @@ import { averageScores } from "@/server/services/history";
 import { getPortalMeasurements } from "@/server/services/project-measurements";
 import { MeasurementCards } from "../../_components/measurement-cards";
 import { ChevronRight } from "../../_components/portal-icons";
+import { PhaseBadge, DevelopmentNotice } from "../../_components/phase-badge";
 import { PortalPage } from "../../_components/portal-page";
 import { loadProjectGate } from "../../_lib/project-gate";
 
@@ -43,7 +44,17 @@ export default async function PortalSummary({ params, searchParams }: { params: 
   const measurements = await getPortalMeasurements(client.id, project, { days: 28, hasLighthouse: project.latest.length > 0 });
 
   return (
-    <PortalPage width="contained" title="Resumen" subtitle={<span className="font-mono break-all text-[14px]">{project.baseUrl}</span>}>
+    <PortalPage
+      width="contained"
+      title="Resumen"
+      subtitle={
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <PhaseBadge phase={project.phase} />
+          <span className="font-mono break-all text-[14px]">{project.baseUrl}</span>
+        </span>
+      }
+    >
+      {project.phase === "development" ? <DevelopmentNotice /> : null}
       {project.latest.length === 0 ? (
         <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Todavía no hay auditorías de este proyecto.</p>
       ) : (
