@@ -127,7 +127,7 @@ describe("frases", () => {
     expect(monthlyStatus({ openAlerts: 2, mobilePerfDelta: 9, actions: 3 })).toEqual({ tone: "attention", line: "Hay 2 puntos en revisión; los explico en el portal." });
     expect(monthlyStatus({ openAlerts: 1, mobilePerfDelta: 0, actions: 0 }).line).toBe("Hay un punto en revisión; lo explico en el portal.");
     expect(monthlyStatus({ openAlerts: 0, mobilePerfDelta: 5, actions: 3 })).toEqual({ tone: "ok", line: "Mejoró la velocidad en el móvil este mes y no quedan puntos abiertos." });
-    expect(monthlyStatus({ openAlerts: 0, mobilePerfDelta: 1, actions: 3 }).line).toBe("Todo en orden: atendí 3 cosas este mes y no quedan puntos abiertos.");
+    expect(monthlyStatus({ openAlerts: 0, mobilePerfDelta: 1, actions: 3 }).line).toBe("Todo en orden: atendimos 3 cosas este mes y no quedan puntos abiertos.");
     expect(monthlyStatus({ openAlerts: 0, mobilePerfDelta: null, actions: 0 })).toEqual({ tone: "ok", line: "Todo en orden: no hubo incidencias." });
   });
   it("promedios y diferencias", () => {

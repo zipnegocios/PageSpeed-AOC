@@ -17,6 +17,11 @@ export async function resolveSender(db: Database, client: Pick<Client, "ownerId"
   return admin ? senderFromAdmin(admin) : DEFAULT_SENDER;
 }
 
+/** Quien firma los correos de este cliente, para mostrarlo en el panel (por ejemplo, en la vista previa de la bienvenida). */
+export async function getClientSender(client: Pick<Client, "ownerId">, db: Database = getDb()): Promise<ClientSender> {
+  return resolveSender(db, client);
+}
+
 export type ResponsibleOption = { id: string; name: string; email: string; role: "owner" | "admin"; phone: string | null; hasName: boolean };
 
 /** Las personas del equipo a las que se puede asignar un cliente. */

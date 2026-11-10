@@ -45,7 +45,7 @@ describe.skipIf(!dbUrl)("correos automáticos al cliente", () => {
       })
       .where(eq(s.clients.id, client.id));
     const project = await projects.createProject(client.id, { name: "Sitio", baseUrl: "https://www.cafeaurora.test" }, db);
-    await db.update(s.projects).set({ phase: "production", seoClientVisible: opts.visible ?? true, includesServer: true }).where(eq(s.projects.id, project.id));
+    await db.update(s.projects).set({ phase: "production", seoClientVisible: opts.visible ?? true, services: ["web", "seo", "server", "security"] }).where(eq(s.projects.id, project.id));
     if (opts.ga4Through !== null) {
       await db.insert(s.seoIntegrations).values({ projectId: project.id, kind: "ga4", externalId: "123", syncStatus: "ok", syncedThrough: opts.ga4Through ?? "2026-11-09" });
     }

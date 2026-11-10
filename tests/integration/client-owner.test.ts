@@ -43,7 +43,7 @@ describe.skipIf(!dbUrl)("responsable del cliente", () => {
     await db.update(s.projects).set({ phase: "production" }).where(eq(s.projects.id, p.id));
     return p;
   };
-  const form = (projectId: string) => ({ projectId, kind: "site", techLabel: "WordPress", includesServer: true, ccText: "" });
+  const form = (projectId: string) => ({ products: [{ projectId, solutions: ["sitio web"], techs: ["WordPress"], services: ["web", "seo", "server", "security"], initialImprovement: false }], ccText: "" });
 
   it("quien crea el cliente queda como su responsable; sin responsable, la cuenta propietaria", async () => {
     const mine = await clients.createClient({ name: "De Luis", contactName: "Ana", contactEmail: "ana@acme.test" }, db, { ownerId: luis!.id });

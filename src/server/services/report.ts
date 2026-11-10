@@ -43,6 +43,8 @@ export type ReportData = {
   contactName: string | null;
   contactEmail: string | null;
   projectId: string;
+  /** El proyecto está en mejora inicial: la portada explica que los valores son el punto de partida. */
+  initialImprovement: boolean;
   projectName: string;
   baseUrl: string;
   /** Meta de rendimiento, para dibujarla en los gráficos. */
@@ -122,7 +124,7 @@ export async function buildProjectReport(
   }
 
   // Lo que cuelga del portal (títulos, causas de las mejoras y tráfico/SEO) sale de los mismos servicios que la pantalla del cliente.
-  const portalProject: PortalProject = { id: project.id, slug: project.slug, name: project.name, baseUrl: project.baseUrl, latest, improvements: [] };
+  const portalProject: PortalProject = { id: project.id, slug: project.slug, name: project.name, baseUrl: project.baseUrl, initialImprovement: project.initialImprovement, latest, improvements: [] };
   const [titles, pageImprovements, measurements, daily, logo, newest] = await Promise.all([
     portalPageTitles(portalProject, latest.map((l) => l.path), db),
     getPortalImprovements(portalProject, db),
@@ -152,6 +154,7 @@ export async function buildProjectReport(
     projectId: project.id,
     projectName: project.name,
     baseUrl: project.baseUrl,
+    initialImprovement: project.initialImprovement,
     performanceThreshold: thresholds.find((t) => t.metric === "performance" && t.enabled)?.minScore ?? null,
     latest,
     improvements: alerts.map((a) => ({

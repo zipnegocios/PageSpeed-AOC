@@ -2,6 +2,7 @@ import { lightToken } from "@/lib/tokens";
 import { ENGINEERING_SECTIONS, SUMMARY_SECTIONS } from "@/server/domain/report-outline";
 import { scoreBand } from "@/server/domain/score-band";
 import { DEFAULT_SENDER, SENDER_BRAND_NAME, SENDER_SERVICE_NAME, type ClientSender } from "@/server/domain/client-sender";
+import { SERVICE_KEYS, unionServices, type ServiceKey } from "@/server/domain/client-welcome";
 import { clientEmailBand, clientEmailFooter, clientTextSignature, EMAIL, emailButton } from "./email-theme";
 
 /**
@@ -31,8 +32,6 @@ export type ClientEmailBase = {
   /** Dirección pública de la app: de ahí sale el logo de la banda. */
   appUrl: string;
 };
-
-export type ProjectKind = "sitio" | "tienda" | "aplicación";
 
 // ------------------------------------------------------------------ utilidades
 
@@ -94,6 +93,7 @@ type Block =
   | { k: "list"; items: string[] }
   | { k: "table"; head: string[]; rows: string[][] }
   | { k: "status"; label: string; t: string }
+  | { k: "calm"; title: string; intro: string; steps: string[]; outro?: string }
   | { k: "buttons"; items: Array<{ label: string; url: string; alt?: boolean }> }
   | { k: "pin"; pin: string }
   | { k: "big"; value: string; caption: string }
@@ -139,6 +139,15 @@ function blockHtml(b: Block): string {
       );
     case "status":
       return `<div style="background:${C.okBg};color:${C.okInk};border-left:4px solid ${C.ok};padding:12px 14px;margin:0 0 16px"><div style="font-size:12px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px">${esc(b.label)}</div>${inline(b.t)}</div>`;
+    case "calm":
+      return (
+        `<div style="background:${C.okBg};color:${C.okInk};border-left:4px solid ${C.ok};padding:14px 16px;margin:4px 0 18px">` +
+        `<div style="font-size:17px;font-weight:bold;margin-bottom:6px">${esc(b.title)}</div>` +
+        `<p style="margin:0 0 10px">${inline(b.intro)}</p>` +
+        `<ol style="margin:0 0 10px;padding-left:20px">${b.steps.map((x) => `<li style="margin-bottom:4px">${inline(x)}</li>`).join("")}</ol>` +
+        (b.outro ? `<p style="margin:0">${inline(b.outro)}</p>` : "") +
+        `</div>`
+      );
     case "buttons":
       return (
         `<p style="margin:18px 0">` +
@@ -207,6 +216,8 @@ function blockText(b: Block): string[] {
       return [...b.rows.map((r) => r.map((c) => plain(c).replace(/\n/g, " ")).join(" · ")), ""];
     case "status":
       return [`${b.label}: ${plain(b.t)}`, ""];
+    case "calm":
+      return [b.title.toUpperCase(), plain(b.intro), ...b.steps.map((x, i) => `${i + 1}. ${plain(x)}`), ...(b.outro ? [plain(b.outro)] : []), ""];
     case "buttons":
       return [...b.items.map((i) => `${i.label}: ${i.url}`), ""];
     case "pin":
@@ -244,100 +255,172 @@ export function composeClientEmail(input: ComposeInput): ClientEmail {
   return { subject: input.subject, text, html };
 }
 
-const kindForms = (kind: ProjectKind) => (kind === "sitio" ? { made: "hecho", fast: "rápido" } : { made: "hecha", fast: "rápida" });
-
 // ---------------------------------------------------------------- bienvenida
 
 /** Datos citados en «Por qué esto importa». Ver docs/borradores-correos.md (sección Fuentes). Revisar las fechas cada trimestre. */
 export const WHY_SPEED =
-  "**La velocidad se nota en el negocio.** Un estudio de Deloitte y 55, encargado por Google, con 37 marcas y más de 30 millones de sesiones, asoció una mejora de 0,1 segundos en la velocidad móvil con un 9,2 % más de gasto en tiendas online y un 21,6 % más de visitantes que llegan al formulario en sitios que captan clientes.";
+  "**La velocidad se nota en el negocio.** En un estudio de Deloitte y 55 para Google (37 marcas, más de 30 millones de sesiones), mejorar 0,1 segundos la velocidad móvil se asoció con un 9,2 % más de gasto en tiendas online y un 21,6 % más de visitantes que llegan al formulario en sitios que captan clientes.";
 export const WHY_VULNERABILITIES =
-  "**Las vulnerabilidades son la puerta de entrada más común.** Según el informe de Verizon de 2026, el 31 % de las brechas de seguridad empieza con una vulnerabilidad de software, por encima de las contraseñas robadas.";
-/** `eolNote` es la frase de fin de soporte de la tecnología del cliente (PHP, Node.js…), o null si no aplica. */
-export const whyVersions = (eolNote: string) => `**Las versiones caducan.** ${eolNote} Mantener al día lo que corre debajo de un sitio es un trabajo continuo, no de una vez.`;
+  "**Las vulnerabilidades son la puerta de entrada más común.** Según el informe de Verizon de 2026, el 31 % de las brechas de seguridad empieza con una vulnerabilidad de software, por encima de las contraseñas robadas. Y usar componentes vulnerables o desactualizados (librerías, dependencias, plataformas y APIs, incluidas las dependencias de las dependencias) está entre los diez riesgos principales del Top 10 de OWASP.";
+/** `eolNote` es la frase de fin de soporte de una de las tecnologías (PHP, Node.js…), o null si no aplica: queda como ejemplo. */
+export const whyLayers = (eolNote: string | null) =>
+  `**Todo lo que sostiene un activo digital caduca.** Son muchas capas que envejecen a distinto ritmo: lenguajes y plataformas${eolNote ? ` (por ejemplo, ${eolNote.replace(/\.$/, "")})` : ""}, librerías y dependencias, APIs y servicios de terceros, integraciones, servidor, dominios, certificados y enrutamiento. Cuando una se desactualiza o se rompe, las demás lo sienten.`;
+export const WHY_OBSERVABILITY =
+  "**Por eso hace falta observabilidad en todas las capas.** Tener a la vista la aplicación, las herramientas de terceros, las integraciones, el servidor, los dominios y el enrutamiento a la vez, con criterio de ingeniería, para actuar antes de que algo falle y mantener todo al día. No es un trabajo de una sola vez: es lo que sostiene este acompañamiento mensual.";
+
+/** Un producto del cliente tal como se presenta en la bienvenida. */
+export type WelcomeProduct = {
+  /** Dirección que se muestra, por ejemplo «cafeaurora.com». */
+  site: string;
+  /** Qué es, con sus palabras: «tienda online», «app móvil iOS»… */
+  solutions: string[];
+  /** En qué está hecho: «Shopify», «Swift», «Firebase»… */
+  techs: string[];
+  /** Qué servicios del acompañamiento incluye (ver `SERVICE_KEYS`). */
+  services: string[];
+};
 
 export type WelcomeInput = ClientEmailBase & {
-  kind: ProjectKind;
-  /** Tecnología que se muestra: «WordPress», «Shopify», «Next.js»… */
-  techLabel: string;
-  /** Si el plan incluye la supervisión de servidor, servicios y APIs. */
-  includesServer: boolean;
+  products: WelcomeProduct[];
+  /** Frase de fin de soporte de una de las tecnologías, o null. */
   eolNote: string | null;
   pin: string;
 };
 
-export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
+const joinList = (a: string[]) => (a.length <= 1 ? (a[0] ?? "") : `${a.slice(0, -1).join(", ")} y ${a[a.length - 1]}`);
+
+/** Lo que se revisa en cada servicio, en plural: los productos pueden ser de cualquier tipo. */
+const SERVICE_ASPECT: Record<ServiceKey, string> = {
+  web: "cómo funcionan y qué tan rápido cargan",
+  seo: "cómo se encuentran en Google y de dónde llegan sus visitas",
+  server: "cómo responden el servidor y los servicios",
+  deps: "cómo están sus dependencias e integraciones",
+  domain: "cómo están el dominio, el DNS y los certificados",
+  security: "cómo están en seguridad y actualizaciones",
+};
+
+/** Los párrafos con que abre la bienvenida (presentación, productos, alcance y para qué). Lo usa también la vista previa del formulario. */
+export function welcomeOpening(i: { names: string[]; products: WelcomeProduct[]; sender: ClientSender }): Block[] {
   const T = voice(i.names);
-  const f = kindForms(i.kind);
-  const blocks: Block[] = [
+  const used = unionServices(i.products);
+  const aspects = SERVICE_KEYS.filter((k) => used.has(k)).map((k) => SERVICE_ASPECT[k]);
+  const many = i.products.length > 1;
+  return [
     {
       k: "p",
       t: T(
-        `Soy **${i.sender.name}** (${i.sender.brand}), quien se encarga de tu ${i.kind}. Te escribo desde esta dirección nueva para enviarte los informes: si no la reconoces, es normal, soy yo.`,
-        `Soy **${i.sender.name}** (${i.sender.brand}), quien se encarga de su ${i.kind}. Les escribo desde esta dirección nueva para enviarles los informes: si no la reconocen, es normal, soy yo.`,
+        `Soy **${i.sender.name}** (${i.sender.brand}), quien se encarga de tus activos digitales. Te escribo desde esta dirección nueva para enviarte los informes: si no la reconoces, es normal, soy yo.`,
+        `Soy **${i.sender.name}** (${i.sender.brand}), quien se encarga de sus activos digitales. Les escribo desde esta dirección nueva para enviarles los informes: si no la reconocen, es normal, soy yo.`,
       ),
     },
-    {
-      k: "p",
-      t: `Desde ahora **${i.site}**, ${i.kind} ${f.made} en **${i.techLabel}**, cuenta con un seguimiento técnico permanente. Lo he incorporado a mi trabajo ${T("contigo", "con ustedes")} para que ${T("tu", "su")} ${i.kind} se mantenga ${f.fast}, visible y al día, y para enterarme antes que ${T("tus", "sus")} visitantes de cualquier cosa que falle.`,
-    },
-    { k: "p", t: "Es el mismo seguimiento para cualquier tecnología: un CMS, una tienda online o una aplicación a medida." },
-    {
-      k: "p",
-      t: `**${T("No tienes que hacer nada", "No tienen que hacer nada")}.** Si algo cambia en Google Analytics, se cae, o una página o producto nuevo necesita ajustes, yo me encargo. Esto es lo que ${T("vas a recibir", "van a recibir")}:`,
-    },
-    {
-      k: "table",
-      head: ["Cuándo", "Qué"],
-      rows: [
-        ["**Cada lunes**", `**${T("Tu", "Su")} semana en la web**\nCuántas visitas ${T("tuviste", "tuvieron")}, de dónde llegaron (Google, Instagram, WhatsApp, Facebook, TikTok, LinkedIn…), con qué palabras ${T("te buscaron", "los buscaron")} y qué páginas funcionaron.`],
-        ["**Una vez al mes**", "**Estado general**\nVelocidad, experiencia real de los visitantes, visitas y visibilidad en Google, lo que atendimos y lo que sigue."],
-        ["**Solo si hace falta**", `**Aviso de incidencia**\n${T("Te escribo", "Les escribo")} yo cuando algo ya está atendido, o necesito algo de ${T("ti", "ustedes")}.`],
-      ],
-    },
-    { k: "p", t: "En total, **no más de cinco correos al mes**, salvo que haya una incidencia." },
-    { k: "h", t: "Qué cuidamos" },
+    { k: "p", t: `Desde hoy ${T("tus", "sus")} activos digitales tienen un acompañamiento técnico de punta a punta:` },
     {
       k: "list",
-      items: [
-        "**Velocidad y calidad de cada página:** medida automáticamente en móvil y escritorio, con lo que hay que mejorar.",
-        "**Experiencia real de tus visitantes:** cómo vivieron la velocidad del sitio personas de verdad (datos de Chrome, últimos 28 días).",
-        "**Visitas y de dónde llegan:** buscadores, redes sociales (Instagram, WhatsApp, Facebook, TikTok, LinkedIn…), otros sitios y directo; también las visitas desde asistentes de IA.",
-        "**Visibilidad en Google:** cuántas veces apareces, cuántos clics recibes y con qué palabras te buscan.",
-        "**Salud SEO:** una revisión técnica del sitio para que Google lo encuentre y lo muestre bien.",
-        ...(i.includesServer ? ["**Servidor, servicios y APIs:** yo los superviso de forma continua."] : []),
-        "**Seguridad y actualizaciones:** yo las superviso y las aplico.",
-      ],
+      items: i.products.map((x) => `**${x.site}** · ${joinList(x.solutions)}${x.techs.length > 0 ? ` en ${joinList(x.techs)}` : ""}`),
     },
+    {
+      k: "p",
+      t: `Con mi equipo revisamos cada aspecto${many ? " de cada uno" : ""}${aspects.length > 0 ? `: ${joinList(aspects)}` : ""}. El objetivo es detectar cualquier falla antes de que la noten ${T("tus", "sus")} usuarios y que todo trabaje bien.`,
+    },
+    {
+      k: "p",
+      t: `Y no solo por lo técnico: con los datos en la mano podemos decidir juntos, también con criterio comercial, cómo hacer evolucionar ${T("tus", "sus")} activos digitales a medida que ${T("tu", "su")} público lo pida y la tecnología lo exija.`,
+    },
+  ];
+}
+
+export function buildWelcomeEmail(i: WelcomeInput): ClientEmail {
+  const T = voice(i.names);
+  const used = unionServices(i.products);
+  const many = i.products.length > 1;
+  const has = (k: ServiceKey) => used.has(k);
+  const cubre: string[] = [
+    ...(has("web")
+      ? [
+          "**Velocidad y calidad de cada página:** medidas automáticamente en móvil y escritorio, con lo que hay que mejorar.",
+          `**Experiencia real de ${T("tus", "sus")} visitantes:** cómo vivieron la velocidad personas de verdad (datos de Chrome, últimos 28 días).`,
+        ]
+      : []),
+    ...(has("seo")
+      ? [
+          `**Visitas y visibilidad:** de dónde llegan (buscadores, redes sociales, otros sitios), con qué palabras ${T("te buscan", "los buscan")} en Google y qué páginas funcionan; también las visitas desde asistentes de IA.`,
+          "**Salud SEO:** una revisión técnica para que Google encuentre y muestre bien lo que publicas.",
+        ]
+      : []),
+    ...(has("server") ? ["**Servidor, servicios y APIs:** yo los superviso y los reviso con regularidad."] : []),
+    ...(has("deps") ? ["**Dependencias e integraciones:** librerías, paquetes, APIs y herramientas de terceros: que estén al día y que sigan funcionando."] : []),
+    ...(has("domain") ? ["**Dominio, DNS y certificados:** que nada venza por sorpresa y que el enrutamiento funcione."] : []),
+    ...(has("security") ? ["**Seguridad y actualizaciones:** yo las superviso y las aplico."] : []),
+  ];
+  const tableRows: string[][] = [
+    ...(has("seo")
+      ? [["**Cada lunes**", `**${T("Tu", "Su")} semana en la web**\nCuántas visitas ${T("tuviste", "tuvieron")}, de dónde llegaron (Google, Instagram, WhatsApp, Facebook, TikTok, LinkedIn…), con qué palabras ${T("te buscaron", "los buscaron")} y qué páginas funcionaron.`]]
+      : []),
+    [
+      "**Una vez al mes**",
+      `**Estado general**\n${has("web") ? "Velocidad, experiencia real de los visitantes, " : ""}${has("seo") ? "visitas y visibilidad en Google, " : ""}lo que atendimos y lo que sigue.`,
+    ],
+    ["**Solo si hace falta**", `**Aviso de incidencia**\n${T("Te escribo", "Les escribo")} yo cuando algo ya está atendido, o necesito algo de ${T("ti", "ustedes")}.`],
+  ];
+  const blocks: Block[] = [
+    ...welcomeOpening(i),
+    {
+      k: "calm",
+      title: "Si ves números bajos, no te alarmes",
+      intro: `Al empezar es normal que algunos valores salgan por debajo del rango esperado: velocidad en el móvil, SEO, accesibilidad, integraciones o ajustes pendientes. No es un desastre ni un problema de ${T("tu", "su")} negocio: es el **punto de partida**.`,
+      steps: [
+        "**Hoy:** el punto de partida, tal como está.",
+        "**Las próximas semanas:** voy corrigiendo de forma progresiva, con los ajustes, los parches y las actualizaciones que hagan falta para dejar todo optimizado, al día y con tecnología de punta.",
+        "**Cada mes:** el informe de «Estado general» muestra cómo evoluciona y qué corregimos. En el portal, los valores se actualizan solos.",
+      ],
+      outro: `Y si ${T("tus", "sus")} valores ya están bien, perfecto: ${T("sigue tranquilo", "sigan tranquilos")}, los mantenemos así.`,
+    },
+    {
+      k: "p",
+      t: `**${T("No tienes que hacer nada", "No tienen que hacer nada")}.** Si algo falla, una herramienta se actualiza o una página o producto nuevo necesita ajustes, yo me encargo. Esto es lo que ${T("vas a recibir", "van a recibir")}:`,
+    },
+    { k: "table", head: ["Cuándo", "Qué"], rows: tableRows },
+    { k: "p", t: has("seo") ? "**Un correo por semana y uno al mes**; fuera de eso, solo si hay una incidencia." : "**Un correo al mes**; fuera de eso, solo si hay una incidencia." },
+    ...(cubre.length > 0 ? ([{ k: "h", t: "Qué cubrimos" }, { k: "list", items: cubre }] as Block[]) : []),
     {
       k: "p",
       t: T(
         "Cuando quieras mirar tú mismo, tienes tu portal, siempre actualizado:",
-        "Cuando quieran mirar ustedes mismos, tienen su portal, siempre actualizado. Es un solo acceso para todo el equipo:",
+        `Cuando quieran mirar ustedes mismos, tienen su portal, siempre actualizado. Es un solo acceso para todo el equipo${many ? ", con todos sus activos" : ""}:`,
       ),
     },
     { k: "pin", pin: i.pin },
     { k: "buttons", items: [{ label: "Abrir el portal", url: i.portalUrl }] },
-    { k: "fine", t: T("Lo puedes instalar como app en el móvil. Ahí mismo, en «Informes», descargas dos informes en PDF: un resumen y el detalle de ingeniería.", "Lo pueden instalar como app en el móvil. Ahí mismo, en «Informes», descargan dos informes en PDF: un resumen y el detalle de ingeniería. Si alguien cambia el PIN, les llega a todos.") },
+    {
+      k: "fine",
+      t: T(
+        "Lo puedes instalar como app en el móvil. Ahí mismo, en «Informes», descargas dos informes en PDF: un resumen y el detalle de ingeniería.",
+        "Lo pueden instalar como app en el móvil. Ahí mismo, en «Informes», descargan dos informes en PDF: un resumen y el detalle de ingeniería. Si alguien cambia el PIN, les llega a todos.",
+      ),
+    },
+    { k: "fine", t: `**Recuerda:** si en el portal ${T("ves", "ven")} valores por debajo de la meta, son el punto de partida. La mejora se ve mes a mes.` },
     { k: "h", t: "Por qué esto importa" },
-    { k: "list", items: [WHY_SPEED, WHY_VULNERABILITIES, ...(i.eolNote ? [whyVersions(i.eolNote)] : [])] },
-    { k: "fine", t: `Fuentes: Deloitte y 55 para Google (web.dev), Verizon DBIR 2026${i.eolNote ? ", endoflife.date" : ""}.` },
+    { k: "list", items: [WHY_SPEED, WHY_VULNERABILITIES, whyLayers(i.eolNote), WHY_OBSERVABILITY] },
+    { k: "fine", t: `Fuentes: Deloitte y 55 para Google (web.dev), Verizon DBIR 2026, OWASP Top 10 (edición 2021, A06)${i.eolNote ? ", endoflife.date" : ""}.` },
     {
       k: "p",
       t: i.sender.whatsapp
         ? T(
-            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndeme este correo o escríbeme por WhatsApp.",
-            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndanme este correo o escríbanme por WhatsApp.",
+            "Cualquier duda, o una idea para tu negocio, respóndeme este correo o escríbeme por WhatsApp. Por ahí también cambiamos la frecuencia de los correos o sumamos a alguien más al equipo.",
+            "Cualquier duda, o una idea para su negocio, respóndanme este correo o escríbanme por WhatsApp. Por ahí también cambiamos la frecuencia de los correos o sumamos a alguien más al equipo.",
           )
         : T(
-            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndeme este correo.",
-            "Para cambiar la frecuencia de los correos o añadir a alguien más, respóndanme este correo.",
+            "Cualquier duda, o una idea para tu negocio, respóndeme este correo. Por ahí también cambiamos la frecuencia de los correos o sumamos a alguien más al equipo.",
+            "Cualquier duda, o una idea para su negocio, respóndanme este correo. Por ahí también cambiamos la frecuencia de los correos o sumamos a alguien más al equipo.",
           ),
     },
   ];
   return composeClientEmail({
-    subject: `${T("Tu", "Su")} ${i.kind} ahora tiene seguimiento técnico permanente`,
-    preview: T("Qué vas a recibir, cuándo y cómo verlo cuando quieras. No tienes que hacer nada.", "Qué van a recibir, cuándo y cómo verlo cuando quieran. No tienen que hacer nada."),
+    subject: `${T("Tus", "Sus")} activos digitales ahora tienen acompañamiento técnico de punta a punta`,
+    preview: T(
+      "Qué revisamos, qué vas a recibir y cómo verlo cuando quieras. No tienes que hacer nada.",
+      "Qué revisamos, qué van a recibir y cómo verlo cuando quieran. No tienen que hacer nada.",
+    ),
     names: i.names,
     clientName: i.clientName,
     sender: i.sender,
@@ -368,6 +451,8 @@ export type MonthlyInput = ClientEmailBase & {
   search?: { clicks: number; clicksDeltaPct: number | null; impressions: number; position: number | null; queries: Array<{ query: string; clicks: number }> } | null;
   /** Experiencia real de los visitantes (Chrome UX Report); null si no hay datos. */
   field?: { verdict: "passed" | "failed" | "no-data"; items: Array<{ label: string; value: string; word: string }> } | null;
+  /** El proyecto está «en mejora inicial»: los valores son el punto de partida. El estado del mes lo explica con calma. */
+  initialImprovement?: boolean;
   reportUrl: string | null;
   /** El informe de ingeniería en PDF. */
   engineeringUrl?: string | null;
@@ -382,7 +467,14 @@ export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
   const perf = i.scores[0];
   const blocks: Block[] = [
     { k: "p", t: `Este es el resumen de ${i.monthLabel} de **${i.site}**.` },
-    { k: "status", label: "Estado del mes", t: i.statusLine },
+    i.initialImprovement
+      ? {
+          k: "calm",
+          title: "Seguimos en la fase de mejora inicial",
+          intro: "Estos valores todavía son el **punto de partida**: es normal que algunos estén por debajo de la meta. Abajo está lo que corregimos este mes; el mes que viene verás cómo se mueven.",
+          steps: [],
+        }
+      : { k: "status", label: "Estado del mes", t: i.statusLine },
     { k: "h", t: "En números" },
     { k: "fine", t: `Promedio del mes, frente a ${i.prevMonthLabel}` },
     { k: "scores", rows: i.scores },
@@ -429,7 +521,7 @@ export function buildMonthlyEmail(i: MonthlyInput): ClientEmail {
   ];
   const head = perf ? ` Rendimiento móvil ${perf.mobile}${perf.mobileDelta === null ? "" : ` (${formatPoints(perf.mobileDelta)})`}` : "";
   return composeClientEmail({
-    subject: i.tone === "ok" ? `${i.site}: ${i.monthLabel} en orden.${head}` : `${i.site}: resumen de ${i.monthLabel}.${head}`,
+    subject: i.tone === "ok" && !i.initialImprovement ? `${i.site}: ${i.monthLabel} en orden.${head}` : `${i.site}: resumen de ${i.monthLabel}.${head}`,
     preview: "Lo que revisamos, lo que atendimos y lo que viene.",
     names: i.names,
     clientName: i.clientName,
@@ -523,7 +615,7 @@ export type ManualReportInput = ClientEmailBase & {
 /** Correo del botón «Enviar a …»: acompaña los dos PDF (resumen e ingeniería) que adjunta quien envía. */
 export function buildClientReportEmail(i: ManualReportInput): ClientEmail {
   const T = voice(i.names);
-  const names = (list: readonly { title: string }[]) => list.map((s) => s.title.toLowerCase()).join(", ");
+  const names = (list: readonly { title: string }[]) => list.map((s) => s.title).join(" · ");
   const blocks: Block[] = [
     {
       k: "p",

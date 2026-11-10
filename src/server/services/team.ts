@@ -4,7 +4,7 @@ import { getDb, type Database } from "@/server/db/client";
 import { env } from "@/server/config/env";
 import { generateMagicToken } from "@/server/auth/magic-token";
 import { hashPassword } from "@/server/auth/password";
-import { assertAvatar } from "@/server/domain/profile";
+import { assertAvatar, displayName } from "@/server/domain/profile";
 import { DomainError } from "@/server/domain/errors";
 import { INVITE_TTL_MS, assertCanRemove, assertOwner, isInviteUsable, type InviteKind } from "@/server/domain/team";
 import { buildInviteEmail } from "@/server/notify/invite-email";
@@ -79,7 +79,7 @@ export type IssueResult = { to: string; link: string; expiresAt: Date; emailed: 
 type InviteProfile = { userId: string | null; firstName: string | null; lastName: string | null; avatarKey: string | null };
 const NO_PROFILE: InviteProfile = { userId: null, firstName: null, lastName: null, avatarKey: null };
 
-async function issue(actor: AdminSummary, email: string, kind: InviteKind, db: Database, deps: TeamDeps, profile: InviteProfile = NO_PROFILE): Promise<IssueResult> {
+async function issue(actor: AdminSummary, email: string, kind: InviteKind, db: Database, deps: TeamDeps, profile: InviteProfile = NO_PROFILE, greetName: string | null = profile.firstName): Promise<IssueResult> {
   const now = nowOf(deps);
   const token = generateMagicToken();
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
@@ -91,9 +91,11 @@ async function issue(actor: AdminSummary, email: string, kind: InviteKind, db: D
 
   const base = (deps.appUrl ?? env().APP_URL).replace(/\/+$/, "");
   const link = `${base}/invitacion/${token}`;
-  const mail = buildInviteEmail({ kind, invitedBy: actor.email, link, expiresAt });
+  // Lo escribe una persona a otra: sale a nombre de quien invita, con su nombre y apellido, y las respuestas le llegan a él.
+  const inviterName = displayName(actor);
+  const mail = buildInviteEmail({ kind, inviterName, inviteeName: greetName, link, expiresAt });
   try {
-    await (deps.mailer ?? webMailer()).send({ to: email, ...mail });
+    await (deps.mailer ?? webMailer()).send({ to: email, subject: mail.subject, text: mail.text, html: mail.html, fromName: inviterName, replyTo: actor.email });
     return { to: email, link, expiresAt, emailed: true };
   } catch (err) {
     const e = err as { code?: unknown; message?: unknown };
@@ -155,7 +157,7 @@ export async function sendPasswordReset(actor: AdminSummary, userId: string, db:
   const target = await admins.findAdminById(db, userId);
   if (!target) throw new DomainError("NOT_FOUND", "Usuario no encontrado.");
   if (target.role === "owner") throw new DomainError("INVALID", "La contraseña de la cuenta propietaria no se cambia desde aquí.");
-  return issue(actor, target.email, "reset", db, deps);
+  return issue(actor, target.email, "reset", db, deps, NO_PROFILE, target.firstName);
 }
 
 /** Reenvía una invitación pendiente con un enlace nuevo (el anterior deja de valer). */

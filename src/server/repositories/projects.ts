@@ -161,11 +161,17 @@ export async function listAllProjects(db: Database, scope?: Scope): Promise<Proj
   return rows.map(({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt, ...p }) => ({ ...p, clientLogo: logoInfo({ logoIconKey, logoFullKey, logoBg, logoUpdatedAt }) }));
 }
 
-/** Qué es el proyecto y en qué está hecho, para los correos al cliente. */
+/** Qué es el producto, en qué está hecho, qué servicios incluye y si está en mejora inicial, para los correos y el portal. */
 export async function setProjectEmailProfile(
   db: Database,
   id: string,
-  values: { kind: "site" | "shop" | "app"; techLabel: string; includesServer: boolean },
+  values: { solutions: string[]; techs: string[]; services: string[]; initialImprovement: boolean },
 ): Promise<void> {
   await db.update(projects).set(values).where(and(eq(projects.id, id), live()));
+}
+
+/** Enciende o apaga «en mejora inicial» (el aviso de tranquilidad del portal, los PDF y el correo mensual). */
+export async function setInitialImprovement(db: Database, id: string, on: boolean): Promise<boolean> {
+  const rows = await db.update(projects).set({ initialImprovement: on }).where(and(eq(projects.id, id), live())).returning({ id: projects.id });
+  return rows.length > 0;
 }

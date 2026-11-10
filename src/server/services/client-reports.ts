@@ -217,7 +217,7 @@ export async function prepareMonthly(c: Ctx, month: MonthPeriod, db: Database): 
     repo.countOpenAlerts(db, c.project.id),
     repo.listActionsBetween(db, c.project.id, cur),
     repo.countNewMonitoredRoutes(db, c.project.id, cur),
-    c.project.includesServer ? repo.hasServerCheck(db, c.project.id, month.key) : Promise.resolve(false),
+    c.project.services.includes("server") ? repo.hasServerCheck(db, c.project.id, month.key) : Promise.resolve(false),
   ]);
   const status = monthlyStatus({ openAlerts, mobilePerfDelta: scores[0]?.mobileDelta ?? null, actions: actions.length });
   const [traffic, search, field] = await Promise.all([monthlyTraffic(c, month, db), monthlySearch(c, month, db), monthlyField(c.project.id, db)]);
@@ -231,6 +231,7 @@ export async function prepareMonthly(c: Ctx, month: MonthPeriod, db: Database): 
       statusLine: status.line,
       scores,
       serverConfirmed: checked,
+      initialImprovement: c.project.initialImprovement,
       actions: actions.map((a) => ({ date: shortDay(a.happenedOn), text: a.text })),
       upcoming: null,
       traffic,

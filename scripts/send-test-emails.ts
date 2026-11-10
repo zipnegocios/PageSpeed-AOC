@@ -9,6 +9,8 @@
 //   --una-persona          saluda a una sola persona («tú») en lugar de a tres («ustedes»)
 //   --tech=wp|shopify|next tecnología del cliente de ejemplo (por defecto wp)
 //   --responsable=luis     firma como el segundo responsable (nombre y WhatsApp de ejemplo)
+//   --varios               la bienvenida presenta tres productos distintos
+//   --mejora-inicial       el correo mensual explica que los valores son el punto de partida
 //   --solo=bienvenida,mensual,semanal,manual   envía solo esos
 //   --dry-run=carpeta      no envía: escribe un .html y un .txt por correo en esa carpeta
 //
@@ -40,9 +42,9 @@ async function main(): Promise<void> {
   }
 
   const TECH = {
-    wp: { label: "WordPress", kind: "sitio", includesServer: true, eolNote: "PHP 8.2 deja de recibir parches de seguridad el 31 de diciembre de 2026." },
-    shopify: { label: "Shopify", kind: "tienda", includesServer: false, eolNote: null },
-    next: { label: "Next.js", kind: "aplicación", includesServer: true, eolNote: "Node.js 20 dejó de recibir parches de seguridad el 30 de abril de 2026." },
+    wp: { solutions: ["sitio web"], techs: ["WordPress"], services: ["web", "seo", "server", "security"], eolNote: "PHP 8.2 deja de recibir parches de seguridad el 31 de diciembre de 2026." },
+    shopify: { solutions: ["tienda online"], techs: ["Shopify", "Klaviyo"], services: ["web", "seo", "security"], eolNote: null },
+    next: { solutions: ["aplicación web"], techs: ["Next.js", "PostgreSQL"], services: ["web", "seo", "server", "deps", "security"], eolNote: "Node.js 20 dejó de recibir parches de seguridad el 30 de abril de 2026." },
   } as const;
   const techKey = (opt("tech") ?? "wp") as keyof typeof TECH;
   const tech = TECH[techKey];
@@ -50,6 +52,14 @@ async function main(): Promise<void> {
     console.error("--tech debe ser wp, shopify o next.");
     process.exit(1);
   }
+  // --varios presenta tres productos de tipos distintos en una sola bienvenida.
+  const products = flag("varios")
+    ? [
+        { site: "cafeaurora.com", solutions: ["tienda online (e-commerce)"], techs: ["Shopify", "Klaviyo"], services: ["web", "seo", "security"] },
+        { site: "app.cafeaurora.com", solutions: ["aplicación móvil iOS", "chatbot"], techs: ["Swift (iOS)", "Firebase"], services: ["server", "deps", "domain", "security"] },
+        { site: "aprende.cafeaurora.com", solutions: ["plataforma de e-learning"], techs: ["Moodle", "PHP", "MySQL"], services: ["web", "seo", "server", "security"] },
+      ]
+    : [{ site: "cafeaurora.com", solutions: [...tech.solutions], techs: [...tech.techs], services: [...tech.services] }];
 
   const appUrl = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
   // Quién firma: por defecto Gustavo; --responsable=luis prueba cómo ve el cliente a un segundo responsable.
@@ -64,19 +74,20 @@ const base: ClientEmailBase = {
   };
 
   const all: Record<string, ClientEmail> = {
-    bienvenida: buildWelcomeEmail({ ...base, kind: tech.kind, techLabel: tech.label, includesServer: tech.includesServer, eolNote: tech.eolNote, pin: "000000" }),
+    bienvenida: buildWelcomeEmail({ ...base, products, eolNote: flag("varios") ? TECH.wp.eolNote : tech.eolNote, pin: "000000" }),
     mensual: buildMonthlyEmail({
       ...base,
       monthLabel: "octubre",
       prevMonthLabel: "septiembre",
       tone: "ok",
+      initialImprovement: flag("mejora-inicial"),
       statusLine: "Mejoró la velocidad en el móvil y atendimos un aviso en la página de contacto.",
       scores: [
         { label: "Rendimiento", mobile: 78, desktop: 91, mobileDelta: 5, desktopDelta: 2 },
         { label: "Visibilidad (SEO)", mobile: 95, desktop: 96, mobileDelta: 0, desktopDelta: 0 },
         { label: "Accesibilidad", mobile: 88, desktop: 88, mobileDelta: 1, desktopDelta: 1 },
       ],
-      serverConfirmed: tech.includesServer,
+      serverConfirmed: (tech.services as readonly string[]).includes("server"),
       actions: [
         { date: "14 oct", text: "Actualicé un componente a su última versión." },
         { date: "18 oct", text: "Ajusté las imágenes de la página Servicios, que tardaba en cargar en el móvil." },

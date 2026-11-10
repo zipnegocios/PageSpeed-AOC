@@ -39,46 +39,94 @@ describe("marca", () => {
     expect(readFileSync(join(root, "design/brand/logo-glyph.svg"), "utf8")).toContain(`d="${LOGO_BOLT_PATH}"`);
   });
 
+  const expiresAt = new Date("2026-12-01T00:00:00Z");
+  const invite = (extra: Partial<Parameters<typeof buildInviteEmail>[0]> = {}) =>
+    buildInviteEmail({ kind: "invite", inviterName: "Gustavo Amarista", inviteeName: "Luis", link: "https://app.test/invitacion/x", expiresAt, ...extra });
+
   it("los correos al administrador llevan el logo (imagen del propio dominio), el nombre del producto y el copyright", () => {
-    const invite = buildInviteEmail({ kind: "invite", invitedBy: "Gustavo", link: "https://app.test/invitacion/x", expiresAt: new Date("2026-12-01T00:00:00Z") });
-    expect(invite.html).toContain("https://app.test/brand/logo-glyph-email.png");
-    expect(invite.html).toContain("PAGESPEED");
-    expect(invite.html).toContain(COPYRIGHT);
-    expect(invite.text).toContain(COPYRIGHT);
+    const m = invite();
+    expect(m.html).toContain("https://app.test/brand/logo-glyph-email.png");
+    expect(m.html).toContain("PAGESPEED");
+    expect(m.html).toContain(COPYRIGHT);
   });
 
-  it("la invitación al equipo lista, por secciones numeradas, todo lo que se puede hacer en la plataforma", () => {
-    const m = buildInviteEmail({ kind: "invite", invitedBy: "Gustavo", link: "https://app.test/invitacion/x", expiresAt: new Date("2026-12-01T00:00:00Z") });
+  it("la invitación la escribe una persona a otra: saluda por el nombre, habla en primera persona y firma", () => {
+    const m = invite();
+    expect(m.subject).toBe("Gustavo Amarista te invita a PageSpeed");
+    for (const out of [m.text, m.html]) {
+      expect(out).toContain("Hola Luis,");
+      expect(out).not.toMatch(/te invitó|junto con su equipo|gustavo@/i);
+    }
+    expect(m.text).toContain("Soy Gustavo Amarista y te invito a PageSpeed, la plataforma desde la que llevo la observabilidad de los activos digitales de mis clientes");
+    expect(m.text).toContain("crea tu cartera o únete a la mía");
+    expect(m.text).toContain("Ellos verán tu nombre en cada correo y en su portal");
+    expect(m.text).toMatch(/PARA EMPEZAR\n1\. Crea tu contraseña[\s\S]*2\. Completa tu perfil: nombre, apellido y WhatsApp[\s\S]*3\. Lee abajo[\s\S]*4\. Crea tu primer cliente/);
+    expect(m.text).toContain("Cualquier duda, respóndeme este correo: me llega directo.");
+    expect(m.text).toContain("\nGustavo Amarista\n");
+    // Sigue dando el enlace y su vencimiento.
+    expect(m.text).toContain("https://app.test/invitacion/x");
+    expect(m.text).toContain("vence el 1 de diciembre de 2026 (UTC)");
+    expect(m.text).toContain("sin el enlace nadie puede entrar con tu correo");
+  });
+
+  it("sin nombre de quien recibe, saluda sin nombre en lugar de inventarlo", () => {
+    expect(invite({ inviteeName: null }).text.startsWith("Hola,\n")).toBe(true);
+    expect(invite({ inviteeName: "  " }).text.startsWith("Hola,\n")).toBe(true);
+  });
+
+  it("escapa los nombres", () => {
+    const m = invite({ inviterName: "G <b>x</b>", inviteeName: "L <i>" });
+    expect(m.html).not.toContain("<b>x</b>");
+    expect(m.html).not.toContain("<i>");
+    expect(m.html).toContain("G &lt;b&gt;x&lt;/b&gt;");
+  });
+
+  it("lista, por secciones numeradas, todo lo que se puede hacer: los dos modos, los agentes, el acceso por persona y lo que recibe el cliente", () => {
+    const m = invite();
     for (const section of STAFF_GUIDE) {
       expect(m.text).toContain(section.title);
       expect(m.html).toContain(section.title);
     }
     expect(STAFF_GUIDE.map((x) => x.title)).toEqual([
       "Tus clientes y sus proyectos",
+      "Los dos modos de uso: desarrollo y producción",
       "Auditorías y alertas",
       "SEO, visibilidad y tráfico",
       "Lo que recibe tu cliente",
       "Lo que anotas tú",
-      "Agentes (MCP)",
+      "Agentes de IA (MCP): desarrollo y producción",
       "En camino",
       "Solo la cuenta propietaria",
     ]);
     expect(m.text).toMatch(/1\. Tus clientes y sus proyectos/);
-    expect(m.text).toMatch(/4\. Lo que recibe tu cliente/);
-    expect(m.text).toContain("Mi perfil");
-    expect(m.text).toContain("WhatsApp");
-    expect(m.text).toContain("Quien crea un cliente es su responsable");
-    expect(m.text).toContain("MCP");
+    expect(m.text).toMatch(/2\. Los dos modos de uso: desarrollo y producción/);
+    expect(m.text).toMatch(/7\. Agentes de IA \(MCP\): desarrollo y producción/);
+    // Los dos modos y el desarrollo guiado por especificaciones con IA.
+    for (const t of ["Modo desarrollo (estás construyendo o mejorando)", "Modo producción (el producto ya está publicado)", "Spec-Driven Development", "criterio de aceptación", "cambiar la fase del proyecto"]) expect(m.text).toContain(t);
+    expect(m.text).toContain("En desarrollo: son el motor del desarrollo acelerado con IA");
+    expect(m.text).toContain("En producción: responden «¿cómo va este cliente?»");
+    // Todo se dice sin negritas sueltas en el texto plano, y con negritas en el HTML.
+    expect(m.text).not.toContain("**");
+    expect(m.html).toContain("<b>Modo desarrollo");
+    // El modelo de acceso por persona.
+    expect(m.text).toContain("Ves tus clientes y lo que otra persona del equipo te comparta");
+    expect(m.text).toContain("nunca ve más que tú");
+    expect(m.text).toContain("sus clientes pasan al propietario");
+    // Varios productos y la mejora inicial.
+    expect(m.text).toContain("Un cliente puede tener varios productos a la vez");
+    expect(m.text).toContain("en mejora inicial");
     expect(m.text).toContain("Integraciones por API con aplicaciones Node y WordPress");
-    // La invitación sigue dando el enlace y su vencimiento.
-    expect(m.text).toContain("https://app.test/invitacion/x");
-    expect(m.text).toContain("vence el");
   });
 
-  it("el restablecimiento de contraseña no lleva el listado", () => {
-    const m = buildInviteEmail({ kind: "reset", invitedBy: "Gustavo", link: "https://app.test/invitacion/x", expiresAt: new Date("2026-12-01T00:00:00Z") });
-    expect(m.text).not.toContain("QUÉ PUEDES HACER");
-    expect(m.html).not.toContain("Qué puedes hacer");
+  it("el restablecimiento de contraseña es breve, en primera persona y sin el listado", () => {
+    const m = invite({ kind: "reset" });
+    expect(m.subject).toBe("Crea una contraseña nueva en PageSpeed");
+    expect(m.text).toContain("Hola Luis,");
+    expect(m.text).toContain("Te envío este enlace para que crees una contraseña nueva en PageSpeed. La anterior dejará de servir.");
+    expect(m.text).not.toContain("LO QUE PUEDES HACER");
+    expect(m.html).not.toContain("Lo que puedes hacer");
+    expect(m.text).not.toContain("PARA EMPEZAR");
+    expect(m.text).toContain("\nGustavo Amarista\n");
   });
 
   it("los correos al cliente llevan el logo y tu nombre en la banda y van firmados por ti y zipnegocios, sin el nombre del producto", () => {
