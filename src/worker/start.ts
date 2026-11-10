@@ -2,6 +2,7 @@ import { access, constants } from "node:fs/promises";
 import { Queue, Worker } from "bullmq";
 import pino, { type Logger } from "pino";
 import type { HostResolver } from "./host-pin";
+import { probeChromium, type ChromiumProbeFn } from "./lighthouse/chromium-probe";
 import type { WorkerEnv } from "@/server/config/env";
 import { createDb } from "@/server/db/client";
 import { createRedis, QUEUE_PREFIX } from "@/server/queue/connection";
@@ -57,6 +58,8 @@ export type StartWorkerOptions = {
   allowPrivate?: boolean;
   /** Solo pruebas: sustituye la resolución de nombres (fijar la IP y el diagnóstico de un 4xx). */
   resolver?: HostResolver;
+  /** Solo pruebas: sustituye la prueba con Chromium real ante un 403. Con un `runner` de pruebas se omite. */
+  chromiumProbe?: ChromiumProbeFn;
   heartbeatIntervalMs?: number;
   /** Solo pruebas: sustituye a las consultas a la API de Chrome UX Report. */
   cruxFetch?: FetchLike;
@@ -132,6 +135,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<RunningW
     authKey: env.AUTH_ENCRYPTION_KEY || undefined,
     allowPrivate: options.allowPrivate,
     resolver: options.resolver,
+    chromiumProbe: options.chromiumProbe ?? (options.runner ? undefined : probeChromium),
   });
 
   const worker = new Worker(LIGHTHOUSE_QUEUE, processor, {

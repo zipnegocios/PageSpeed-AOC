@@ -18,8 +18,8 @@ const TRANSIENT_4XX = new Set(["408", "425", "429"]);
 const NETWORK_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EPIPE"]);
 
 /** Añade una nota al mensaje de un fallo, sin pasar del tope. */
-export function withNote(failure: ClassifiedError, note: string): ClassifiedError {
-  return note ? { ...failure, message: clip(`${failure.message} ${note}`) } : failure;
+export function withNote(failure: ClassifiedError, note: string, max = MAX_MESSAGE): ClassifiedError {
+  return note ? { ...failure, message: `${failure.message} ${note}`.replace(/\s+/g, " ").trim().slice(0, max) } : failure;
 }
 
 /** Traduce un error de Lighthouse (`runtimeError.code`) a un código propio. */

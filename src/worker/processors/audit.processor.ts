@@ -18,6 +18,7 @@ import { resolvePinnedHost, type HostResolver } from "../host-pin";
 import type { ProjectAuthConfig } from "@/server/domain/project-auth";
 import type { LighthouseRunner } from "../lighthouse/runner";
 import { describeProbe, pinIsCulprit, probeSite } from "../lighthouse/probe";
+import { describeChromium, type ChromiumProbeFn } from "../lighthouse/chromium-probe";
 
 export type AuditProcessorDeps = {
   db: Database;
@@ -32,6 +33,8 @@ export type AuditProcessorDeps = {
   /** Solo pruebas y script de desarrollo. El producto no lo expone por entorno. */
   allowPrivate?: boolean;
   resolver?: HostResolver;
+  /** Prueba con Chromium real ante un 401/403 (en pruebas se omite salvo que se pase una). */
+  chromiumProbe?: ChromiumProbeFn;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
   /** Evaluación de alertas; se puede sustituir en pruebas. */
@@ -107,13 +110,14 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
       }
 
       launched = true;
-      const run = async (pin: typeof pinnedHost) => {
+      const run = async (pin: typeof pinnedHost, extraChromeFlags: string[] = []) => {
         const { lhr } = await deps.runner({
           url: ctx.route.url,
           profile: ctx.audit.profile,
           timeoutMs: deps.timeoutMs,
           chromePath: deps.chromePath,
           pinnedHost: pin,
+          extraChromeFlags,
           extraPinnedHosts: extraPinnedHosts.filter((p): p is NonNullable<typeof p> => Boolean(p)),
           auth,
         });
@@ -132,10 +136,22 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
         if (!(first.code === "HTTP_4XX" || first.code === "SITE_DOWN") || ctx.route.requiresAuth) throw err;
         const probe = await probeSite(ctx.route.url, ctx.audit.profile, pinnedHost, { allowPrivate: deps.allowPrivate, resolver: deps.resolver });
         diagnosis = describeProbe(probe);
-        if (!pinIsCulprit(probe)) throw err;
-        log.warn({ diagnosis }, "la IP fijada hace que el sitio rechace a Chromium; se reintenta con el DNS normal");
-        result = await run(undefined);
-        diagnosis = "";
+        if (pinIsCulprit(probe)) {
+          log.warn({ diagnosis }, "la IP fijada hace que el sitio rechace a Chromium; se reintenta con el DNS normal");
+          result = await run(undefined);
+          diagnosis = "";
+        } else {
+          // Las peticiones sencillas pasan y Chromium recibe 401/403: el cortafuegos distingue al navegador. Se prueba con Chromium real y, si alguna
+          // variante abre la puerta, se reintenta con ella; si no, el mensaje cuenta lo que recibió.
+          const status = /error (\d{3})/.exec(first.message)?.[1];
+          const worked = first.code === "HTTP_4XX" && (status === "403" || status === "401") && probe && probe.dns.status !== null && probe.dns.status < 400;
+          const browser = worked && deps.chromiumProbe ? await deps.chromiumProbe(ctx.route.url, pinnedHost, { chromePath: deps.chromePath }) : null;
+          if (browser) diagnosis = `${diagnosis} ${describeChromium(browser)}`.trim();
+          if (!browser?.winner) throw err;
+          log.warn({ diagnosis, variant: browser.winner.id }, "una variante de Chromium evita el rechazo del sitio; se reintenta con ella");
+          result = await run(browser.winner.pin ? pinnedHost : undefined, browser.winner.flags);
+          diagnosis = "";
+        }
       }
       const { lhr, extracted } = result;
 
@@ -163,7 +179,7 @@ export function createAuditProcessor(deps: AuditProcessorDeps) {
       );
       await evaluate("success", auditId, log);
     } catch (err) {
-      const failure = withNote(classifyError(err), diagnosis);
+      const failure = withNote(classifyError(err), diagnosis, 600);
       const isLast = !failure.retryable || attempt >= maxAttempts;
       if (isLast) {
         await repo.markFailed(deps.db, auditId, failure);

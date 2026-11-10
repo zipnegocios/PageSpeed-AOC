@@ -24,6 +24,8 @@ export type RunnerInput = {
   pinnedHost?: PinnedHost;
   /** Otros hosts del flujo (p. ej. la página de login en otro subdominio), igualmente validados y fijados. */
   extraPinnedHosts?: PinnedHost[];
+  /** Banderas de Chromium añadidas a las de siempre (p. ej. las que, según el diagnóstico, evitan que un cortafuegos rechace al navegador). */
+  extraChromeFlags?: string[];
   /** Si la ruta es privada: cómo iniciar sesión antes de auditar. */
   auth?: Omit<AuthContext, "routeUrl">;
 };
@@ -31,7 +33,7 @@ export type RunnerInput = {
 export type RunnerOutput = { lhr: LhrLike & Record<string, unknown> };
 export type LighthouseRunner = (input: RunnerInput) => Promise<RunnerOutput>;
 
-const CHROME_FLAGS = [
+export const CHROME_FLAGS = [
   "--headless=new",
   "--no-sandbox",
   "--disable-gpu",
@@ -42,7 +44,7 @@ const CHROME_FLAGS = [
   "--mute-audio",
 ];
 
-function hostRules(pins: PinnedHost[]): string[] {
+export function hostRules(pins: PinnedHost[]): string[] {
   if (pins.length === 0) return [];
   const rules = pins.map((p) => `MAP ${p.host} ${p.ip.includes(":") ? `[${p.ip}]` : p.ip}`);
   return [`--host-resolver-rules=${rules.join(", ")}`];
@@ -65,7 +67,7 @@ export const runLighthouse: LighthouseRunner = async (input) => {
     try {
       chrome = await launch({
         chromePath: input.chromePath || undefined,
-        chromeFlags: [...CHROME_FLAGS, ...hostRules([...(input.pinnedHost ? [input.pinnedHost] : []), ...(input.extraPinnedHosts ?? [])])],
+        chromeFlags: [...CHROME_FLAGS, ...(input.extraChromeFlags ?? []), ...hostRules([...(input.pinnedHost ? [input.pinnedHost] : []), ...(input.extraPinnedHosts ?? [])])],
         userDataDir,
         logLevel: "silent",
         handleSIGINT: false,

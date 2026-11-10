@@ -18,6 +18,7 @@ import * as clients from "@/server/services/clients";
 import * as projects from "@/server/services/projects";
 import * as routes from "@/server/services/routes";
 import type { HostResolver } from "@/worker/host-pin";
+import type { ChromiumProbe, ChromiumProbeFn, ChromiumVariant } from "@/worker/lighthouse/chromium-probe";
 import { startWorker, type RunningWorker } from "@/worker/start";
 import type { LighthouseRunner } from "@/worker/lighthouse/runner";
 
@@ -63,8 +64,8 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
   });
 
   const okRunner: LighthouseRunner = async () => ({ lhr: structuredClone(fixture) as never });
-  const start = async (runner: LighthouseRunner, resolver?: HostResolver) => {
-    worker = await startWorker({ env: env(), runner, allowPrivate: true, resolver, logger: pino({ level: "silent" }), heartbeatIntervalMs: 100 });
+  const start = async (runner: LighthouseRunner, resolver?: HostResolver, chromiumProbe?: ChromiumProbeFn) => {
+    worker = await startWorker({ env: env(), runner, allowPrivate: true, resolver, chromiumProbe, logger: pino({ level: "silent" }), heartbeatIntervalMs: 100 });
   };
 
   beforeAll(async () => {
@@ -448,6 +449,44 @@ describe.skipIf(!ready)("flujo de auditorías: solicitud → cola → worker →
         const done = await waitFor(finished(a!.id));
         expect(done).toMatchObject({ status: "succeeded", attempts: 1, errorCode: null });
         expect(pins).toEqual([{ host: "pin.test", ip: "127.0.0.1" }, undefined]);
+      });
+    });
+
+    describe("403 solo para el navegador", () => {
+      // El sitio responde 200 a las peticiones sencillas (127.0.0.2) pero Lighthouse recibe 403: lo distingue por Chromium, no por la IP.
+      let site: Server;
+      beforeAll(async () => {
+        site = createServer((_q, res) => void res.writeHead(200, { server: "hcdn" }).end("ok"));
+        await new Promise<void>((r) => site.listen(18123, "0.0.0.0", r));
+      });
+      afterAll(() => new Promise<void>((r) => site.close(() => r())));
+      const resolver: HostResolver = async () => [{ address: "127.0.0.2", family: 4 }];
+      const lever: ChromiumVariant = { id: "stealth", label: "sin señales de automatización", flags: ["--x-palanca"], pin: true };
+      const variant = (v: ChromiumVariant, status: number, excerpt = "") => ({ variant: v, status, server: null, excerpt });
+      const base: ChromiumVariant = { id: "base", label: "Chromium", flags: [], pin: true };
+      const forbiddenUnlessLever: LighthouseRunner = async (input) => {
+        if (!input.extraChromeFlags?.includes("--x-palanca")) throw new LighthouseRuntimeError("ERRORED_DOCUMENT_REQUEST", "Status code: 403");
+        return okRunner(input);
+      };
+
+      it("si una variante de Chromium abre la puerta, reintenta con ella y la auditoría sale bien", async () => {
+        const { routes: [r] } = await setup({ baseUrl: "http://pin.test:18123" });
+        const probe: ChromiumProbe = { attempts: [variant(base, 403, "Access denied"), variant(lever, 200)], winner: lever };
+        await start(forbiddenUnlessLever, resolver, async () => probe);
+        const { audits: [a] } = await req(r!.id, ["mobile"]);
+        const done = await waitFor(finished(a!.id));
+        expect(done).toMatchObject({ status: "succeeded", attempts: 1, errorCode: null });
+      });
+
+      it("si ninguna variante pasa, falla y el mensaje cuenta lo que recibió Chromium", async () => {
+        const { routes: [r] } = await setup({ baseUrl: "http://pin.test:18123" });
+        const probe: ChromiumProbe = { attempts: [variant(base, 403, "Access denied"), variant(lever, 403)], winner: null };
+        await start(forbiddenUnlessLever, resolver, async () => probe);
+        const { audits: [a] } = await req(r!.id, ["mobile"]);
+        const done = await waitFor(finished(a!.id));
+        expect(done).toMatchObject({ status: "failed", errorCode: "HTTP_4XX" });
+        expect(done.errorMessage).toContain("Prueba desde el worker: IP fijada 200 · DNS normal 200 · otro agente 200");
+        expect(done.errorMessage).toContain("Navegador: Chromium 403 «Access denied» · sin señales de automatización 403.");
       });
     });
 
