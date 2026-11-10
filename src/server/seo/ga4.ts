@@ -1,3 +1,4 @@
+import { SOCIAL_CHANNEL_GROUPS, SOCIAL_SOURCE_REGEX } from "@/server/domain/seo-social";
 import { requestJson, type Ctx } from "./http";
 
 export const GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
@@ -78,3 +79,16 @@ export async function runReport(c: Ga4Ctx, property: string, q: Ga4Report): Prom
   }
   return { rows, rowCount, truncated, requests };
 }
+
+/**
+ * Filtro de GA4 para las redes sociales: sesiones cuyo grupo de canal es social o de vídeo, o cuya fuente parece de una red
+ * conocida (WhatsApp o Telegram llegan a veces como «referido»). Es amplio a propósito: en local se descarta lo que no encaja.
+ */
+export const socialSourceFilter = {
+  orGroup: {
+    expressions: [
+      { filter: { fieldName: "sessionDefaultChannelGroup", inListFilter: { values: [...SOCIAL_CHANNEL_GROUPS] } } },
+      { filter: { fieldName: "sessionSource", stringFilter: { matchType: "PARTIAL_REGEXP", value: SOCIAL_SOURCE_REGEX, caseSensitive: false } } },
+    ],
+  },
+};

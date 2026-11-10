@@ -308,6 +308,32 @@ function Dashboard({
         </div>
       </Group>
 
+      <Group title="Visitas desde redes sociales" period={d.social ? periodText(d.social.range, d.social.previous, days) : t ? periodText(t.range, t.previous, days) : undefined} note="Sesiones que GA4 atribuyó a una red social por el sitio desde el que llegaron. Los mensajes privados (WhatsApp, Telegram) y algunas aplicaciones llegan sin referido y GA4 las cuenta como tráfico directo: es un mínimo.">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <DataTable
+            title="Por red"
+            columns={[
+              { header: "Red", cell: (r) => r.label },
+              { header: "Sesiones", numeric: true, cell: (r) => formatCount(r.sessions) },
+              { header: "% de las redes", numeric: true, hideOnMobile: true, cell: (r) => share(r.sessions, d.social?.totals.sessions ?? 0) },
+            ]}
+            rows={d.social?.byNetwork ?? []}
+            rowKey={(r) => r.network}
+            empty="Aún no hay visitas desde redes sociales en este periodo. Si GA4 ya las recibe, aparecerán tras la próxima descarga."
+          />
+          <DataTable
+            title="Páginas de entrada"
+            columns={[
+              { header: "Página", mono: true, cell: (r) => r.page },
+              { header: "Sesiones", numeric: true, cell: (r) => formatCount(r.sessions) },
+            ]}
+            rows={d.social?.topPages ?? []}
+            rowKey={(r) => r.page}
+            empty="Aún no hay visitas desde redes sociales en este periodo."
+          />
+        </div>
+      </Group>
+
       <Group title="Visitas desde asistentes de IA" badge="Mínimo observado" period={ai ? periodText(ai.range, ai.previous, days) : t ? periodText(t.range, t.previous, days) : undefined} note={AI_VISITS_NOTE}>
         <div className="grid gap-6 lg:grid-cols-2">
           <DataTable

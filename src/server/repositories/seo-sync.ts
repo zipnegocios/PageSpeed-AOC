@@ -1,7 +1,7 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { Database } from "@/server/db/client";
-import { seoAiReferralsDaily, seoSearchDaily, seoTrafficDaily } from "@/server/db/schema";
-import type { AiRow, SearchRow, TrafficRow } from "@/server/domain/seo-sync";
+import { seoAiReferralsDaily, seoSocialDaily, seoSearchDaily, seoTrafficDaily } from "@/server/db/schema";
+import type { AiRow, SearchRow, SocialRow, TrafficRow } from "@/server/domain/seo-sync";
 
 /** Filas por INSERT: con 8 columnas quedan lejos del límite de parámetros de Postgres (65.535). */
 const BATCH = 2000;
@@ -39,5 +39,12 @@ export async function replaceAiWindow(db: Database, projectId: string, from: str
   await db.transaction(async (tx) => {
     await tx.delete(seoAiReferralsDaily).where(and(eq(seoAiReferralsDaily.projectId, projectId), gte(seoAiReferralsDaily.date, from), lte(seoAiReferralsDaily.date, to)));
     for (const batch of batches(within(rows, from, to))) await tx.insert(seoAiReferralsDaily).values(batch.map((r) => ({ projectId, ...r })));
+  });
+}
+
+export async function replaceSocialWindow(db: Database, projectId: string, from: string, to: string, rows: SocialRow[]): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.delete(seoSocialDaily).where(and(eq(seoSocialDaily.projectId, projectId), gte(seoSocialDaily.date, from), lte(seoSocialDaily.date, to)));
+    for (const batch of batches(within(rows, from, to))) await tx.insert(seoSocialDaily).values(batch.map((r) => ({ projectId, ...r })));
   });
 }

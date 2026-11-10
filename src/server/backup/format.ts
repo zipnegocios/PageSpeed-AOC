@@ -18,6 +18,7 @@ export const BACKUP_TABLES: ReadonlyArray<{ name: string; table: PgTable; order:
   { name: "seo_search_daily", table: s.seoSearchDaily, order: [s.seoSearchDaily.projectId, s.seoSearchDaily.date, s.seoSearchDaily.page, s.seoSearchDaily.country, s.seoSearchDaily.device] },
   { name: "seo_traffic_daily", table: s.seoTrafficDaily, order: [s.seoTrafficDaily.projectId, s.seoTrafficDaily.date, s.seoTrafficDaily.page, s.seoTrafficDaily.country, s.seoTrafficDaily.channel] },
   { name: "seo_ai_referrals_daily", table: s.seoAiReferralsDaily, order: [s.seoAiReferralsDaily.projectId, s.seoAiReferralsDaily.date, s.seoAiReferralsDaily.source, s.seoAiReferralsDaily.page] },
+  { name: "seo_social_daily", table: s.seoSocialDaily, order: [s.seoSocialDaily.projectId, s.seoSocialDaily.date, s.seoSocialDaily.network, s.seoSocialDaily.page] },
   { name: "alert_thresholds", table: s.alertThresholds, order: [s.alertThresholds.projectId, s.alertThresholds.metric] },
   { name: "audit_logs", table: s.auditLogs, order: [s.auditLogs.id] },
   { name: "alert_states", table: s.alertStates, order: [s.alertStates.id] },

@@ -106,6 +106,7 @@ export async function getPortalTraffic(clientId: string, project: { id: string; 
   for (const p of dashboard?.traffic?.topPages ?? []) paths.add(p.page);
   for (const p of dashboard?.search?.topPages ?? []) paths.add(p.page);
   for (const p of dashboard?.ai?.topPages ?? []) paths.add(p.page);
+  for (const p of dashboard?.social?.topPages ?? []) paths.add(p.page);
   const titles = paths.size > 0 ? await portalPageTitles(project, [...paths], db) : new Map<string, string>();
   return { days: opts.days, dashboard, health, titles: Object.fromEntries(titles) };
 }

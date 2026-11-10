@@ -1,3 +1,4 @@
+import { networkOf } from "./seo-social";
 import { pagePath } from "@/server/seo/urls";
 
 /**
@@ -42,6 +43,7 @@ export function planSyncWindows(syncedThrough: string | null, kind: SyncKind, no
 export type SearchRow = { date: string; page: string; country: string; device: string; clicks: number; impressions: number; positionSum: number };
 export type TrafficRow = { date: string; page: string; country: string; channel: string; sessions: number; users: number };
 export type AiRow = { date: string; source: string; page: string; sessions: number; users: number };
+export type SocialRow = { date: string; network: string; page: string; sessions: number; users: number };
 
 type GscRecordLike = { keys: Record<string, string>; clicks: number; impressions: number; position: number };
 type Ga4RowLike = { dims: Record<string, string>; metrics: Record<string, number> };
@@ -96,6 +98,23 @@ export function aggregateAi(rows: Ga4RowLike[]): AiRow[] {
     const page = pagePath(r.dims.pagePath ?? "");
     const key = `${date}|${source}|${page}`;
     const row = out.get(key) ?? { date, source, page, sessions: 0, users: 0 };
+    row.sessions += r.metrics.sessions ?? 0;
+    row.users += r.metrics.totalUsers ?? 0;
+    out.set(key, row);
+  }
+  return [...out.values()];
+}
+
+/** Reduce las filas de GA4 por fuente a sesiones por red social, día y página de entrada (las que no son sociales se descartan). */
+export function aggregateSocial(rows: Ga4RowLike[]): SocialRow[] {
+  const out = new Map<string, SocialRow>();
+  for (const r of rows) {
+    const network = networkOf(r.dims.sessionSource ?? "", r.dims.sessionDefaultChannelGroup ?? "");
+    if (!network) continue;
+    const date = ga4Date(r.dims.date ?? "");
+    const page = pagePath(r.dims.pagePath ?? "");
+    const key = `${date}|${network}|${page}`;
+    const row = out.get(key) ?? { date, network, page, sessions: 0, users: 0 };
     row.sessions += r.metrics.sessions ?? 0;
     row.users += r.metrics.totalUsers ?? 0;
     out.set(key, row);

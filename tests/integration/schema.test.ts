@@ -71,6 +71,7 @@ describe.skipIf(!url)("esquema de Postgres", () => {
       "seo_integrations",
       "seo_markets",
       "seo_search_daily",
+      "seo_social_daily",
       "seo_traffic_daily",
       "settings",
     ]);

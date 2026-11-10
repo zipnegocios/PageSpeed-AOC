@@ -1,4 +1,5 @@
 import { getDb, type Database } from "@/server/db/client";
+import { socialLabel } from "@/server/domain/seo-social";
 import { DomainError } from "@/server/domain/errors";
 import {
   averagePosition,
@@ -69,6 +70,15 @@ export type SeoDashboard = {
     topPages: Array<{ page: string; sessions: number; users: number }>;
     countries: Array<{ country: string; sessions: number }>;
   } | null;
+  /** Visitas que llegan desde redes sociales (GA4), por red. Null si no hay filas en el periodo. */
+  social: {
+    range: DateRange;
+    previous: DateRange;
+    totals: TrafficTotals;
+    previousTotals: TrafficTotals;
+    byNetwork: Array<{ network: string; label: string; sessions: number }>;
+    topPages: Array<{ page: string; sessions: number }>;
+  } | null;
   /** Visitas que llegan desde asistentes de IA (GA4). Null si no hay filas en el periodo. */
   ai: {
     range: DateRange;
@@ -85,6 +95,8 @@ const TOP_COUNTRIES = 8;
 const TOP_CHANNELS = 10;
 const TOP_AI_SOURCES = 10;
 const TOP_AI_PAGES = 5;
+const TOP_SOCIAL_NETWORKS = 12;
+const TOP_SOCIAL_PAGES = 5;
 
 const searchTotals = (row: data.SearchTotalsRow): SearchTotals => ({
   clicks: row.clicks,
@@ -142,6 +154,25 @@ async function loadTraffic(db: Database, projectId: string, range: DateRange, pr
   };
 }
 
+async function loadSocial(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["social"]> {
+  const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
+  const [current, before, networks, pages] = await Promise.all([
+    data.socialTotals(db, projectId, scope(range)),
+    data.socialTotals(db, projectId, scope(prev)),
+    data.socialBy(db, projectId, scope(range), "network", TOP_SOCIAL_NETWORKS),
+    data.socialBy(db, projectId, scope(range), "page", TOP_SOCIAL_PAGES),
+  ]);
+  if (current.rows === 0) return null;
+  return {
+    range,
+    previous: prev,
+    totals: { sessions: current.sessions, users: current.users },
+    previousTotals: { sessions: before.sessions, users: before.users },
+    byNetwork: networks.map((n) => ({ network: n.key, label: socialLabel(n.key), sessions: n.sessions })),
+    topPages: pages.map((p) => ({ page: p.key, sessions: p.sessions })),
+  };
+}
+
 async function loadAi(db: Database, projectId: string, range: DateRange, prev: DateRange, filter?: marketsRepo.PageFilter): Promise<SeoDashboard["ai"]> {
   const scope = (r: DateRange) => ({ from: r.from, to: r.to, pageFilter: filter });
   const [current, before, sources, pages] = await Promise.all([
@@ -196,8 +227,8 @@ export async function getSeoDashboard(projectId: string, opts: { days: number; /
   const filter = lang ? marketsRepo.languageFilter(declared, lang) : undefined;
   const sync = { gsc: syncInfo(rows.find((r) => r.kind === "gsc")), ga4: syncInfo(rows.find((r) => r.kind === "ga4")) };
 
-  const end = latestDate([last.search, last.traffic, last.ai]);
-  if (!end) return { range: null, previous: null, sync, markets, lang, languages: null, search: null, traffic: null, ai: null };
+  const end = latestDate([last.search, last.traffic, last.ai, last.social]);
+  if (!end) return { range: null, previous: null, sync, markets, lang, languages: null, search: null, traffic: null, social: null, ai: null };
 
   const range = periodRange(end, opts.days);
   const prev = previousRange(range);
@@ -208,12 +239,13 @@ export async function getSeoDashboard(projectId: string, opts: { days: number; /
     return { r, p: previousRange(r) };
   };
   const s = forSource(last.search);
-  const t = forSource(latestDate([last.traffic, last.ai]));
-  const [search, traffic, ai, languages] = await Promise.all([
+  const t = forSource(latestDate([last.traffic, last.ai, last.social]));
+  const [search, traffic, social, ai, languages] = await Promise.all([
     loadSearch(db, projectId, s.r, s.p, filter),
     loadTraffic(db, projectId, t.r, t.p, filter),
+    loadSocial(db, projectId, t.r, t.p, filter),
     loadAi(db, projectId, t.r, t.p, filter),
     declared.length > 0 ? loadLanguages(db, projectId, s.r, t.r, declared) : Promise.resolve(null),
   ]);
-  return { range, previous: { from: prev.from, to: prev.to }, sync, markets, lang, languages, search, traffic, ai };
+  return { range, previous: { from: prev.from, to: prev.to }, sync, markets, lang, languages, search, traffic, social, ai };
 }

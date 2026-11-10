@@ -98,13 +98,18 @@ const headlineOf = (rows: Row[], total: number, unit: string) => (rows[0] ? `${r
 function Visits({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dashboard"]> }) {
   const tr = d.traffic;
   const ai = d.ai;
-  if (!tr && !ai) return <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Aún no hay datos de visitas al sitio para este periodo.</p>;
+  const social = d.social;
+  if (!tr && !ai && !social) return <p className="rounded-lg bg-surface-200 p-4 text-ink-muted">Aún no hay datos de visitas al sitio para este periodo.</p>;
   const total = tr?.totals.sessions ?? 0;
   const channels: Row[] = (tr?.channels ?? []).map((c) => ({ key: c.channel, label: channelLabel(c.channel), value: c.sessions }));
   const countries: Row[] = (tr?.countries ?? []).map((c) => ({ key: c.country, label: c.country, value: c.sessions }));
   const pages: Row[] = (tr?.topPages ?? []).map((p) => ({ key: p.page, label: t.titles[p.page] ?? p.page, value: p.sessions }));
   const sources: Row[] = (ai?.bySource ?? []).map((s) => ({ key: s.source, label: s.source, value: s.sessions }));
   const aiTotal = ai?.totals.sessions ?? 0;
+  const networks: Row[] = (social?.byNetwork ?? []).map((n) => ({ key: n.network, label: n.label, value: n.sessions }));
+  const socialTotal = social?.totals.sessions ?? 0;
+  const socialPages: Row[] = (social?.topPages ?? []).map((p) => ({ key: p.page, label: t.titles[p.page] ?? p.page, value: p.sessions }));
+  const socialDelta = social ? percentDelta(social.totals.sessions, social.previousTotals.sessions) : null;
   return (
     <>
       {tr ? <SeoChart title="Sesiones por día" unit="sesiones" series={tr.daily.map((p) => ({ date: p.date, value: p.sessions }))} tone={2} /> : null}
@@ -113,6 +118,25 @@ function Visits({ t, d }: { t: PortalTraffic; d: NonNullable<PortalTraffic["dash
           <Bars rows={channels} total={total} unit="sesiones" />
         </Fold>
       ) : null}
+      <Fold title="Redes sociales" headline={networks[0] ? `${networks[0].label} ${share(networks[0].value, socialTotal)} · ${formatCount(socialTotal)} sesiones` : "Sin visitas en este periodo"} open={networks.length > 0}>
+        {networks.length === 0 ? (
+          <p className="text-[14px] leading-5 text-ink-muted">Todavía no hay visitas desde redes sociales en este periodo. Cuando lleguen de Facebook, Instagram, LinkedIn u otras, aparecerán aquí con su red.</p>
+        ) : (
+          <>
+            <p className="text-[14px] leading-5 text-ink-muted">
+              Las redes que más visitas te traen. Es un mínimo: los mensajes privados (WhatsApp, Telegram) y algunas aplicaciones llegan sin referido y se cuentan como tráfico directo.
+            </p>
+            {socialDelta ? <Delta change={socialDelta} /> : null}
+            <Bars rows={networks} total={socialTotal} unit="sesiones" />
+            {socialPages.length > 0 ? (
+              <>
+                <p className="text-[13px] leading-5 font-semibold text-ink-muted">Páginas a las que llegan desde las redes</p>
+                <Bars rows={socialPages} total={socialTotal} unit="sesiones" />
+              </>
+            ) : null}
+          </>
+        )}
+      </Fold>
       {pages.length > 0 ? (
         <Fold title="Páginas más visitadas" headline={`${pages[0]!.label} · ${formatCount(pages[0]!.value)} sesiones`}>
           <Bars rows={pages} total={total} unit="sesiones" />

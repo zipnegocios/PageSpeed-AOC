@@ -410,6 +410,14 @@ La fuente de verdad del diseño es el Design System "PageSpeed" (Rajdhani, Midni
   (`line-clamp-2`), `.portal` lleva `overflow-x: clip` como red de seguridad y `tests/unit/portal-layout-guard.test.ts` falla si se
   reintroduce. Comprobación manual en un teléfono simulado de 320 a 412 px (con títulos de 60 caracteres):
   `PORTAL_CLIENT=… PORTAL_PROJECT=… PORTAL_PIN=… node scripts/portal-fit-audit.mjs`.
+- **Redes sociales** (migración 0019: tabla `seo_social_daily`). GA4 agrupa todo en un solo canal («Organic Social»); la descarga ahora
+  pide también la **fuente de cada sesión** (filtro amplio: grupo de canal social o de vídeo, o fuente de una red conocida) y
+  `domain/seo-social.ts` la normaliza a la red (Facebook, Instagram, LinkedIn, X, TikTok, YouTube, Pinterest, Reddit, WhatsApp,
+  Telegram, Threads, Snapchat…; lo que GA4 marca como social y no se reconoce va a «Otras redes»; un referido que solo coincidió con el
+  filtro amplio se descarta). Se ve en la pestaña Tráfico → Visitas (tarjeta «Redes sociales», con el porcentaje de cada red y las
+  páginas a las que llegan), en el panel (tabla «Visitas desde redes sociales») y en el resumen en PDF. Es un **mínimo observado**: los
+  mensajes privados llegan sin referido y GA4 los cuenta como directo. La migración pone `synced_through = null` en las conexiones de GA4
+  **una sola vez** para que la siguiente descarga traiga los últimos 90 días (hasta entonces el portal no muestra «visitas hasta el…»).
 - **App instalable del portal**: el manifiesto se pide con `crossorigin="use-credentials"` (así lleva el nombre del cliente) y
   se llama «Informes técnicos web - <cliente>»; el icono es el isotipo con el rayo de PageSpeed en una insignia
   (`/c/<enlace>/pwa-icon/<tamaño>`, con dirección firmada con HMAC porque el navegador lo pide sin cookies). Sin sesión de PIN, el

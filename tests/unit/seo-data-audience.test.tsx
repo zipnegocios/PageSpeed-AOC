@@ -28,7 +28,7 @@ const withData: SeoDashboard = {
     devices: [],
   },
   traffic: null,
-  ai: null,
+  ai: null, social: null,
 };
 
 const render = (audience: "admin" | "client", d: SeoDashboard = withData) =>

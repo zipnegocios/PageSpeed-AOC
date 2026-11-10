@@ -7,10 +7,10 @@ import { getRedis } from "@/server/queue/connection";
 import { seoQueue } from "@/server/queue/queues";
 import { SEO_SYNC_JOB } from "@/server/queue/schedulers";
 import { explainFailure } from "@/server/domain/seo-connections";
-import { aggregateAi, aggregateSearch, aggregateTraffic, planSyncWindows, type SyncKind } from "@/server/domain/seo-sync";
+import { aggregateAi, aggregateSearch, aggregateSocial, aggregateTraffic, planSyncWindows, type SyncKind } from "@/server/domain/seo-sync";
 import * as repo from "@/server/repositories/seo-integrations";
 import * as writes from "@/server/repositories/seo-sync";
-import { aiSourceFilter, GA4_SCOPE, runReport } from "@/server/seo/ga4";
+import { aiSourceFilter, GA4_SCOPE, runReport, socialSourceFilter } from "@/server/seo/ga4";
 import { getAccessToken } from "@/server/seo/google-auth";
 import { GSC_SCOPE, searchAnalytics } from "@/server/seo/gsc";
 import { SpikeHttpError } from "@/server/seo/http";
@@ -109,13 +109,17 @@ async function syncGa4(row: repo.SeoIntegration, account: Parameters<typeof getA
     const base = { startDate: w.from, endDate: w.to, metrics: ["sessions", "totalUsers"], maxRows: MAX_ROWS_PER_WINDOW };
     const traffic = await runReport({ token, ...http }, row.externalId, { ...base, dimensions: ["date", "pagePath", "country", "sessionDefaultChannelGroup"] });
     const ai = await runReport({ token, ...http }, row.externalId, { ...base, dimensions: ["date", "sessionSource", "pagePath"], dimensionFilter: aiSourceFilter });
-    truncated ||= traffic.truncated || ai.truncated;
+    // Redes sociales: la fuente de cada sesión y su grupo de canal, para decidir en local qué red es (o «Otras redes»).
+    const social = await runReport({ token, ...http }, row.externalId, { ...base, dimensions: ["date", "sessionSource", "sessionDefaultChannelGroup", "pagePath"], dimensionFilter: socialSourceFilter });
+    truncated ||= traffic.truncated || ai.truncated || social.truncated;
     const trafficRows = aggregateTraffic(traffic.rows);
     const aiRows = aggregateAi(ai.rows);
+    const socialRows = aggregateSocial(social.rows);
     await writes.replaceTrafficWindow(db, row.projectId, w.from, w.to, trafficRows);
     await writes.replaceAiWindow(db, row.projectId, w.from, w.to, aiRows);
+    await writes.replaceSocialWindow(db, row.projectId, w.from, w.to, socialRows);
     await repo.setSyncedThrough(db, row.id, w.to);
-    rows += trafficRows.length + aiRows.length;
+    rows += trafficRows.length + aiRows.length + socialRows.length;
     through = w.to;
   }
   const detail = windows.length === 0 ? "Los datos ya estaban al día." : `Se guardaron ${rows} filas de ${range(windows)}.${truncated ? " Alguna ventana llegó al máximo de filas: faltan las páginas con menos tráfico." : ""}`;

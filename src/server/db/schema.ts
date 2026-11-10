@@ -474,6 +474,26 @@ export const seoAiReferralsDaily = pgTable(
   ],
 );
 
+// -------------------------------------------------- seo_social_daily
+// GA4: sesiones que llegan desde redes sociales, por día, red (normalizada: facebook, instagram, linkedin…, other) y página de entrada.
+export const seoSocialDaily = pgTable(
+  "seo_social_daily",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: date("date", { mode: "string" }).notNull(),
+    network: text("network").notNull(),
+    page: text("page").notNull(),
+    sessions: integer("sessions").notNull().default(0),
+    users: integer("users").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.date, t.network, t.page] }),
+    index("seo_social_daily_project_date_idx").on(t.projectId, t.date),
+  ],
+);
+
 // -------------------------------------------------------- mcp_api_keys
 export const mcpApiKeys = pgTable("mcp_api_keys", {
   id: uuid("id").primaryKey().defaultRandom(),
