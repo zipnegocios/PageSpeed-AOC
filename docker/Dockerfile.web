@@ -23,6 +23,8 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/dist/migrate-cli.cjs ./migrate-cli.cjs
 # Restauración de respaldos (se ejecuta a mano desde la consola del servicio; ver docs/runbook.md).
 COPY --from=build /app/dist/restore-cli.cjs ./restore-cli.cjs
+# Correos de prueba al cliente con datos de ejemplo (se ejecuta a mano desde la consola del servicio: node send-test-emails-cli.cjs <correo>).
+COPY --from=build /app/dist/send-test-emails-cli.cjs ./send-test-emails-cli.cjs
 COPY --from=build /app/drizzle ./drizzle
 EXPOSE 3000
 # Solo comprueba que el proceso responde (no mira la base: una caída de Postgres no debe reiniciar el web).
