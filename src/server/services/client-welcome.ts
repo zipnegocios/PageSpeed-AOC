@@ -4,11 +4,11 @@ import { DomainError } from "@/server/domain/errors";
 import {
   ccAddresses,
   CcParseError,
+  cleanServices,
+  cleanTags,
   endOfSupportNote,
   greetingNames,
-  isProjectKind,
   parseCcContacts,
-  PROJECT_KIND_LABEL,
   siteLabel,
 } from "@/server/domain/client-welcome";
 import { senderMailFields } from "@/server/domain/client-sender";
@@ -19,7 +19,6 @@ import { webMailer } from "@/server/notify/web-mailer";
 import { insertNotification } from "@/server/repositories/alerts";
 import { findClient, setClientCc, setClientPinRow, setWelcomeSent } from "@/server/repositories/clients";
 import { findProject, setProjectEmailProfile } from "@/server/repositories/projects";
-import { requiredText } from "@/server/validation/common";
 import { readStoredPin, type PinDeps } from "./portal-pin";
 import { resolveSender } from "./client-sender";
 import { assertUuid, parseInput } from "./shared";
@@ -30,11 +29,17 @@ export const WELCOME_COOLDOWN_MS = 5 * 60_000;
 
 export type WelcomeDeps = PinDeps & { mailer?: Mailer };
 
-const welcomeInput = z.object({
+/** Un producto del cliente en el formulario: qué es, en qué está hecho, qué servicios incluye y si empieza en mejora inicial. */
+const productInput = z.object({
   projectId: z.string(),
-  kind: z.string().refine(isProjectKind, { error: "Elige si es un sitio, una tienda o una aplicación." }),
-  techLabel: requiredText("La tecnología", 2, 60),
-  includesServer: z.boolean(),
+  solutions: z.array(z.string()).default([]),
+  techs: z.array(z.string()).default([]),
+  services: z.array(z.string()).default([]),
+  initialImprovement: z.boolean().default(false),
+});
+
+const welcomeInput = z.object({
+  products: z.array(productInput).min(1, { error: "Marca al menos un producto para la bienvenida." }).max(20, { error: "Demasiados productos en una sola bienvenida." }),
   ccText: z.string().max(4000, { error: "La lista de personas en copia es demasiado larga." }),
 });
 
@@ -64,8 +69,9 @@ function secretOf(deps: PinDeps): string {
 }
 
 /**
- * Envía la bienvenida a un cliente: un solo correo para el contacto principal, con copia al resto del equipo. Guarda lo
- * que se pidió en el formulario (tecnología, tipo, servidor y personas en copia) para los envíos siguientes.
+ * Envía la bienvenida a un cliente: un solo correo para el contacto principal, con copia al resto del equipo, que presenta todos
+ * los productos marcados (cada uno con su tipo, su tecnología y los servicios que incluye). Guarda lo que se pidió en el
+ * formulario (por producto, y las personas en copia) para los envíos siguientes.
  *
  * Con `testTo`, es una prueba: el mismo correo, con los mismos datos, solo para esa dirección. No guarda nada, no toca
  * el PIN ni anota el envío.
@@ -90,10 +96,24 @@ export async function sendClientWelcome(
   if (client.status !== "active" && !test) throw new DomainError("INVALID", "El cliente está suspendido. Reactívalo antes de enviarle la bienvenida.");
 
   const input = parseInput(welcomeInput, raw);
-  assertUuid(input.projectId, "Proyecto");
-  const project = await findProject(db, input.projectId);
-  if (!project || project.clientId !== client.id) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
-  if (project.phase !== "production") throw new DomainError("INVALID", "La bienvenida habla de un sitio ya publicado: el proyecto debe estar en producción. El cliente ya ve sus proyectos en desarrollo en el portal.");
+  const seen = new Set<string>();
+  const products: Array<{ project: NonNullable<Awaited<ReturnType<typeof findProject>>>; solutions: string[]; techs: string[]; services: string[]; initialImprovement: boolean }> = [];
+  for (const p of input.products) {
+    assertUuid(p.projectId, "Proyecto");
+    if (seen.has(p.projectId)) throw new DomainError("INVALID", "Un producto está repetido en la bienvenida.");
+    seen.add(p.projectId);
+    const project = await findProject(db, p.projectId);
+    if (!project || project.clientId !== client.id) throw new DomainError("NOT_FOUND", "Proyecto no encontrado.");
+    if (project.phase !== "production") throw new DomainError("INVALID", `«${project.name}» debe estar en producción: la bienvenida habla de un sitio ya publicado. El cliente ya ve sus proyectos en desarrollo en el portal.`);
+    const solutions = cleanTags(p.solutions, `«${project.name}», qué es`);
+    if (solutions.error) throw new DomainError("INVALID", solutions.error);
+    if (solutions.tags.length === 0) throw new DomainError("INVALID", `Escribe qué es «${project.name}» (por ejemplo, tienda online, app móvil, CRM).`);
+    const techs = cleanTags(p.techs, `«${project.name}», tecnología`);
+    if (techs.error) throw new DomainError("INVALID", techs.error);
+    const services = cleanServices(p.services);
+    if (services.length === 0) throw new DomainError("INVALID", `Marca al menos un servicio en «${project.name}»: el correo solo promete lo que está marcado.`);
+    products.push({ project, solutions: solutions.tags, techs: techs.tags, services, initialImprovement: p.initialImprovement });
+  }
 
   let cc;
   try {
@@ -107,12 +127,11 @@ export async function sendClientWelcome(
     throw new DomainError("CONFLICT", "La bienvenida de este cliente ya se envió hace unos minutos. Espera un poco antes de reenviarla.");
   }
 
-  const kind = input.kind as "site" | "shop" | "app";
-  const techLabel = input.techLabel;
-
   // Lo del formulario se guarda antes de enviar: si el correo falla, no hay que volver a escribirlo.
   if (!test) {
-    await setProjectEmailProfile(db, project.id, { kind, techLabel, includesServer: input.includesServer });
+    for (const p of products) {
+      await setProjectEmailProfile(db, p.project.id, { solutions: p.solutions, techs: p.techs, services: p.services, initialImprovement: p.initialImprovement });
+    }
     await setClientCc(db, client.id, cc);
   }
 
@@ -127,12 +146,10 @@ export async function sendClientWelcome(
     appUrl: base,
     names: greetingNames(client.contactName, cc),
     clientName: client.name,
-    site: siteLabel(project.baseUrl),
+    site: products.map((p) => siteLabel(p.project.baseUrl)).join(", "),
     portalUrl: `${base}/c/${client.slug}`,
-    kind: PROJECT_KIND_LABEL[kind],
-    techLabel,
-    includesServer: input.includesServer,
-    eolNote: endOfSupportNote(techLabel, now),
+    products: products.map((p) => ({ site: siteLabel(p.project.baseUrl), solutions: p.solutions, techs: p.techs, services: p.services })),
+    eolNote: endOfSupportNote(products.flatMap((p) => p.techs), now),
     pin,
   });
 
@@ -140,7 +157,7 @@ export async function sendClientWelcome(
   const ccTo = test ? [] : ccAddresses(cc, primary);
   const subject = test ? `[PRUEBA] ${mail.subject}` : mail.subject;
   const record = {
-    projectId: project.id,
+    projectId: products[0]!.project.id,
     clientId: client.id,
     type: "welcome" as const,
     recipient: [to, ...ccTo].join(", "),

@@ -263,7 +263,7 @@ export function monthlyStatus(input: { openAlerts: number; mobilePerfDelta: numb
     return { tone: "ok", line: "Mejoró la velocidad en el móvil este mes y no quedan puntos abiertos." };
   }
   if (input.actions > 0) {
-    return { tone: "ok", line: input.actions === 1 ? "Todo en orden: atendí una cosa este mes y no quedan puntos abiertos." : `Todo en orden: atendí ${input.actions} cosas este mes y no quedan puntos abiertos.` };
+    return { tone: "ok", line: input.actions === 1 ? "Todo en orden: atendimos una cosa este mes y no quedan puntos abiertos." : `Todo en orden: atendimos ${input.actions} cosas este mes y no quedan puntos abiertos.` };
   }
   return { tone: "ok", line: "Todo en orden: no hubo incidencias." };
 }

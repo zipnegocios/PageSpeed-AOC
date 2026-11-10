@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { portalLogoUrl } from "@/lib/ui/components/client-logo";
+import { InitialImprovementNotice } from "../../_components/initial-improvement-notice";
 import { PortalChrome } from "../../_components/portal-chrome";
 import { loadProjectGate } from "../../_lib/project-gate";
 
@@ -19,6 +20,7 @@ export default async function PortalProjectLayout({ children, params }: { childr
       several={gate.several}
       badges={{ mejoras: gate.project.improvements.length }}
     >
+      {gate.project.initialImprovement ? <InitialImprovementNotice /> : null}
       {children}
     </PortalChrome>
   );

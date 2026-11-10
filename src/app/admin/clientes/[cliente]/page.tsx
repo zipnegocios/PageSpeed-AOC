@@ -15,7 +15,7 @@ import { CopyButton } from "@/lib/ui/components/copy-button";
 import { CheckboxField, Field, SelectField, TextareaField } from "@/lib/ui/components/field";
 import { getClientByRef } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
-import { listResponsibles } from "@/server/services/client-sender";
+import { getClientSender, listResponsibles } from "@/server/services/client-sender";
 import { ClientLogoUploader } from "@/app/admin/_components/client-logo-uploader";
 import { logoInfo } from "@/server/domain/client-logo";
 import { PinForms } from "@/app/admin/_components/pin-forms";
@@ -58,6 +58,7 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
   const projects = (await listProjects(id)).filter((p) => canViewProject(scope, { id: p.id, clientId: id }));
   const sharing = manage ? await getClientSharing(session, id) : null;
   const responsibles = await listResponsibles();
+  const sender = await getClientSender(client);
   // Sin responsable (clientes anteriores) firma la cuenta propietaria.
   const responsible = responsibles.find((r) => r.id === client.ownerId) ?? responsibles.find((r) => r.role === "owner") ?? responsibles[0] ?? null;
   const fixedUrl = `${appUrl()}/c/${client.slug}`;
@@ -201,13 +202,15 @@ export default async function ClientPage({ params }: { params: Promise<{ cliente
             contactName={client.contactName}
             contactEmail={client.contactEmail}
             initialCc={formatCcContacts(client.ccContacts)}
-            projects={productionProjects.map((p) => ({
+            sender={sender}
+            products={productionProjects.map((p) => ({
               id: p.id,
               name: p.name,
               site: siteLabel(p.baseUrl),
-              kind: p.kind,
-              techLabel: p.techLabel ?? "",
-              includesServer: p.includesServer,
+              solutions: p.solutions,
+              techs: p.techs,
+              services: p.services,
+              initialImprovement: p.initialImprovement,
             }))}
           />
         )}

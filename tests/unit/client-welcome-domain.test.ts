@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  cleanServices,
+  cleanTags,
+  DEFAULT_SERVICES,
+  SERVICE_KEYS,
+  SOLUTION_SUGGESTIONS,
+  TECH_SUGGESTIONS,
+  unionServices,
   ccAddresses,
   CcParseError,
   endOfSupportNote,
@@ -97,18 +104,62 @@ describe("saludo y sitio", () => {
 
 describe("nota de fin de soporte", () => {
   const before = new Date("2026-11-10T00:00:00Z");
-  it("según la tecnología, sin importar mayúsculas ni acentos", () => {
-    expect(endOfSupportNote("WordPress", before)).toContain("PHP 8.2");
-    expect(endOfSupportNote("  prestashop ", before)).toContain("PHP 8.2");
-    expect(endOfSupportNote("Next.js", before)).toContain("Node.js 20");
+  it("según las tecnologías del producto, sin importar mayúsculas ni acentos", () => {
+    expect(endOfSupportNote(["WordPress"], before)).toContain("PHP 8.2");
+    expect(endOfSupportNote(["  prestashop "], before)).toContain("PHP 8.2");
+    expect(endOfSupportNote(["Next.js"], before)).toContain("Node.js 20");
+    expect(endOfSupportNote("Laravel", before)).toContain("PHP 8.2");
   });
-  it("sin nota para Shopify ni para lo que no está en la lista", () => {
-    expect(endOfSupportNote("Shopify", before)).toBeNull();
-    expect(endOfSupportNote("Sistema propio", before)).toBeNull();
+  it("basta con que una de las tecnologías la tenga", () => {
+    expect(endOfSupportNote(["Flutter", "Firebase", "Laravel", "MySQL"], before)).toContain("PHP 8.2");
+    expect(endOfSupportNote(["Swift (iOS)", "Next.js"], before)).toContain("Node.js 20");
+  });
+  it("sin nota para Shopify, para una app móvil ni para lo que no está en la lista", () => {
+    expect(endOfSupportNote(["Shopify"], before)).toBeNull();
+    expect(endOfSupportNote(["Swift (iOS)", "Firebase"], before)).toBeNull();
+    expect(endOfSupportNote(["Sistema propio"], before)).toBeNull();
+    expect(endOfSupportNote([], before)).toBeNull();
   });
   it("caduca: pasada su fecha ya no se cita", () => {
-    expect(endOfSupportNote("WordPress", new Date("2026-12-31T23:00:00Z"))).not.toBeNull();
-    expect(endOfSupportNote("WordPress", new Date("2027-01-01T00:00:00Z"))).toBeNull();
-    expect(endOfSupportNote("Next.js", new Date("2027-05-01T00:00:00Z"))).toBeNull();
+    expect(endOfSupportNote(["WordPress"], new Date("2026-12-31T23:00:00Z"))).not.toBeNull();
+    expect(endOfSupportNote(["WordPress"], new Date("2027-01-01T00:00:00Z"))).toBeNull();
+    expect(endOfSupportNote(["Next.js"], new Date("2027-05-01T00:00:00Z"))).toBeNull();
+  });
+});
+
+describe("etiquetas libres", () => {
+  it("recorta, quita vacías y repetidas sin distinguir mayúsculas ni acentos, y respeta el orden", () => {
+    expect(cleanTags(["  Tienda  online ", "tienda online", "", "App móvil", "app movil"], "x").tags).toEqual(["Tienda online", "App móvil"]);
+    expect(cleanTags("a, b ,, A", "x").tags).toEqual(["a", "b"]);
+    expect(cleanTags(undefined, "x").tags).toEqual([]);
+  });
+  it("rechaza signos peligrosos, textos largos y demasiados elementos, diciendo qué campo", () => {
+    expect(cleanTags(["<script>"], "Qué es").error).toContain("Qué es");
+    expect(cleanTags(["a".repeat(61)], "Tecnología").error).toContain("60");
+    expect(cleanTags(Array.from({ length: 13 }, (_, i) => `t${i}`), "Tecnología").error).toContain("12");
+  });
+});
+
+describe("servicios del acompañamiento", () => {
+  it("deja solo los conocidos, sin repetir y en el orden de siempre", () => {
+    expect(cleanServices(["security", "web", "nada", "web", "deps"])).toEqual(["web", "deps", "security"]);
+    expect(cleanServices("web")).toEqual([]);
+    expect(SERVICE_KEYS).toEqual(["web", "seo", "server", "deps", "domain", "security"]);
+    expect(DEFAULT_SERVICES).toEqual(["web", "seo", "security"]);
+  });
+  it("une lo que cubre cada producto", () => {
+    expect([...unionServices([{ services: ["web", "seo"] }, { services: ["server", "nada"] }])].sort()).toEqual(["seo", "server", "web"]);
+  });
+});
+
+describe("sugerencias", () => {
+  it("cubren tipos de solución y tecnologías muy variados, sin repetirse", () => {
+    const sol = SOLUTION_SUGGESTIONS.flatMap((g) => g.items);
+    const tec = TECH_SUGGESTIONS.flatMap((g) => g.items);
+    for (const x of ["tienda online (e-commerce)", "marketplace", "plataforma de e-learning", "CRM", "chatbot", "aplicación móvil iOS", "automatización de procesos"]) expect(sol).toContain(x);
+    for (const x of ["WordPress", "Shopify", "Next.js", "Laravel", "Flutter", "Swift (iOS)", "PostgreSQL", "Docker", "n8n", "Moodle", "Stripe"]) expect(tec).toContain(x);
+    expect(new Set(sol).size).toBe(sol.length);
+    expect(new Set(tec).size).toBe(tec.length);
+    expect(tec.length).toBeGreaterThan(80);
   });
 });

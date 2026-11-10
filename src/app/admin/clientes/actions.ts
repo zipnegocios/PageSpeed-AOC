@@ -88,6 +88,23 @@ export async function generateAndEmailPinAction(id: string, _prev: ActionState):
   });
 }
 
+/** Los productos de la bienvenida llegan como JSON en un campo oculto; lo que no sea una lista se rechaza. */
+function parseProducts(raw: FormDataEntryValue | null): Array<{ projectId: string; solutions: string[]; techs: string[]; services: string[]; initialImprovement: boolean }> {
+  try {
+    const parsed: unknown = JSON.parse(typeof raw === "string" ? raw : "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((p: Record<string, unknown>) => ({
+      projectId: String(p.projectId ?? ""),
+      solutions: Array.isArray(p.solutions) ? p.solutions.map(String) : [],
+      techs: Array.isArray(p.techs) ? p.techs.map(String) : [],
+      services: Array.isArray(p.services) ? p.services.map(String) : [],
+      initialImprovement: p.initialImprovement === true,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function sendWelcomeAction(clientId: string, _prev: ActionState, fd: FormData): Promise<ActionState> {
   return guarded(async () => {
     const session = await requireClientAccess(clientId);
@@ -95,10 +112,7 @@ export async function sendWelcomeAction(clientId: string, _prev: ActionState, fd
     const result = await sendClientWelcome(
       clientId,
       {
-        projectId: field(fd, "projectId"),
-        kind: field(fd, "kind"),
-        techLabel: field(fd, "techLabel"),
-        includesServer: fd.get("includesServer") === "on",
+        products: parseProducts(fd.get("products")),
         ccText: (fd.get("ccText") as string | null) ?? "",
       },
       test ? { testTo: session.email } : {},

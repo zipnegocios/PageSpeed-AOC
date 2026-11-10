@@ -80,7 +80,7 @@ export type PortalProjectSummary = {
 /** Los proyectos del cliente que no están archivados, en producción o en desarrollo: así puede ver cómo avanza lo que aún se está construyendo. */
 async function visibleProjects(db: Database, clientId: string) {
   return db
-    .select({ id: projects.id, slug: projects.slug, slugAliases: projects.slugAliases, name: projects.name, baseUrl: projects.baseUrl, phase: projects.phase })
+    .select({ id: projects.id, slug: projects.slug, slugAliases: projects.slugAliases, name: projects.name, baseUrl: projects.baseUrl, phase: projects.phase, initialImprovement: projects.initialImprovement })
     .from(projects)
     .where(and(eq(projects.clientId, clientId), isNull(projects.deletedAt)))
     .orderBy(asc(projects.phase), asc(projects.name));
@@ -121,6 +121,8 @@ export type PortalProject = {
   name: string;
   baseUrl: string;
   phase: "development" | "production";
+  /** En mejora inicial: el portal avisa que los valores son el punto de partida. */
+  initialImprovement: boolean;
   latest: LatestScores[];
   /** Lo que está por debajo de la meta; sin datos internos. */
   improvements: Array<Pick<AlertView, "id" | "kind" | "routePath" | "profile" | "summary" | "openedAt">>;
@@ -135,7 +137,7 @@ export type PortalProject = {
 export async function getPortalProject(clientId: string, ref: string, db: Database = getDb()): Promise<PortalProject | null> {
   assertUuid(clientId, "Cliente");
   const found = (await visibleProjects(db, clientId)).find((p) => p.slug === ref || p.slugAliases.includes(ref) || p.id === ref);
-  const project = found ? { id: found.id, slug: found.slug, name: found.name, baseUrl: found.baseUrl, phase: found.phase } : undefined;
+  const project = found ? { id: found.id, slug: found.slug, name: found.name, baseUrl: found.baseUrl, phase: found.phase, initialImprovement: found.initialImprovement } : undefined;
   if (!project) return null;
   const latest = await getLatestScores(project.id, db);
   if (project.phase === "development") {
